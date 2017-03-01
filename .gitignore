@@ -1,0 +1,6 @@
+.idea/
+.vscode/
+node_modules/
+out/*.java
+*.js
+*.map
