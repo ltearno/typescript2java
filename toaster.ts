@@ -25,7 +25,7 @@ export class JavaArtifactToaster {
         let className = exportedNode.node.name.text
         console.log(`${className}`)
 
-        let imports: {[key: string]: any} = {}
+        let resolutionContext = new TypeResolutionContext(className, typeChecker, exportedNodes)
 
         let relative = path.relative(baseDirectory, exportedNode.sourceFile.fileName)
 
@@ -54,7 +54,7 @@ export class JavaArtifactToaster {
             else if (exportedNode.node.kind == ts.SyntaxKind.InterfaceDeclaration || exportedNode.node.kind == ts.SyntaxKind.TypeAliasDeclaration) {
                 content += `@JsType( isNative=true, name="Object", namespace=JsPackage.GLOBAL )\n`
 
-                imports['jsinterop.annotations.JsPackage'] = true
+                resolutionContext.addImport('jsinterop.annotations.JsPackage')
             }
 
             let classChildren = getChildren(exportedNode.node)
@@ -66,7 +66,7 @@ export class JavaArtifactToaster {
             classChildren.filter(c => c.kind == ts.SyntaxKind.HeritageClause)
                 .forEach((clause: ts.HeritageClause) => {
                     let expression = <ts.ExpressionWithTypeArguments>getFirstChild(clause)
-                    heritage = getTypeName(expression, typeChecker, exportedNodes, imports, false)
+                    heritage = getTypeName(expression, false, resolutionContext)
                 })
 
             if (exportedNode.isInterface)
@@ -89,7 +89,7 @@ export class JavaArtifactToaster {
                         let methodDeclaration = <ts.MethodDeclaration|ts.MethodSignature>child
                         let methodName = child.kind == ts.SyntaxKind.Constructor ? className : getPropertyName(methodDeclaration.name)
 
-                        let info = getMethodInformation(methodDeclaration, typeChecker, exportedNodes, imports, className)
+                        let info = getMethodInformation(methodDeclaration, resolutionContext)
 
                         let tp = ''
                         if (info.typeParameters.length > 0) {
@@ -101,7 +101,7 @@ export class JavaArtifactToaster {
                             optional = methodDeclaration.questionToken != null
 
                         if (child.kind == ts.SyntaxKind.Constructor) {
-                            imports['jsinterop.annotations.JsConstructor'] = true
+                            resolutionContext.addImport('jsinterop.annotations.JsConstructor')
                             content += `    @JsConstructor\n    public ${className}(${info.parameters.join()}) {}\n`
                         }
                         else {
@@ -115,10 +115,10 @@ export class JavaArtifactToaster {
                         let propertyDeclaration = <ts.PropertyDeclaration>child
                         let propertyName = getPropertyName(propertyDeclaration.name)
                         let isStatic = getChildren(propertyDeclaration).find(c => c.kind == ts.SyntaxKind.StaticKeyword) != null
-                        let typeName = propertyDeclaration.type ? getTypeName(propertyDeclaration.type, typeChecker, exportedNodes, imports, false) : 'Object'
+                        let typeName = propertyDeclaration.type ? getTypeName(propertyDeclaration.type, false, resolutionContext) : 'Object'
 
                         if (exportedNode.isInterface) {
-                            imports['jsinterop.annotations.JsProperty'] = true
+                            resolutionContext.addImport('jsinterop.annotations.JsProperty')
 
                             content += `    @JsProperty(name="${propertyName}")\n`
                             content += `    ${isStatic ? 'static ' : ''}${typeName} ${propertyName}();\n`
@@ -134,10 +134,10 @@ export class JavaArtifactToaster {
                     case ts.SyntaxKind.PropertySignature: {
                         let signature = <ts.PropertySignature>child
                         let name = getPropertyName(signature.name)
-                        let typeName = signature.type ? getTypeName(signature.type, typeChecker, exportedNodes, imports, false) : 'Object'
+                        let typeName = signature.type ? getTypeName(signature.type, false, resolutionContext) : 'Object'
 
                         if (exportedNode.isInterface) {
-                            imports['jsinterop.annotations.JsProperty'] = true
+                            resolutionContext.addImport('jsinterop.annotations.JsProperty')
 
                             content += `    public${signature.questionToken ? ' /* optional */' : ''} ${typeName} ${name};\n`
 
@@ -171,7 +171,7 @@ export class JavaArtifactToaster {
             + `\n`
             + `import jsinterop.annotations.JsType;\n`
 
-        for (let i in imports) {
+        for (let i in resolutionContext.imports) {
             let ip = i.substr(0, i.lastIndexOf('.'))
             if (ip != exportedNode.package)
                 prepend += `import ${i};\n`
@@ -187,7 +187,7 @@ export class JavaArtifactToaster {
 }
 
 
-function getMethodInformation(method: ts.MethodDeclaration|ts.MethodSignature|ts.ConstructorDeclaration, typeChecker: ts.TypeChecker, exportedNodes: ExportedNodeInformation[], imports: {[key: string]: any}, containerName: string) {
+function getMethodInformation(method: ts.MethodDeclaration|ts.MethodSignature|ts.ConstructorDeclaration, context: TypeResolutionContext) {
     let info = {
         returnType: 'void',
         name: null,
@@ -222,10 +222,10 @@ function getMethodInformation(method: ts.MethodDeclaration|ts.MethodSignature|ts
                 // child 1 : type
                 let paramChilds = getChildren(child)
                 if (paramChilds.length == 2) {
-                    info.parameters.push(`${getTypeName(paramChilds[1], typeChecker, exportedNodes, imports, false)} ${(<ts.Identifier>paramChilds[0]).text}`)
+                    info.parameters.push(`${getTypeName(paramChilds[1], false, context)} ${(<ts.Identifier>paramChilds[0]).text}`)
                 }
                 else if (paramChilds.length == 3) {
-                    info.parameters.push(`${getTypeName(paramChilds[2], typeChecker, exportedNodes, imports, false)} /* optional */ ${(<ts.Identifier>paramChilds[0]).text}`)
+                    info.parameters.push(`${getTypeName(paramChilds[2], false, context)} /* optional */ ${(<ts.Identifier>paramChilds[0]).text}`)
                 }
                 break
             }
@@ -242,11 +242,11 @@ function getMethodInformation(method: ts.MethodDeclaration|ts.MethodSignature|ts
             case ts.SyntaxKind.TypeLiteral:
             case ts.SyntaxKind.FunctionType:
             case ts.SyntaxKind.ParenthesizedType:
-                info.returnType = getTypeName(child, typeChecker, exportedNodes, imports, false)
+                info.returnType = getTypeName(child, false, context)
                 break
 
             case ts.SyntaxKind.ThisType:
-                info.returnType = containerName
+                info.returnType = context.containerName
                 break
 
             default:
@@ -278,10 +278,32 @@ function getEntityName(entity: ts.EntityName) {
     }
 }
 
-function getTypeName(type: ts.Node, typeChecker: ts.TypeChecker, exportedNodes: ExportedNodeInformation[], imports: {[key: string]: any} = {}, needBoxedType: boolean): string {
+class TypeResolutionContext {
+    public imports: {[key: string]: any}
+
+    constructor(public containerName: string,
+                public typeChecker: ts.TypeChecker,
+                public knownNodes: ExportedNodeInformation[]) {
+        this.imports = {}
+    }
+
+    addImport(name: string) {
+        this.imports[name] = true
+    }
+
+    findSymbol(symbol: ts.Symbol) {
+        if (this.knownNodes)
+            return this.knownNodes.find(n => n.symbol == symbol)
+        return null
+    }
+}
+
+const DefaultTypeResultionContext = new TypeResolutionContext(null, null, [])
+
+function getTypeName(type: ts.Node, needBoxedType: boolean, context: TypeResolutionContext = DefaultTypeResultionContext): string {
     switch (type.kind) {
         case ts.SyntaxKind.ParenthesizedType:
-            return getTypeName((<ts.ParenthesizedTypeNode>type).type, typeChecker, exportedNodes, imports, needBoxedType)
+            return getTypeName((<ts.ParenthesizedTypeNode>type).type, needBoxedType, context)
 
         case ts.SyntaxKind.TypeLiteral: {
             let typeLiteral = <ts.TypeLiteralNode>type
@@ -293,10 +315,9 @@ function getTypeName(type: ts.Node, typeChecker: ts.TypeChecker, exportedNodes: 
                 let valueType = indexSignature.type
 
                 let nameToImport = `fr.lteconsulting.angular2gwt.client.JsTypedObject`
-                if (!(nameToImport in imports))
-                    imports[nameToImport] = true
+                context.addImport(nameToImport)
 
-                return `JsTypedObject<${getTypeName(keyType, typeChecker, exportedNodes, imports, true)},${getTypeName(valueType, typeChecker, exportedNodes, imports, true)}>`
+                return `JsTypedObject<${getTypeName(keyType, true, context)},${getTypeName(valueType, true, context)}>`
             }
 
             debugNode(type, `not implemented TypeLiteral`)
@@ -305,17 +326,16 @@ function getTypeName(type: ts.Node, typeChecker: ts.TypeChecker, exportedNodes: 
 
         case ts.SyntaxKind.TypeReference: {
             let typeReference = <ts.TypeReferenceNode>type
-            let refType = typeChecker ? typeChecker.getTypeFromTypeNode(typeReference) : null
+            let refType = context.typeChecker ? context.typeChecker.getTypeFromTypeNode(typeReference) : null
             let prefix = ''
-            if (exportedNodes && refType && refType.symbol) {
-                let referencedExportedNode = exportedNodes.find(n => n.symbol == refType.symbol)
+            if (refType && refType.symbol) {
+                let referencedExportedNode = context.findSymbol(refType.symbol)
                 if (referencedExportedNode) {
                     if (referencedExportedNode.isEnum)
                         return `/* ${referencedExportedNode.package}.${referencedExportedNode.name} */ int`
 
                     let nameToImport = `${referencedExportedNode.package}.${referencedExportedNode.name}`
-                    if (!(nameToImport in imports))
-                        imports[nameToImport] = true
+                    context.addImport(nameToImport)
                 }
             }
             else {
@@ -324,7 +344,7 @@ function getTypeName(type: ts.Node, typeChecker: ts.TypeChecker, exportedNodes: 
             }
 
             if (typeReference.typeArguments)
-                return prefix + getEntityName(typeReference.typeName) + `<${typeReference.typeArguments.map(t => getTypeName(t, typeChecker, exportedNodes, imports, true)).join()}>`
+                return prefix + getEntityName(typeReference.typeName) + `<${typeReference.typeArguments.map(t => getTypeName(t, true, context)).join()}>`
             else
                 return prefix + getEntityName(typeReference.typeName)
         }
@@ -342,27 +362,27 @@ function getTypeName(type: ts.Node, typeChecker: ts.TypeChecker, exportedNodes: 
         case ts.SyntaxKind.UnionType :
             return "Object /* UnionType */"
         case ts.SyntaxKind.ArrayType : {
-            imports['fr.lteconsulting.angular2gwt.client.JsArray'] = true
+            context.addImport('fr.lteconsulting.angular2gwt.client.JsArray')
             let typeChildren = getChildren(type)
             if (typeChildren && typeChildren.length > 0) {
-                return `JsArray<${getTypeName(typeChildren[0], typeChecker, exportedNodes, imports, true)}>`
+                return `JsArray<${getTypeName(typeChildren[0], true, context)}>`
             }
             return 'JsArray<Object>'
         }
         case ts.SyntaxKind.ExpressionWithTypeArguments: {
             let expression = <ts.ExpressionWithTypeArguments>type
             if (expression.typeArguments && expression.typeArguments.length > 0)
-                return (<ts.Identifier>getFirstChild(type)).text + `<${expression.typeArguments.map(a => getTypeName(a, typeChecker, exportedNodes, imports, true)).join()}>`
+                return (<ts.Identifier>getFirstChild(type)).text + `<${expression.typeArguments.map(a => getTypeName(a, true, context)).join()}>`
             else
                 return (<ts.Identifier>getFirstChild(type)).text
         }
         case ts.SyntaxKind.TupleType: {
-            imports['fr.lteconsulting.angular2gwt.client.JsArray'] = true
+            context.addImport('fr.lteconsulting.angular2gwt.client.JsArray')
             let child = getChildren(type)
-            if (getTypeName(child[0], typeChecker, exportedNodes, imports, needBoxedType) == getTypeName(child[1], typeChecker, exportedNodes, imports, needBoxedType))
-                return `JsArray<${getTypeName(child[0], typeChecker, exportedNodes, imports, true)}> /* Tuple [${getTypeName(child[0], typeChecker, exportedNodes, imports, needBoxedType)}, ${getTypeName(child[1], typeChecker, exportedNodes, imports, needBoxedType)}] */`
+            if (getTypeName(child[0], needBoxedType, context) == getTypeName(child[1], needBoxedType, context))
+                return `JsArray<${getTypeName(child[0], true, context)}> /* Tuple [${getTypeName(child[0], needBoxedType, context)}, ${getTypeName(child[1], needBoxedType, context)}] */`
             else
-                return `JsArray<Object> /* Tuple [${getTypeName(child[0], typeChecker, exportedNodes, imports, needBoxedType)}, ${getTypeName(child[1], typeChecker, exportedNodes, imports, needBoxedType)}] */`
+                return `JsArray<Object> /* Tuple [${getTypeName(child[0], needBoxedType, context)}, ${getTypeName(child[1], needBoxedType, context)}] */`
         }
 
         case ts.SyntaxKind.FunctionType: {
@@ -373,9 +393,9 @@ function getTypeName(type: ts.Node, typeChecker: ts.TypeChecker, exportedNodes: 
 
             let javaClassName = `JsFunction${parameters.length > 0 ? parameters.length : ''}`
 
-            imports['fr.lteconsulting.angular2gwt.client.' + javaClassName] = true
+            context.addImport('fr.lteconsulting.angular2gwt.client.' + javaClassName)
 
-            return `${javaClassName}<${parameters.map((p: ts.ParameterDeclaration) => getTypeName(p.type, typeChecker, exportedNodes, imports, true) + ',').join('')}${getTypeName(returnType, typeChecker, exportedNodes, imports, true)}>`
+            return `${javaClassName}<${parameters.map((p: ts.ParameterDeclaration) => getTypeName(p.type, true, context) + ',').join('')}${getTypeName(returnType, true, context)}>`
         }
     }
 
@@ -432,7 +452,7 @@ export function debugNode(node: ts.Node, space: string) {
         case ts.SyntaxKind.PropertyDeclaration:
             let propertyDeclaration = <ts.PropertyDeclaration>node
 
-            text = `PROPERTY ${propertyDeclaration.type && getTypeName(propertyDeclaration.type, null, null, undefined, false)} ${propertyDeclaration.name.toString()}`
+            text = `PROPERTY ${propertyDeclaration.type && getTypeName(propertyDeclaration.type, false)} ${propertyDeclaration.name.toString()}`
             break
 
         case ts.SyntaxKind.UnionType:
