@@ -4,6 +4,14 @@
     "target": "es6",
     "noImplicitAny": false,
     "sourceMap": true,
-    "moduleResolution": "node"
-  }
+    "moduleResolution": "node",
+    "typeRoots": [
+      "typings/index.d.ts"
+    ]
+  },
+  "exclude": [
+    "node_modules",
+    "tests.full",
+    "tests"
+  ]
 }
