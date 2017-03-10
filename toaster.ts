@@ -1,7 +1,6 @@
 import * as ts from "typescript"
 import * as path from "path"
 import * as fs from "fs"
-import {AnimationEntryAst} from "./tests/@angular/compiler/src/animation/animation_ast";
 
 export interface ExportedNodeInformation {
     node: ts.InterfaceDeclaration|ts.ClassDeclaration|ts.EnumDeclaration|ts.TypeAliasDeclaration;
@@ -12,95 +11,96 @@ export interface ExportedNodeInformation {
     type: ts.Type;
     isEnum: boolean;
     isInterface: boolean;
+    isAbstract: boolean;
 }
 
 export class JavaArtifactToaster {
-    exportArtifact(exportedNode: ExportedNodeInformation, baseDirectory: string, typeChecker: ts.TypeChecker, exportedNodes: ExportedNodeInformation[]) {
-        let className = exportedNode.node.name.text
-        console.log(`${className}`)
-
-        let resolutionContext = new TypeResolutionContext(className, typeChecker, exportedNodes)
-
-        let relative = path.relative(baseDirectory, exportedNode.sourceFile.fileName)
+    private generateEnum(source: ExportedNodeInformation,
+                         typeChecker: ts.TypeChecker,
+                         exportedNodes: ExportedNodeInformation[],
+                         baseDirectory: string) {
+        console.log(`generate enum ${source.node.name.text}`)
 
         let content = ''
-        content += `\n`
-        content += `/**\n`
-        content += `  * Generated from ${relative}\n`
-        content += `  * Package ${exportedNode.package}\n`
-        content += `  * Name ${exportedNode.symbol.getName()}\n`
-        content += `  * ${exportedNode.symbol.getDocumentationComment().map(sdp => sdp.text).join().replace(new RegExp('\n', 'g'), '\n  * ')}\n`
-        content += `  **/\n`
+        content += this.generateHeader(source, baseDirectory)
 
-        if (exportedNode.node.kind == ts.SyntaxKind.EnumDeclaration) {
-            content += `public interface ${className} {\n`
+        content += `public interface ${source.node.name.text} {\n`
 
-            let members = getChildren(exportedNode.node).filter(c => c.kind == ts.SyntaxKind.EnumMember)
-            members.forEach(member => {
-                let child = getChildren(member)
-                if (child.length == 2 && child[0].kind == ts.SyntaxKind.Identifier && child[1].kind == ts.SyntaxKind.FirstLiteralToken)
-                    content += `    final int ${(<ts.Identifier>child[0]).text} = ${(<ts.LiteralExpression>child[1]).text};\n`
+        let members = getChildren(source.node).filter(c => c.kind == ts.SyntaxKind.EnumMember)
+        members.forEach(member => {
+            let child = getChildren(member)
+            if (child.length == 2 && child[0].kind == ts.SyntaxKind.Identifier && child[1].kind == ts.SyntaxKind.FirstLiteralToken)
+                content += `    final int ${(<ts.Identifier>child[0]).text} = ${(<ts.LiteralExpression>child[1]).text};\n`
+        })
+
+        content += `}\n`
+
+        this.writeArtifact('fr.lteconsulting.angular2gwt.client.interop.' + source.package, source.node.name.text, content, null)
+
+        return content
+    }
+
+    private generateJavaArtifact(artifactType: string,
+                                 artifactPackageName: string,
+                                 artifactName: string,
+                                 jsPackageName: string,
+                                 jsName: string,
+                                 source: ExportedNodeInformation,
+                                 typeChecker: ts.TypeChecker,
+                                 exportedNodes: ExportedNodeInformation[],
+                                 baseDirectory: string) {
+        console.log(`generate java ${artifactType} ${artifactName}`)
+
+        let resolutionContext = new TypeResolutionContext(artifactName, typeChecker, exportedNodes)
+
+        let content = ''
+        content += this.generateHeader(source, baseDirectory)
+
+        content += `@JsType( isNative=true, namespace="${jsPackageName}", name="${jsName}" )\n`
+
+        let classChildren = getChildren(source.node)
+        let typeParameters = classChildren.filter(c => c.kind == ts.SyntaxKind.TypeParameter)
+            .map(c => getChildren(c)[0])
+            .map(i => (<ts.Identifier>i).text)
+
+        let heritage = null
+        classChildren
+            .filter(c => c.kind == ts.SyntaxKind.HeritageClause)
+            .forEach((clause: ts.HeritageClause) => {
+                let expression = <ts.ExpressionWithTypeArguments>getFirstChild(clause)
+                heritage = getTypeName(expression, false, resolutionContext)
             })
-        } else {
-            if (exportedNode.node.kind == ts.SyntaxKind.ClassDeclaration) {
-                content += `@JsType( isNative=true, namespace="${exportedNode.package}" )\n`
-            }
-            else if (exportedNode.node.kind == ts.SyntaxKind.InterfaceDeclaration || exportedNode.node.kind == ts.SyntaxKind.TypeAliasDeclaration) {
-                content += `@JsType( isNative=true, name="Object", namespace=JsPackage.GLOBAL )\n`
 
-                resolutionContext.addImport('jsinterop.annotations.JsPackage')
-            }
+        content += `public ${artifactType} ${artifactName}${typeParameters.length > 0 ? `<${typeParameters.join()}>` : ''} ${heritage ? ('extends ' + heritage) : ''} {\n`
 
-            let classChildren = getChildren(exportedNode.node)
-            let typeParameters = classChildren.filter(c => c.kind == ts.SyntaxKind.TypeParameter)
-                .map(c => getChildren(c)[0])
-                .map(i => (<ts.Identifier>i).text)
-
-            let heritage = null
-            classChildren.filter(c => c.kind == ts.SyntaxKind.HeritageClause)
-                .forEach((clause: ts.HeritageClause) => {
-                    let expression = <ts.ExpressionWithTypeArguments>getFirstChild(clause)
-                    heritage = getTypeName(expression, false, resolutionContext)
-                })
-
-            if (exportedNode.isInterface)
-                content += `public interface ${className}${typeParameters.length > 0 ? `<${typeParameters.join()}>` : ''} ${heritage ? ('extends ' + heritage) : ''} {\n`
-            else
-                content += `public class ${className}${typeParameters.length > 0 ? `<${typeParameters.join()}>` : ''} ${heritage ? ('extends ' + heritage) : ''} {\n`
-
-            ts.forEachChild(exportedNode.node, (child: ts.Node) => {
-                //let internalSymbol = typeChecker.getSymbolAtLocation(child)
-                //if (internalSymbol && internalSymbol.getDocumentationComment() && internalSymbol.getDocumentationComment().length > 0) {
-                //    content += `    /**\n`
-                //    content += `      * ${internalSymbol.getDocumentationComment().map(sdp => sdp.text).join().replace(new RegExp('\n', 'g'), '\n      * ')}\n`
-                //    content += `      */\n`
-                //}
-
+        ///
+        ts.forEachChild(source.node, (child: ts.Node) => {
                 switch (child.kind) {
                     case ts.SyntaxKind.Constructor:
                     case ts.SyntaxKind.MethodDeclaration:
                     case ts.SyntaxKind.MethodSignature: {
                         let methodDeclaration = <ts.MethodDeclaration|ts.MethodSignature>child
-                        let methodName = child.kind == ts.SyntaxKind.Constructor ? className : getPropertyName(methodDeclaration.name)
+                        let methodName = child.kind == ts.SyntaxKind.Constructor ? artifactName : getPropertyName(methodDeclaration.name)
 
                         let info = getMethodInformation(methodDeclaration, resolutionContext)
 
-                        let tp = ''
-                        if (info.typeParameters.length > 0) {
-                            tp = `<${info.typeParameters.join()}>`
-                        }
+                        if (artifactType != 'interface' || !info.isStatic) {
+                            let tp = ''
+                            if (info.typeParameters.length > 0)
+                                tp = `<${info.typeParameters.join()}>`
 
-                        let optional = false
-                        if (methodDeclaration.kind == ts.SyntaxKind.MethodSignature)
-                            optional = methodDeclaration.questionToken != null
+                            let optional = false
+                            if (methodDeclaration.kind == ts.SyntaxKind.MethodSignature)
+                                optional = methodDeclaration.questionToken != null
 
-                        if (child.kind == ts.SyntaxKind.Constructor) {
-                            resolutionContext.addImport('jsinterop.annotations.JsConstructor')
-                            content += `    @JsConstructor\n    public ${className}(${info.parameters.join()}) {}\n`
-                        }
-                        else {
-                            let methodPrefix = exportedNode.isInterface ? '' : `public${info.isStatic ? ' static' : ''} native `
-                            content += `    ${methodPrefix}${tp}${optional ? ' /* optional */' : ''} ${info.returnType} ${methodName}(${info.parameters.join()});\n`
+                            if (child.kind == ts.SyntaxKind.Constructor) {
+                                resolutionContext.addImport('jsinterop.annotations.JsConstructor')
+                                content += `    @JsConstructor\n    public ${artifactName}(${info.parameters.join()}) {}\n`
+                            }
+                            else {
+                                let methodPrefix = artifactType == 'interface' ? '' : `public${info.isStatic ? ' static' : ''} native `
+                                content += `    ${methodPrefix}${tp}${optional ? ' /* optional */' : ''} ${info.returnType} ${methodName}(${info.parameters.join()});\n`
+                            }
                         }
                         break
                     }
@@ -111,72 +111,114 @@ export class JavaArtifactToaster {
                         let isStatic = getChildren(propertyDeclaration).find(c => c.kind == ts.SyntaxKind.StaticKeyword) != null
                         let typeName = propertyDeclaration.type ? getTypeName(propertyDeclaration.type, false, resolutionContext) : 'Object'
 
-                        if (exportedNode.isInterface) {
+                        if (artifactType != 'interface' || !isStatic) {
                             resolutionContext.addImport('jsinterop.annotations.JsProperty')
 
+                            let upcaseName = propertyName.slice(0, 1).toUpperCase() + propertyName.slice(1)
+
                             content += `    @JsProperty(name="${propertyName}")\n`
-                            content += `    ${isStatic ? 'static ' : ''}${typeName} ${propertyName}();\n`
+                            content += `    ${isStatic ? 'static ' : ''}${typeName} get${upcaseName}();\n`
                             content += `    @JsProperty(name="${propertyName}")\n`
-                            content += `    ${isStatic ? 'static ' : ''}void ${propertyName}(${typeName} value);\n`
-                        }
-                        else {
-                            content += `    public${isStatic ? ' static' : ''} ${typeName} ${propertyName};\n`
+                            content += `    ${isStatic ? 'static ' : ''}void set${upcaseName}(${typeName} value);\n`
                         }
                         break
                     }
 
-                    case ts.SyntaxKind.PropertySignature: {
+                    case ts.SyntaxKind.PropertySignature : {
                         let signature = <ts.PropertySignature>child
                         let name = getPropertyName(signature.name)
                         let typeName = signature.type ? getTypeName(signature.type, false, resolutionContext) : 'Object'
 
-                        if (exportedNode.isInterface) {
-                            resolutionContext.addImport('jsinterop.annotations.JsProperty')
+                        resolutionContext.addImport('jsinterop.annotations.JsProperty')
 
-                            content += `    public${signature.questionToken ? ' /* optional */' : ''} ${typeName} ${name};\n`
+                        if (signature.questionToken)
+                            content += `    /* optional property ${name}*/`
 
-                            content += `    @JsProperty(name="${name}")\n`
-                            content += `    ${typeName} ${name}();\n`
-                            content += `    @JsProperty(name="${name}")\n`
-                            content += `    void ${name}(${typeName} value);\n`
-                        } else {
-                            content += `    public${signature.questionToken ? ' /* optional */' : ''} ${typeName} ${name};\n`
-                        }
+                        content += `    @JsProperty(name="${name}")\n`
+                        content += `    ${typeName} ${name}();\n`
+                        content += `    @JsProperty(name="${name}")\n`
+                        content += `    void ${name}(${typeName} value);\n`
                         break
                     }
 
-                    case ts.SyntaxKind.ExportKeyword:
-                    case ts.SyntaxKind.DeclareKeyword:
-                    case ts.SyntaxKind.Identifier:
-                    case ts.SyntaxKind.HeritageClause:
-                    case ts.SyntaxKind.AbstractKeyword:
+                    case ts.SyntaxKind.ExportKeyword :
+                    case ts.SyntaxKind.DeclareKeyword :
+                    case ts.SyntaxKind.Identifier :
+                    case ts.SyntaxKind.HeritageClause :
+                    case ts.SyntaxKind.AbstractKeyword :
                     case ts.SyntaxKind.TypeParameter:
                         break
 
                     default:
                         content += `    // ignored ${ts.SyntaxKind[child.kind]}\n`
                 }
-            });
-        }
+            }
+        );
+        ///
 
-        content += `}\n`
+        content
+            += `}\n`
 
-        let prepend = `package fr.lteconsulting.angular2gwt.client.interop.${exportedNode.package};\n`
+        this
+            .writeArtifact(artifactPackageName, artifactName, content, resolutionContext)
+    }
+
+    private generateHeader(source: ExportedNodeInformation, baseDirectory) {
+        let relativePath = path.relative(baseDirectory, source.sourceFile.fileName)
+        let content = ''
+        content += `\n`
+        content += `/**\n`
+        content += `  * Generated from ${relativePath}\n`
+        content += `  * Package ${source.package}\n`
+        content += `  * Name ${source.symbol.getName()}\n`
+        content += `  * ${source.symbol.getDocumentationComment().map(sdp => sdp.text).join().replace(new RegExp('\n', 'g'), '\n  * ')}\n`
+        content += `  **/\n`
+        return content
+    }
+
+    private writeArtifact(artifactPackageName: string, artifactName: string, content: string, resolutionContext: TypeResolutionContext) {
+        let prepend = `package ${artifactPackageName};\n`
             + `\n`
             + `import jsinterop.annotations.JsType;\n`
 
-        for (let i in resolutionContext.imports) {
-            let ip = i.substr(0, i.lastIndexOf('.'))
-            if (ip != exportedNode.package)
-                prepend += `import ${i};\n`
+        if (resolutionContext) {
+            for (let i in resolutionContext.imports) {
+                let ip = i.substr(0, i.lastIndexOf('.'))
+                if (ip != artifactPackageName)
+                    prepend += `import ${i};\n`
+            }
         }
 
-        content = prepend + content
+        mkdirRec(path.join('out', artifactPackageName.replace(new RegExp('\\.', 'g'), '/')))
 
-        mkdirRec(path.join('out', exportedNode.package.replace(new RegExp('\\.', 'g'), '/')))
+        let fileName = path.join('out', artifactPackageName.replace(new RegExp('\\.', 'g'), '/'), `${artifactName}.java`)
+        fs.writeFileSync(fileName, prepend + content, 'utf8')
+    }
 
-        let fileName = path.join('out', exportedNode.package.replace(new RegExp('\\.', 'g'), '/'), `${className}.java`)
-        fs.writeFileSync(fileName, content, 'utf8')
+    exportArtifact(exportedNode: ExportedNodeInformation, baseDirectory: string, typeChecker: ts.TypeChecker, exportedNodes: ExportedNodeInformation[]) {
+        let className = exportedNode.node.name.text
+        console.log(`${className}`)
+
+        switch (exportedNode.node.kind) {
+            case ts.SyntaxKind.EnumDeclaration:
+                this.generateEnum(exportedNode, typeChecker, exportedNodes, baseDirectory)
+                break
+
+            case ts.SyntaxKind.ClassDeclaration:
+                // generate class(package,name+'Impl') + interface(Global,Object)
+                this.generateJavaArtifact('interface', 'fr.lteconsulting.angular2gwt.client.interop.' + exportedNode.package, className, 'jsinterop.annotations.JsPackage.GLOBAL', 'Object', exportedNode, typeChecker, exportedNodes, baseDirectory)
+                this.generateJavaArtifact(exportedNode.isAbstract ? 'abstract class' : 'class', 'fr.lteconsulting.angular2gwt.client.interop.' + exportedNode.package, className + 'Impl', exportedNode.package, className, exportedNode, typeChecker, exportedNodes, baseDirectory) // TODO : implement the previous interface
+                break
+
+            case ts.SyntaxKind.InterfaceDeclaration:
+                // generate interface(Global,Object)
+                this.generateJavaArtifact('interface', 'fr.lteconsulting.angular2gwt.client.interop.' + exportedNode.package, className, 'jsinterop.annotations.JsPackage.GLOBAL', 'Object', exportedNode, typeChecker, exportedNodes, baseDirectory)
+                break
+
+            case ts.SyntaxKind.TypeAliasDeclaration:
+                // TODO
+                break
+        }
     }
 }
 

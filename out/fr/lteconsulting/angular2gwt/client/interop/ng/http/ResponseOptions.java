@@ -1,0 +1,60 @@
+package fr.lteconsulting.angular2gwt.client.interop.ng.http;
+
+import jsinterop.annotations.JsType;
+import jsinterop.annotations.JsProperty;
+import ng.http.Headers;
+import ng.http.ResponseOptionsArgs;
+import jsinterop.annotations.JsConstructor;
+import ng.http.ResponseOptions;
+
+/**
+  * Generated from tests\@angular\http\src\base_response_options.d.ts
+  * Package ng.http
+  * Name ResponseOptions
+  * Creates a response options object to be optionally provided when instantiating a
+  * {@link Response}.
+  * 
+  * This class is based on the `ResponseInit` description in the [Fetch
+  * Spec](https://fetch.spec.whatwg.org/#responseinit).
+  * 
+  * All values are null by default. Typical defaults can be found in the
+  * {@link BaseResponseOptions} class, which sub-classes `ResponseOptions`.
+  * 
+  * This class may be used in tests to build {@link Response Responses} for
+  * mock responses (see {@link MockBackend}).
+  * 
+  * ### Example ([live demo](http://plnkr.co/edit/P9Jkk8e8cz6NVzbcxEsD?p=preview))
+  * 
+  * ```typescript
+  * import {ResponseOptions, Response} from '@angular/http';
+  * 
+  * var options = new ResponseOptions({
+  *    body: '{"name":"Jeff"}'
+  * });
+  * var res = new Response(options);
+  * 
+  * console.log('res.json():', res.json()); // Object {name: "Jeff"}
+  * ```
+  **/
+@JsType( isNative=true, namespace="jsinterop.annotations.JsPackage.GLOBAL", name="Object" )
+public interface ResponseOptions  {
+    @JsProperty(name="body")
+    Object /* UnionType */ getBody();
+    @JsProperty(name="body")
+    void setBody(Object /* UnionType */ value);
+    @JsProperty(name="status")
+    int getStatus();
+    @JsProperty(name="status")
+    void setStatus(int value);
+    @JsProperty(name="headers")
+    Headers getHeaders();
+    @JsProperty(name="headers")
+    void setHeaders(Headers value);
+    @JsProperty(name="url")
+    String getUrl();
+    @JsProperty(name="url")
+    void setUrl(String value);
+    @JsConstructor
+    public ResponseOptions(ResponseOptionsArgs /* optional */ undefined) {}
+     ResponseOptions merge(ResponseOptionsArgs /* optional */ options);
+}

@@ -1,0 +1,53 @@
+package fr.lteconsulting.angular2gwt.client.interop.ng.router;
+
+import jsinterop.annotations.JsType;
+import jsinterop.annotations.JsProperty;
+import ng.router.RouterStateSnapshot;
+import ng.core.Injector;
+import jsinterop.annotations.JsConstructor;
+import ng.router.RouterOutletMap;
+import rxjs.Observable;
+import ng.router.TreeNode;
+import ng.router.ActivatedRouteSnapshot;
+import fr.lteconsulting.angular2gwt.client.JsArray;
+
+/**
+  * Generated from tests\@angular\router\src\router.d.ts
+  * Package ng.router
+  * Name PreActivation
+  * 
+  **/
+@JsType( isNative=true, namespace="jsinterop.annotations.JsPackage.GLOBAL", name="Object" )
+public interface PreActivation  {
+    @JsProperty(name="future")
+    Object getFuture();
+    @JsProperty(name="future")
+    void setFuture(Object value);
+    @JsProperty(name="curr")
+    Object getCurr();
+    @JsProperty(name="curr")
+    void setCurr(Object value);
+    @JsProperty(name="injector")
+    Object getInjector();
+    @JsProperty(name="injector")
+    void setInjector(Object value);
+    @JsProperty(name="checks")
+    Object getChecks();
+    @JsProperty(name="checks")
+    void setChecks(Object value);
+    @JsConstructor
+    public PreActivation(RouterStateSnapshot future,RouterStateSnapshot curr,Injector injector) {}
+     void traverse(RouterOutletMap parentOutletMap);
+     Observable<Boolean> checkGuards();
+     Observable<Object> resolveData();
+     void traverseChildRoutes();
+     void traverseRoutes(TreeNode<ActivatedRouteSnapshot> futureNode,TreeNode<ActivatedRouteSnapshot> currNode,RouterOutletMap parentOutletMap,JsArray<ActivatedRouteSnapshot> futurePath);
+     void deactiveRouteAndItsChildren();
+     void runCanActivate();
+     void runCanActivateChild();
+     void extractCanActivateChild();
+     void runCanDeactivate();
+     void runResolve();
+     void resolveNode();
+     void getToken();
+}

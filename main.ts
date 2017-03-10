@@ -118,7 +118,8 @@ let addExportableNodes = (sourceFile: ts.SourceFile, exportedNodes: toaster.Expo
 
                         package: getJavaPackageFromSourceFile(sourceFile),
                         isEnum: node.kind == ts.SyntaxKind.EnumDeclaration,
-                        isInterface: node.kind == ts.SyntaxKind.ClassDeclaration && toaster.getChildren(node).find(c => c.kind == ts.SyntaxKind.AbstractKeyword)
+                        isInterface: node.kind == ts.SyntaxKind.InterfaceDeclaration,
+                        isAbstract: (toaster.getChildren(node).find(c => c.kind == ts.SyntaxKind.AbstractKeyword)) != null
                     })
                     break;
 
