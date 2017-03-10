@@ -82,11 +82,9 @@ allDiagnostics.forEach(diagnostic => {
     }
 });
 
-//let exitCode = emitResult.emitSkipped ? 1 : 0;
-//console.log(`Process exiting with code '${exitCode}'.`);
-//process.exit(exitCode);
-
-//program.getTypeChecker().getTypeFromTypeNode()
+if (emitResult.emitSkipped) {
+    console.log(`emit has been skipped, exit.`);
+}
 
 let getJavaPackageFromSourceFile = (sourceFile: ts.SourceFile) => {
     let relative = path.relative(program.getCurrentDirectory(), sourceFile.fileName)
@@ -100,16 +98,16 @@ let getJavaPackageFromSourceFile = (sourceFile: ts.SourceFile) => {
 
 let addExportableNodes = (sourceFile: ts.SourceFile, exportedNodes: toaster.ExportedNodeInformation[]): void => {
     ts.forEachChild(sourceFile, (node) => {
-        switch (node.kind) {
-            case ts.SyntaxKind.InterfaceDeclaration:
-            case ts.SyntaxKind.ClassDeclaration:
-            case ts.SyntaxKind.EnumDeclaration:
-            case ts.SyntaxKind.TypeAliasDeclaration:
-                if (node.modifiers && node.modifiers.filter(e => e.kind == ts.SyntaxKind.ExportKeyword).length > 0) {
+        if (node.modifiers && node.modifiers.filter(e => e.kind == ts.SyntaxKind.ExportKeyword).length > 0) {
+            switch (node.kind) {
+                case ts.SyntaxKind.InterfaceDeclaration:
+                case ts.SyntaxKind.ClassDeclaration:
+                case ts.SyntaxKind.EnumDeclaration:
+                case ts.SyntaxKind.TypeAliasDeclaration:
                     let declaration = <ts.EnumDeclaration|ts.InterfaceDeclaration|ts.ClassDeclaration|ts.TypeAliasDeclaration>node
 
                     // TODO seulement c'est si c'est un alias vers un type non nommé à ce moment il devient l'alias naturel des alias vers ce type
-                    toaster.debugNode(node, ' exported ')
+                    toaster.debugNode(node, ' exported ', false)
 
                     exportedNodes.push({
                         node: declaration,
@@ -121,16 +119,12 @@ let addExportableNodes = (sourceFile: ts.SourceFile, exportedNodes: toaster.Expo
                         package: getJavaPackageFromSourceFile(sourceFile),
                         isEnum: node.kind == ts.SyntaxKind.EnumDeclaration,
                         isInterface: node.kind == ts.SyntaxKind.ClassDeclaration && toaster.getChildren(node).find(c => c.kind == ts.SyntaxKind.AbstractKeyword)
-
-                        // TODO maybe type parameters
-                        // TODO for aliases : target name and type parameters
                     })
-                }
-                break;
+                    break;
 
-            default: {
-                if (sourceFile.fileName.indexOf('shared.d.ts') > 0)
-                    console.log(`NOT EXPORTED ${ts.SyntaxKind[node.kind]}`)
+                default: {
+                    toaster.debugNode(node, ' NOT EXPORTED ', false)
+                }
             }
         }
     })
@@ -140,17 +134,10 @@ let exportedNodes: toaster.ExportedNodeInformation[] = []
 
 console.log(`Adding exportable nodes...`)
 
-//program.getTypeChecker().getAmbientModules().forEach(m => console.log(m.name))
 program.getSourceFiles().forEach(sourceFile => {
-    console.log(`SOURCE FILE ${sourceFile.fileName}, ${sourceFile.languageVariant}, ${sourceFile.languageVersion}`)
+    console.log(`SOURCE FILE ${sourceFile.fileName}, language variant:${sourceFile.languageVariant}, version:${sourceFile.languageVersion}`)
     addExportableNodes(sourceFile, exportedNodes)
 })
-
-/*files.map(file => program.getSourceFile(file))
- .forEach(sf => {
- console.log(`SOURCE FILE ${sf.fileName}, ${sf.languageVariant}, ${sf.languageVersion}`)
- addExportableNodes(sf, exportedNodes)
- })*/
 
 console.log(`Exporting nodes...`)
 
@@ -159,3 +146,4 @@ exportedNodes.forEach((info: toaster.ExportedNodeInformation) => {
     t.exportArtifact(info, program.getCurrentDirectory(), program.getTypeChecker(), exportedNodes)
 })
 
+console.log(`Finished.`)

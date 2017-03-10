@@ -14,12 +14,6 @@ export interface ExportedNodeInformation {
     isInterface: boolean;
 }
 
-export enum JavaArtifactKind{
-    JavaClass,
-    JavaInterface,
-    JavaEnum
-}
-
 export class JavaArtifactToaster {
     exportArtifact(exportedNode: ExportedNodeInformation, baseDirectory: string, typeChecker: ts.TypeChecker, exportedNodes: ExportedNodeInformation[]) {
         let className = exportedNode.node.name.text
@@ -340,7 +334,7 @@ function getTypeName(type: ts.Node, needBoxedType: boolean, context: TypeResolut
             }
             else {
                 prefix = `/* NO SYMBOL */`
-                debugNode(typeReference, "==[ NOT FOUND SYMBOL ON TYPE REFERENCE ]==")
+                debugNode(typeReference, `==[ NOT FOUND SYMBOL ON TYPE REFERENCE ${getEntityName(typeReference.typeName)} ]==`)
             }
 
             if (typeReference.typeArguments)
@@ -418,8 +412,8 @@ function getPropertyName(name: ts.PropertyName) {
     }
 }
 
-export function debugNode(node: ts.Node, space: string) {
-    let text = '*'
+export function debugNode(node: ts.Node, space: string, rec: boolean = true) {
+    let text = '(unk name)'
 
     switch (node.kind) {
         case ts.SyntaxKind.SourceFile:
@@ -461,9 +455,10 @@ export function debugNode(node: ts.Node, space: string) {
             break
     }
 
-    console.log(`${space}${text} kind ${ts.SyntaxKind[node.kind]}`)
+    console.log(`${space}${text} of kind ${ts.SyntaxKind[node.kind]}`)
 
-    ts.forEachChild(node, child => debugNode(child, ' ' + space));
+    if (rec)
+        ts.forEachChild(node, child => debugNode(child, ' ' + space));
 }
 
 function mkdirRec(p, opts = undefined, made = null) {
