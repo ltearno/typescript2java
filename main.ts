@@ -1,7 +1,8 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as ts from "typescript";
-import * as toaster from "./toaster"
+import {ExportPhase} from './processor.export-phase';
+import {SyncPhase} from "./processor.sync-phase";
 
 /**
  * TODO
@@ -28,19 +29,6 @@ let walkSync = function (dir, filelist = []) {
 };
 
 let files = walkSync("./tests")
-
-let baseJavaPackage = 'fr.lteconsulting.angular2gwt.client.interop'
-let javaPackages = {
-    "tests/@angular/common/": "ng.core",
-    "tests/@angular/compiler/": "ng.core",
-    "tests/@angular/core/": "ng.core",
-    "tests/@angular/forms/": "ng.forms",
-    "tests/@angular/http/": "ng.http",
-    "tests/@angular/platform-browser/": "ng.platformBrowser",
-    "tests/@angular/platform-browser-dynamic/": "ng.platformBrowserDynamic",
-    "tests/@angular/router/": "ng.router",
-    "tests/rxjs": "rxjs"
-}
 
 let compilerOptions: ts.CompilerOptions = {
     baseUrl: './tests',
@@ -86,65 +74,33 @@ if (emitResult.emitSkipped) {
     console.log(`emit has been skipped, exit.`);
 }
 
-let getJavaPackageFromSourceFile = (sourceFile: ts.SourceFile) => {
-    let relative = path.relative(program.getCurrentDirectory(), sourceFile.fileName)
-    for (let pathPrefix in javaPackages) {
-        if (!path.relative(pathPrefix, relative).startsWith('..'))
-            return javaPackages[pathPrefix]
-    }
+console.log(`Adding exportable nodes...`);
 
-    return "ng"
+let baseJavaPackage = 'fr.lteconsulting.angular2gwt.client.interop';
+let javaPackages = {
+    "tests/@angular/common/": "ng.core",
+    "tests/@angular/compiler/": "ng.core",
+    "tests/@angular/core/": "ng.core",
+    "tests/@angular/forms/": "ng.forms",
+    "tests/@angular/http/": "ng.http",
+    "tests/@angular/platform-browser/": "ng.platformBrowser",
+    "tests/@angular/platform-browser-dynamic/": "ng.platformBrowserDynamic",
+    "tests/@angular/router/": "ng.router",
+    "tests/rxjs": "rxjs"
 }
 
-let addExportableNodes = (sourceFile: ts.SourceFile, exportedNodes: toaster.ExportedNodeInformation[]): void => {
-    ts.forEachChild(sourceFile, (node) => {
-        if (node.modifiers && node.modifiers.filter(e => e.kind == ts.SyntaxKind.ExportKeyword).length > 0) {
-            switch (node.kind) {
-                case ts.SyntaxKind.InterfaceDeclaration:
-                case ts.SyntaxKind.ClassDeclaration:
-                case ts.SyntaxKind.EnumDeclaration:
-                case ts.SyntaxKind.TypeAliasDeclaration:
-                    let declaration = <ts.EnumDeclaration|ts.InterfaceDeclaration|ts.ClassDeclaration|ts.TypeAliasDeclaration>node
-
-                    // TODO seulement c'est si c'est un alias vers un type non nommé à ce moment il devient l'alias naturel des alias vers ce type
-                    toaster.debugNode(node, ' exported ', false)
-
-                    exportedNodes.push({
-                        node: declaration,
-                        sourceFile,
-                        name: declaration.name.text,
-                        symbol: program.getTypeChecker().getSymbolAtLocation(declaration.name),
-                        type: program.getTypeChecker().getTypeAtLocation(declaration),
-
-                        package: getJavaPackageFromSourceFile(sourceFile),
-                        isEnum: node.kind == ts.SyntaxKind.EnumDeclaration,
-                        isInterface: node.kind == ts.SyntaxKind.InterfaceDeclaration,
-                        isAbstract: (toaster.getChildren(node).find(c => c.kind == ts.SyntaxKind.AbstractKeyword)) != null
-                    })
-                    break;
-
-                default: {
-                    toaster.debugNode(node, ' NOT EXPORTED ', false)
-                }
-            }
-        }
-    })
-}
-
-let exportedNodes: toaster.ExportedNodeInformation[] = []
-
-console.log(`Adding exportable nodes...`)
+let syncPhase = new SyncPhase(baseJavaPackage, javaPackages);
 
 program.getSourceFiles().forEach(sourceFile => {
-    console.log(`SOURCE FILE ${sourceFile.fileName}, language variant:${sourceFile.languageVariant}, version:${sourceFile.languageVersion}`)
-    addExportableNodes(sourceFile, exportedNodes)
-})
+    console.log(`source ${sourceFile.fileName}`);
+
+    syncPhase.addTypesFromSourceFile(sourceFile, program);
+});
 
 console.log(`Exporting nodes...`)
 
-exportedNodes.forEach((info: toaster.ExportedNodeInformation) => {
-    let t: toaster.JavaArtifactToaster = new toaster.JavaArtifactToaster()
-    t.exportArtifact(info, program.getCurrentDirectory(), program.getTypeChecker(), exportedNodes)
-})
+let exportPhase = new ExportPhase(syncPhase);
+
+exportPhase.exportNodes(program);
 
 console.log(`Finished.`)
