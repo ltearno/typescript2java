@@ -1,6 +1,6 @@
 import {SyncPhase} from './processor.sync-phase';
 import * as ts from 'typescript';
-import {childrenOf} from './tools';
+import {childrenOf, firstChildOf} from './tools';
 
 export interface Options {
     boxedType?: boolean;
@@ -13,9 +13,59 @@ export class TypeHelper {
                 public program: ts.Program) {
     }
 
-    getTypeName(type: ts.Type, options: Options = null): string {
+    getTypeName(typeReferenceNode: ts.Node, options: Options = null): string {
         options = options || {};
 
+        let typeReferenceType = this.program.getTypeChecker().getTypeAtLocation(typeReferenceNode);
+
+        switch (typeReferenceNode.kind) {
+            case ts.SyntaxKind.UnionType :
+                return "Object /* UnionType */";
+
+            case ts.SyntaxKind.IntersectionType:
+                return "Object /* IntersectionType */";
+
+            case ts.SyntaxKind.ParenthesizedType:
+                return this.getTypeName((typeReferenceNode as ts.ParenthesizedTypeNode).type, options);
+
+            case ts.SyntaxKind.TypeLiteral: {
+                let typeLiteral = typeReferenceNode as ts.TypeLiteralNode;
+
+                if (typeLiteral.members && typeLiteral.members.length > 0 && typeLiteral.members[0].kind == ts.SyntaxKind.IndexSignature) {
+                    let indexSignature = <ts.IndexSignatureDeclaration> firstChildOf(typeReferenceNode);
+                    let keyType = indexSignature.parameters[0].type;
+                    let valueType = indexSignature.type;
+
+                    let nameToImport = `fr.lteconsulting.angular2gwt.client.JsTypedObject`;
+                    this.imports[nameToImport] = true;
+
+                    return `JsTypedObject<${this.getTypeName(keyType, {
+                        boxedType: true,
+                        requiresClass: true
+                    })},${this.getTypeName(valueType, {
+                        boxedType: true,
+                        requiresClass: true
+                    })}>`
+                }
+
+                return "/* TypeLiteral */ Object";
+            }
+
+            case ts.SyntaxKind.ArrayType : {
+                this.imports['fr.lteconsulting.angular2gwt.client.JsArray'] = true;
+
+                let typeChildren = childrenOf(typeReferenceNode);
+                if (typeChildren && typeChildren.length)
+                    return `JsArray<${this.getTypeName(typeChildren[0], {requiresClass: true, boxedType: true})}>`;
+
+                return 'JsArray<Object>';
+            }
+        }
+
+        return this.__getTypeName(typeReferenceType, options);
+    }
+
+    __getTypeName(type: ts.Type, options: Options = null): string {
         if (type.flags & ts.TypeFlags.Boolean || type.flags & ts.TypeFlags.BooleanLike)
             return options.boxedType ? 'Boolean' : 'boolean';
 
@@ -45,7 +95,7 @@ export class TypeHelper {
                         let functionType = <ts.FunctionTypeNode>declarationNode;
 
                         let parameters = functionType.parameters;
-                        let returnType = this.getTypeName(this.program.getTypeChecker().getTypeAtLocation(functionType.type), {
+                        let returnType = this.__getTypeName(this.program.getTypeChecker().getTypeAtLocation(functionType.type), {
                             requiresClass: true,
                             boxedType: true
                         });
@@ -54,7 +104,7 @@ export class TypeHelper {
 
                         this.imports['fr.lteconsulting.angular2gwt.client.' + javaClassName] = true;
 
-                        return `${javaClassName}<${parameters.map((p: ts.ParameterDeclaration) => this.getTypeName(this.program.getTypeChecker().getTypeAtLocation(p.type), {
+                        return `${javaClassName}<${parameters.map((p: ts.ParameterDeclaration) => this.__getTypeName(this.program.getTypeChecker().getTypeAtLocation(p.type), {
                             requiresClass: true,
                             boxedType: true
                         }) + ',').join('')}${returnType}>`
@@ -63,7 +113,7 @@ export class TypeHelper {
                         this.imports['fr.lteconsulting.angular2gwt.client.JsArray'] = true;
                         let typeChildren = childrenOf(declarationNode);
                         if (typeChildren && typeChildren.length) {
-                            let arrayType = this.getTypeName(this.program.getTypeChecker().getTypeAtLocation(typeChildren[0]));
+                            let arrayType = this.__getTypeName(this.program.getTypeChecker().getTypeAtLocation(typeChildren[0]));
                             return `JsArray<${arrayType}>`;
                         }
                         return 'JsArray<Object>';
@@ -81,7 +131,7 @@ export class TypeHelper {
                     let typeArguments = typeReference.typeArguments;
                     if (typeArguments) {
                         token += `<${typeArguments.map(a => {
-                            return this.getTypeName(a);
+                            return this.__getTypeName(a);
                         }).join(', ')}>`;
                     }
                 }

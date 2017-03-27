@@ -1,5 +1,23 @@
+export class Babouche<T> {
+	[key:number]:T;
+	push(elem:T):void;
+}
+
+/**
+ * Top je suis une classe
+ */
 export declare class Toto {
-    static flatten<T>(list: Array<T | T[]>): T[];
+	/** Yopyop
+		Et ouoiuoiuoi*/
+    static flatten<T>(list: Babouche<T | T[]>): T[];
+	
+	/** Yipyip */
+	expand<T>(list: T[]): T[];
+	
+	/**
+	 * Top je suis une classe
+	 */
+	doSomething(v:number, cb:(element:string)=>boolean):number;
 }
 
 /*export interface Hoho {

@@ -73,7 +73,8 @@ export class ExportPhase {
 
         let inside = this.makeMethodsAndProperties(javaNode, {
             generateConstructors: true,
-            override: true
+            override: true,
+            generateStatics: true
         }, program, typeHelper);
 
         this.exportJavaClassOrInterface(javaNode, typeParameters, extendedJavaClass, implementedJavaInterfaces, inside, typeHelper, program);
@@ -98,7 +99,8 @@ export class ExportPhase {
 
         let inside = this.makeMethodsAndProperties(javaNode, {
             generateConstructors: false,
-            override: false
+            override: false,
+            generateStatics: false
         }, program, typeHelper);
 
         this.exportJavaClassOrInterface(javaNode, typeParameters, null, implementedJavaInterfaces, inside, typeHelper, program);
@@ -123,13 +125,14 @@ export class ExportPhase {
 
         let inside = this.makeMethodsAndProperties(javaNode, {
             generateConstructors: false,
-            override: false
+            override: false,
+            generateStatics: false
         }, program, typeHelper);
 
         this.exportJavaClassOrInterface(javaNode, typeParameters, null, implementedJavaInterfaces, inside, typeHelper, program);
     }
 
-    private makeMethodsAndProperties(javaNode: Model.JavaNode, options: { generateConstructors: boolean; override: boolean }, program: ts.Program, typeHelper: TypeHelper) {
+    private makeMethodsAndProperties(javaNode: Model.JavaNode, options: { generateConstructors: boolean; override: boolean; generateStatics: boolean; }, program: ts.Program, typeHelper: TypeHelper) {
         let inside = [];
 
         let children = childrenOf(javaNode.tsNode);
@@ -152,13 +155,30 @@ export class ExportPhase {
             switch (child.kind) {
                 case ts.SyntaxKind.MethodDeclaration:
                 case ts.SyntaxKind.MethodSignature: {
-                    inside.push(this.makeMethodContent(child as ts.ConstructorDeclaration, javaNode.name, options.override, program, typeHelper));
+                    if (options.generateStatics || childrenOf(child).find(c => c.kind == ts.SyntaxKind.StaticKeyword) == null)
+                        inside.push(this.makeMethodContent(child as ts.ConstructorDeclaration, javaNode.name, options.override, program, typeHelper));
                     break;
                 }
             }
         });
 
         return inside.join('\n');
+    }
+
+    private getJsDocs(node: ts.Node) {
+        let result = '';
+
+        if ('jsDoc' in node) {
+            let docs: ts.Node[] = (node as any).jsDoc;
+            if (docs && docs.length) {
+                result += `    /**\n`;
+                result += docs.map(d => '     * ' + ((d as any).comment as string).trim()).join('\n').replace(new RegExp('\n', 'g'), '\n     * ');
+                result += '\n';
+                result += `     */\n`;
+            }
+        }
+
+        return result;
     }
 
     private makeMethodContent(signature: ts.MethodDeclaration
@@ -172,7 +192,7 @@ export class ExportPhase {
 
         let info = this.getMethodInformation(signature, artifactNameForConstructor, program, typeHelper);
 
-        let result = '';
+        let result = this.getJsDocs(signature);
 
         let tp = info.typeParameters.length ? `<${info.typeParameters.join()}> ` : '';
 
@@ -233,8 +253,6 @@ export class ExportPhase {
 
                     let name = (parameterNode.name as ts.Identifier).text;
 
-                    debugNode(child, ` PARAMETER ${name} => `);
-
                     let paramChilds = childrenOf(parameterNode);
                     let parameterTypeNode: ts.Node = null;
                     let optional = false;
@@ -247,8 +265,7 @@ export class ExportPhase {
                     }
 
                     if (parameterTypeNode) {
-                        let parameterType = program.getTypeChecker().getTypeAtLocation(parameterTypeNode);
-                        let parameterTypeName = typeHelper.getTypeName(parameterType);
+                        let parameterTypeName = typeHelper.getTypeName(parameterTypeNode);
 
                         info.parameters.push(`${parameterTypeName}${optional ? ' /* optional */' : ''} ${name}`);
                     }
@@ -269,10 +286,7 @@ export class ExportPhase {
                 case ts.SyntaxKind.ParenthesizedType:
 
                 case ts.SyntaxKind.ThisType: {
-                    let type = program.getTypeChecker().getTypeAtLocation(child);
-                    let typeName = typeHelper.getTypeName(type);
-
-                    info.returnType = typeName;
+                    info.returnType = typeHelper.getTypeName(child);
                     break;
                 }
 
@@ -285,8 +299,7 @@ export class ExportPhase {
     }
 
     private makePropertyDeclarationContent(declaration: ts.PropertyDeclaration, override: boolean, program: ts.Program, typeHelper: TypeHelper) {
-        let type = program.getTypeChecker().getTypeAtLocation(declaration);
-        let typeName = typeHelper.getTypeName(type);
+        let typeName = typeHelper.getTypeName(declaration);
         let name = propertyName(declaration.name);
 
         let isStatic = childrenOf(declaration).find(c => c.kind == ts.SyntaxKind.StaticKeyword) != null;
@@ -296,11 +309,14 @@ export class ExportPhase {
 
         let upcaseName = name.slice(0, 1).toUpperCase() + name.slice(1);
 
-        let content = '';
+        let doc = this.getJsDocs(declaration);
+
+        let content = doc;
         content += `    @JsProperty(name="${name}")\n`;
         if (override)
             content += `    @Override\n`;
         content += `    ${override ? 'public ' : ''}${isStatic ? 'static ' : ''}${typeName} get${upcaseName}();\n\n`;
+        content += doc;
         content += `    @JsProperty(name="${name}")\n`;
         if (override)
             content += `    @Override\n`;
@@ -310,23 +326,25 @@ export class ExportPhase {
     }
 
     private makePropertySignatureContent(signature: ts.PropertySignature, override: boolean, program: ts.Program, typeHelper: TypeHelper) {
-        let type = program.getTypeChecker().getTypeAtLocation(signature);
-        let typeName = typeHelper.getTypeName(type);
+        let typeName = typeHelper.getTypeName(signature);
         let name = propertyName(signature.name);
 
         typeHelper.imports['jsinterop.annotations.JsProperty'] = true;
+
+        let doc = this.getJsDocs(signature);
 
         let upcaseName = name.slice(0, 1).toUpperCase() + name.slice(1);
 
         let isStatic = !!childrenOf(signature).find(c => c.kind == ts.SyntaxKind.StaticKeyword);
 
-        let inside = '';
+        let inside = doc;
         if (signature.questionToken)
             inside += `    /* optional property ${name}*/`;
         inside += `    @JsProperty(name="${name}")\n`;
         if (override)
             inside += `    @Override\n`;
         inside += `    ${override ? 'public ' : ''}${isStatic ? 'static ' : ''}${typeName} get${upcaseName}();\n\n`;
+        inside += doc;
         inside += `    @JsProperty(name="${name}")\n`;
         if (override)
             inside += `    @Override\n`;
@@ -352,7 +370,7 @@ export class ExportPhase {
             });
 
         if (classBaseType)
-            return typeHelper.getTypeName(classBaseType, {requiresClass: true});
+            return typeHelper.getTypeName(classBaseType.symbol.valueDeclaration, {requiresClass: true});
 
         return null;
     }
@@ -367,14 +385,12 @@ export class ExportPhase {
             }
 
             if (javaNode.kind != Model.JavaNodeKind.Class || !((baseType as ts.ObjectType).objectFlags & ts.ObjectFlags.Class))
-                interfaces.push(typeHelper.getTypeName(baseType));
+                interfaces.push(typeHelper.getTypeName(baseType.symbol.valueDeclaration));
         });
 
         let heritageClauses = javaNode.tsSymbol.valueDeclaration && (javaNode.tsSymbol.valueDeclaration as ts.ClassLikeDeclaration).heritageClauses;
         heritageClauses && heritageClauses && heritageClauses[1] && heritageClauses[1].types && heritageClauses[1].types.forEach((implementedTypeNodeObject: ts.ExpressionWithTypeArguments) => {
-            let implementedType = program.getTypeChecker().getTypeFromTypeNode(implementedTypeNodeObject);
-            //let ttt = program.getTypeChecker().getTypeAtLocation(implementedTypeNodeObject);
-            interfaces.push(typeHelper.getTypeName(implementedType));
+            interfaces.push(typeHelper.getTypeName(implementedTypeNodeObject));
         });
 
         return interfaces;
@@ -466,6 +482,7 @@ function generateHeaderComments(javaNode: Model.JavaNode, program: ts.Program) {
     content += `  * Generated from ${relativePath}\n`;
     if (symbol) {
         content += `  * Name ${symbol.getName()}\n`;
+        content += `  * Typescript fqn ${program.getTypeChecker().getFullyQualifiedName(symbol)}\n`;
         content += `  *\n`;
         content += `  * ${symbol.getDocumentationComment().map(item => item.text).join().replace(new RegExp('\n', 'g'), '\n  * ')}\n`;
     }

@@ -93,6 +93,13 @@ let javaPackages = {
 
 let syncPhase = new SyncPhase(baseJavaPackage, javaPackages);
 
+let ambientModules = program.getTypeChecker().getAmbientModules();
+ambientModules.forEach(ambientModule => {
+    let rootSymbols = program.getTypeChecker().getRootSymbols(ambientModule);
+    console.log(`root symbol of ${ambientModule.name} : ${rootSymbols.length}`);
+});
+
+
 program.getSourceFiles().forEach(sourceFile => {
     console.log(`source ${sourceFile.fileName}`);
 
