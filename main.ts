@@ -93,17 +93,12 @@ let javaPackages = {
 
 let syncPhase = new SyncPhase(baseJavaPackage, javaPackages);
 
-let ambientModules = program.getTypeChecker().getAmbientModules();
-ambientModules.forEach(ambientModule => {
-    let rootSymbols = program.getTypeChecker().getRootSymbols(ambientModule);
-    console.log(`root symbol of ${ambientModule.name} : ${rootSymbols.length}`);
-});
-
-
 program.getSourceFiles().forEach(sourceFile => {
     console.log(`source ${sourceFile.fileName}`);
 
-    syncPhase.addTypesFromSourceFile(sourceFile, program);
+    let isInternalFile = !files.find(file => path.normalize(file) === path.normalize(sourceFile.fileName));
+
+    syncPhase.addTypesFromSourceFile(sourceFile, !isInternalFile, program);
 });
 
 console.log(`Exporting nodes...`)

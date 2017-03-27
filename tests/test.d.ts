@@ -18,6 +18,8 @@ export declare class Toto {
 	 * Top je suis une classe
 	 */
 	doSomething(v:number, cb:(element:string)=>boolean):number;
+	
+	test: Array<number>;
 }
 
 /*export interface Hoho {

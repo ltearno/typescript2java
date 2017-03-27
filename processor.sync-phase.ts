@@ -16,19 +16,10 @@ export class SyncPhase {
                 private javaPackages: { [key: string]: string }) {
     }
 
-    addTypesFromSourceFile(sourceFile: ts.SourceFile, program: ts.Program) {
+    addTypesFromSourceFile(sourceFile: ts.SourceFile, onlyExportedSymbols: boolean, program: ts.Program) {
         ts.forEachChild(sourceFile, (node) => {
-            if (!node.modifiers || !node.modifiers.find(e => e.kind == ts.SyntaxKind.ExportKeyword))
+            if (onlyExportedSymbols && ( !node.modifiers || !node.modifiers.find(e => e.kind == ts.SyntaxKind.ExportKeyword)))
                 return;
-
-            /*
-             isEnum: node.kind == ts.SyntaxKind.EnumDeclaration,
-             isInterface: node.kind == ts.SyntaxKind.InterfaceDeclaration,
-             isAbstract: (toaster.getChildren(node).find(c => c.kind == ts.SyntaxKind.AbstractKeyword)) != null
-
-             symbol: program.getTypeChecker().getSymbolAtLocation(declaration.name),
-             type: program.getTypeChecker().getTypeAtLocation(declaration),
-             */
 
             let javaNodes: Model.JavaNode[];
 
@@ -112,7 +103,11 @@ export class SyncPhase {
 
             if (javaNodes) {
                 this.nodes.set(node, javaNodes);
-                this.symbols.set(program.getTypeChecker().getSymbolAtLocation((node as ts.Declaration).name), javaNodes);
+                let symbol = program.getTypeChecker().getSymbolAtLocation((node as ts.Declaration).name);
+                if (this.symbols.get(symbol)) {
+                    console.log(`ALREADY SOMETHING FOR SYMBOL ${symbol.name}`);
+                }
+                this.symbols.set(symbol, javaNodes);
             }
         });
     }

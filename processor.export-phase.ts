@@ -13,42 +13,38 @@ export class ExportPhase {
     exportNodes(program: ts.Program) {
         this.syncPhase.nodes.forEach((javaNodes, tsNode) => {
             javaNodes.forEach(javaNode => {
-                switch (javaNode.kind) {
-                    case Model.JavaNodeKind.Enum:
-                        this.exportEnum(javaNode, program);
-                        break;
-                    case Model.JavaNodeKind.Class:
-                        // abstract class :
-                        // properties as methods
-                        // properties as fields
-                        // methods
-
-                        // class :
-                        // properties as methods
-                        // properties as fields
-                        // methods
-                        // ADD THE INHERITED PROPERTIES AND METHODS
-                        this.exportClass(javaNode, program);
-                        break;
-                    case Model.JavaNodeKind.InterfaceForClass:
-                        // properties as methods
-                        // methods
-                        this.exportInterfaceForClass(javaNode, program);
-                        break;
-                    case Model.JavaNodeKind.Interface:
-                        // properties as methods
-                        // methods
-                        this.exportInterface(javaNode, program);
-                        break;
+                try {
+                    this.exportNode(javaNode, program);
+                } catch (error) {
+                    console.error(`ERROR exporting java node ${Model.JavaNodeKind[javaNode.kind]} ${javaNode.name} : ${error}`);
                 }
             });
         });
     }
 
+    private exportNode(javaNode: Model.JavaNode, program: ts.Program) {
+        switch (javaNode.kind) {
+            case Model.JavaNodeKind.Enum:
+                this.exportEnum(javaNode, program);
+                break;
+            case Model.JavaNodeKind.Class:
+                this.exportClass(javaNode, program);
+                break;
+            case Model.JavaNodeKind.InterfaceForClass:
+                this.exportInterfaceForClass(javaNode, program);
+                break;
+            case Model.JavaNodeKind.Interface:
+                this.exportInterface(javaNode, program);
+                break;
+        }
+    }
+
     private exportClass(javaNode: Model.ClassNode, program: ts.Program) {
+        let className = javaNode.tsSymbol.name;
+        console.log(`generate class ${className}`);
+
         let typeHelper = new TypeHelper(this.syncPhase, {}, program);
 
-        let className = javaNode.tsSymbol.name;
         let extendedJavaClass: string = null;
         let implementedJavaInterfaces: string[] = [];
         let typeParameters: string[] = [];
@@ -60,8 +56,6 @@ export class ExportPhase {
         classType.typeParameters && classType.typeParameters.forEach(typeParameter => {
             typeParameters.push(typeParameter.getSymbol().name);
         });
-
-        console.log(`generate class ${className}`);
 
         extendedJavaClass = this.getExtendedClass(javaNode, typeHelper);
         implementedJavaInterfaces = this.getImplementedInterfaces(javaNode, typeHelper, program);
@@ -81,11 +75,13 @@ export class ExportPhase {
     }
 
     private exportInterfaceForClass(javaNode: Model.InterfaceForClassNode, program: ts.Program) {
+        let interfaceName = javaNode.tsSymbol.name;
+        console.log(`generate interface (for class) ${interfaceName}`);
+
         let typeHelper = new TypeHelper(this.syncPhase, {
             'jsinterop.annotations.JsPackage': true
         }, program);
 
-        let interfaceName = javaNode.tsSymbol.name;
         let implementedJavaInterfaces: string[] = this.getImplementedInterfaces(javaNode, typeHelper, program);
         let typeParameters: string[] = [];
 
@@ -94,8 +90,6 @@ export class ExportPhase {
         interfaceType.typeParameters && interfaceType.typeParameters.forEach(typeParameter => {
             typeParameters.push(typeParameter.getSymbol().name);
         });
-
-        console.log(`generate interface (for class) ${interfaceName}`);
 
         let inside = this.makeMethodsAndProperties(javaNode, {
             generateConstructors: false,
@@ -107,11 +101,13 @@ export class ExportPhase {
     }
 
     private exportInterface(javaNode: Model.InterfaceNode, program: ts.Program) {
+        let interfaceName = javaNode.tsSymbol.name;
+        console.log(`generate interface ${interfaceName}`);
+
         let typeHelper = new TypeHelper(this.syncPhase, {
             'jsinterop.annotations.JsPackage': true
         }, program);
 
-        let interfaceName = javaNode.tsSymbol.name;
         let implementedJavaInterfaces: string[] = this.getImplementedInterfaces(javaNode, typeHelper, program);
         let typeParameters: string[] = [];
 
@@ -120,8 +116,6 @@ export class ExportPhase {
         interfaceType.typeParameters && interfaceType.typeParameters.forEach(typeParameter => {
             typeParameters.push(typeParameter.getSymbol().name);
         });
-
-        console.log(`generate interface ${interfaceName}`);
 
         let inside = this.makeMethodsAndProperties(javaNode, {
             generateConstructors: false,
