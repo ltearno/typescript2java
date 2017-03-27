@@ -28,11 +28,13 @@ let walkSync = function (dir, filelist = []) {
     return filelist;
 };
 
-let files = walkSync("./tests")
+let sourceRootDir = './tests';
+
+let files = walkSync(sourceRootDir)
 
 let compilerOptions: ts.CompilerOptions = {
-    baseUrl: './tests',
-    rootDir: './tests',
+    baseUrl: sourceRootDir,
+    rootDir: sourceRootDir,
     moduleResolution: ts.ModuleResolutionKind.NodeJs,
     listFiles: true,
     typeRoots: ["./typings/index.d.ts"],

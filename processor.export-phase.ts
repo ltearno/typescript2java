@@ -4,6 +4,7 @@ import * as path from "path";
 import * as fs from "fs";
 import {SyncPhase} from './processor.sync-phase';
 import{TypeHelper} from './type-helper';
+import {childrenOf, firstChildOf, debugNode, mkdirRec} from './tools';
 
 export class ExportPhase {
     constructor(private syncPhase: SyncPhase) {
@@ -17,25 +18,35 @@ export class ExportPhase {
                         this.exportEnum(javaNode, program);
                         break;
                     case Model.JavaNodeKind.Class:
+                        // abstract class :
+                        // properties as methods
+                        // properties as fields
+                        // methods
+
+                        // class :
+                        // properties as methods
+                        // properties as fields
+                        // methods
+                        // ADD THE INHERITED PROPERTIES AND METHODS
                         this.exportClass(javaNode, program);
                         break;
                     case Model.JavaNodeKind.InterfaceForClass:
+                        // properties as methods
+                        // methods
                         this.exportInterfaceForClass(javaNode, program);
                         break;
                     case Model.JavaNodeKind.Interface:
+                        // properties as methods
+                        // methods
                         this.exportInterface(javaNode, program);
                         break;
                 }
             });
-            /*
-             let t: toaster.JavaArtifactToaster = new toaster.JavaArtifactToaster()
-             t.exportArtifact(info, program.getCurrentDirectory(), program.getTypeChecker(), exportedNodes)
-             */
         });
     }
 
     private exportClass(javaNode: Model.ClassNode, program: ts.Program) {
-        let typeHelper = new TypeHelper(this.syncPhase, {});
+        let typeHelper = new TypeHelper(this.syncPhase, {}, program);
 
         let className = javaNode.tsSymbol.name;
         let extendedJavaClass: string = null;
@@ -45,49 +56,36 @@ export class ExportPhase {
         let classType = javaNode.tsType as ts.InterfaceType;
 
         typeHelper.imports[`${javaNode.interfaceNode.packageName}.${javaNode.interfaceNode.name}`] = true;
-        let interfaceForClassToken = javaNode.interfaceNode.name;
 
         classType.typeParameters && classType.typeParameters.forEach(typeParameter => {
             typeParameters.push(typeParameter.getSymbol().name);
         });
 
+        console.log(`generate class ${className}`);
+
+        extendedJavaClass = this.getExtendedClass(javaNode, typeHelper);
+        implementedJavaInterfaces = this.getImplementedInterfaces(javaNode, typeHelper, program);
+
+        let interfaceForClassToken = javaNode.interfaceNode.name;
         if (typeParameters.length)
             interfaceForClassToken += `<${typeParameters.join(', ')}>`;
         implementedJavaInterfaces.push(interfaceForClassToken);
 
-        console.log(`generate class ${className}`);
+        let inside = this.makeMethodsAndProperties(javaNode, {
+            generateConstructors: true,
+            override: true
+        }, program, typeHelper);
 
-        let heritageClauses = (javaNode.tsSymbol.valueDeclaration as ts.ClassLikeDeclaration).heritageClauses;
-
-        heritageClauses && heritageClauses && heritageClauses[1] && heritageClauses[1].types.forEach((implementedTypeNodeObject: ts.ExpressionWithTypeArguments) => {
-            let implementedType = program.getTypeChecker().getTypeFromTypeNode(implementedTypeNodeObject);
-            //let ttt = program.getTypeChecker().getTypeAtLocation(implementedTypeNodeObject);
-
-            implementedJavaInterfaces.push(typeHelper.getTypeName(implementedType));
-        });
-
-        javaNode.tsType.getBaseTypes().forEach(baseType => {
-            if (baseType.flags & ts.TypeFlags.Intersection) {
-                console.log(`NOT YET IMPLEMENTED Intersection BaseType`);
-                return;
-            }
-
-            if ((baseType as ts.ObjectType).objectFlags & ts.ObjectFlags.Class)
-                extendedJavaClass = typeHelper.getTypeName(baseType, {requiresClass: true});
-            else
-                implementedJavaInterfaces.push(typeHelper.getTypeName(baseType));
-        });
-
-        this.exportJavaClassOrInterface(javaNode, typeParameters, extendedJavaClass, implementedJavaInterfaces, typeHelper, program);
+        this.exportJavaClassOrInterface(javaNode, typeParameters, extendedJavaClass, implementedJavaInterfaces, inside, typeHelper, program);
     }
 
     private exportInterfaceForClass(javaNode: Model.InterfaceForClassNode, program: ts.Program) {
         let typeHelper = new TypeHelper(this.syncPhase, {
             'jsinterop.annotations.JsPackage': true
-        });
+        }, program);
 
         let interfaceName = javaNode.tsSymbol.name;
-        let implementedJavaInterfaces: string[] = [];
+        let implementedJavaInterfaces: string[] = this.getImplementedInterfaces(javaNode, typeHelper, program);
         let typeParameters: string[] = [];
 
         let interfaceType = javaNode.tsType as ts.InterfaceTypeWithDeclaredMembers;
@@ -98,25 +96,21 @@ export class ExportPhase {
 
         console.log(`generate interface (for class) ${interfaceName}`);
 
-        javaNode.tsType.getBaseTypes().forEach(baseType => {
-            if (baseType.flags & ts.TypeFlags.Intersection) {
-                console.log(`NOT YET IMPLEMENTED Intersection BaseType`);
-                return;
-            }
+        let inside = this.makeMethodsAndProperties(javaNode, {
+            generateConstructors: false,
+            override: false
+        }, program, typeHelper);
 
-            implementedJavaInterfaces.push(typeHelper.getTypeName(baseType));
-        });
-
-        this.exportJavaClassOrInterface(javaNode, typeParameters, null, implementedJavaInterfaces, typeHelper, program);
+        this.exportJavaClassOrInterface(javaNode, typeParameters, null, implementedJavaInterfaces, inside, typeHelper, program);
     }
 
     private exportInterface(javaNode: Model.InterfaceNode, program: ts.Program) {
         let typeHelper = new TypeHelper(this.syncPhase, {
             'jsinterop.annotations.JsPackage': true
-        });
+        }, program);
 
         let interfaceName = javaNode.tsSymbol.name;
-        let implementedJavaInterfaces: string[] = [];
+        let implementedJavaInterfaces: string[] = this.getImplementedInterfaces(javaNode, typeHelper, program);
         let typeParameters: string[] = [];
 
         let interfaceType = javaNode.tsType as ts.InterfaceTypeWithDeclaredMembers;
@@ -127,22 +121,270 @@ export class ExportPhase {
 
         console.log(`generate interface ${interfaceName}`);
 
+        let inside = this.makeMethodsAndProperties(javaNode, {
+            generateConstructors: false,
+            override: false
+        }, program, typeHelper);
+
+        this.exportJavaClassOrInterface(javaNode, typeParameters, null, implementedJavaInterfaces, inside, typeHelper, program);
+    }
+
+    private makeMethodsAndProperties(javaNode: Model.JavaNode, options: { generateConstructors: boolean; override: boolean }, program: ts.Program, typeHelper: TypeHelper) {
+        let inside = [];
+
+        let children = childrenOf(javaNode.tsNode);
+        children.byKind(ts.SyntaxKind.PropertySignature)
+            .forEach((child: ts.PropertySignature) => {
+                inside.push(this.makePropertySignatureContent(child, options.override, program, typeHelper));
+            });
+
+        children.byKind(ts.SyntaxKind.PropertyDeclaration)
+            .forEach((child: ts.PropertyDeclaration) => {
+                inside.push(this.makePropertyDeclarationContent(child, options.override, program, typeHelper));
+            });
+
+        options.generateConstructors && children.byKind(ts.SyntaxKind.Constructor)
+            .forEach((child: ts.ConstructorDeclaration) => {
+                inside.push(this.makeMethodContent(child, javaNode.name, false, program, typeHelper));
+            });
+
+        children.forEach((child) => {
+            switch (child.kind) {
+                case ts.SyntaxKind.MethodDeclaration:
+                case ts.SyntaxKind.MethodSignature: {
+                    inside.push(this.makeMethodContent(child as ts.ConstructorDeclaration, javaNode.name, options.override, program, typeHelper));
+                    break;
+                }
+            }
+        });
+
+        return inside.join('\n');
+    }
+
+    private makeMethodContent(signature: ts.MethodDeclaration
+                                  | ts.MethodSignature
+                                  | ts.ConstructorDeclaration,
+                              artifactNameForConstructor: string,
+                              override: boolean,
+                              program: ts.Program,
+                              typeHelper: TypeHelper) {
+        let methodName = signature.kind == ts.SyntaxKind.Constructor ? artifactNameForConstructor : propertyName(signature.name);
+
+        let info = this.getMethodInformation(signature, artifactNameForConstructor, program, typeHelper);
+
+        let result = '';
+
+        let tp = info.typeParameters.length ? `<${info.typeParameters.join()}> ` : '';
+
+        let optional = signature.kind == ts.SyntaxKind.MethodSignature && signature.questionToken;
+
+        if (signature.kind == ts.SyntaxKind.Constructor) {
+            typeHelper.imports['jsinterop.annotations.JsConstructor'] = true;
+            result += `    @JsConstructor\n    public ${artifactNameForConstructor}(${info.parameters.join()}) {}\n`
+        }
+        else {
+            if (override)
+                result += `    @Override\n`;
+            result += `    ${override ? 'public native ' : ''}${info.isStatic ? 'static ' : ''}${tp}${optional ? '/* optional */ ' : ''}${info.returnType} ${methodName}(${info.parameters.join(', ')});\n`
+        }
+
+        return result;
+    }
+
+    private getMethodInformation(signature: ts.MethodDeclaration
+                                     | ts.MethodSignature
+                                     | ts.ConstructorDeclaration,
+                                 artifactName: string,
+                                 program: ts.Program,
+                                 typeHelper: TypeHelper) {
+        let info = {
+            returnType: 'void',
+            name: null,
+            typeParameters: [],
+            parameters: [],
+            isStatic: false
+        };
+
+        let children: ts.Node[] = childrenOf(signature);
+
+        for (let child of children) {
+            switch (child.kind) {
+                case ts.SyntaxKind.StaticKeyword :
+                    info.isStatic = true;
+                    break
+
+                case ts.SyntaxKind.AbstractKeyword :
+                case ts.SyntaxKind.PrivateKeyword :
+                case ts.SyntaxKind.ProtectedKeyword:
+                    break;
+
+                case ts.SyntaxKind.Identifier:
+                    info.name = (<ts.Identifier> child).text;
+                    break;
+
+                case ts.SyntaxKind.TypeParameter:
+                    info.typeParameters.push((firstChildOf(child) as ts.Identifier).text);
+                    break;
+
+                case ts.SyntaxKind.Parameter: {
+                    // child 0 : name (Identifier)
+                    // child 1 : type
+                    let parameterNode = child as ts.ParameterDeclaration;
+
+                    let name = (parameterNode.name as ts.Identifier).text;
+
+                    debugNode(child, ` PARAMETER ${name} => `);
+
+                    let paramChilds = childrenOf(parameterNode);
+                    let parameterTypeNode: ts.Node = null;
+                    let optional = false;
+                    if (paramChilds.length == 2) {
+                        parameterTypeNode = paramChilds[1];
+                    }
+                    else if (paramChilds.length == 3) {
+                        parameterTypeNode = paramChilds[2];
+                        optional = true;
+                    }
+
+                    if (parameterTypeNode) {
+                        let parameterType = program.getTypeChecker().getTypeAtLocation(parameterTypeNode);
+                        let parameterTypeName = typeHelper.getTypeName(parameterType);
+
+                        info.parameters.push(`${parameterTypeName}${optional ? ' /* optional */' : ''} ${name}`);
+                    }
+                    break;
+                }
+
+                case ts.SyntaxKind.VoidKeyword:
+                case ts.SyntaxKind.NumberKeyword:
+                case ts.SyntaxKind.BooleanKeyword:
+                case ts.SyntaxKind.StringKeyword:
+                case ts.SyntaxKind.AnyKeyword:
+                case ts.SyntaxKind.UnionType :
+                case ts.SyntaxKind.TypeReference:
+                case ts.SyntaxKind.ArrayType :
+                case ts.SyntaxKind.TupleType:
+                case ts.SyntaxKind.TypeLiteral:
+                case ts.SyntaxKind.FunctionType:
+                case ts.SyntaxKind.ParenthesizedType:
+
+                case ts.SyntaxKind.ThisType: {
+                    let type = program.getTypeChecker().getTypeAtLocation(child);
+                    let typeName = typeHelper.getTypeName(type);
+
+                    info.returnType = typeName;
+                    break;
+                }
+
+                default:
+                //debugNode(method, `~~ Ignored in method: ${ts.SyntaxKind[child.kind]} ~~`)
+            }
+        }
+
+        return info;
+    }
+
+    private makePropertyDeclarationContent(declaration: ts.PropertyDeclaration, override: boolean, program: ts.Program, typeHelper: TypeHelper) {
+        let type = program.getTypeChecker().getTypeAtLocation(declaration);
+        let typeName = typeHelper.getTypeName(type);
+        let name = propertyName(declaration.name);
+
+        let isStatic = childrenOf(declaration).find(c => c.kind == ts.SyntaxKind.StaticKeyword) != null;
+
+        //if (artifactType != 'interface' || !isStatic) {
+        typeHelper.imports['jsinterop.annotations.JsProperty'] = true;
+
+        let upcaseName = name.slice(0, 1).toUpperCase() + name.slice(1);
+
+        let content = '';
+        content += `    @JsProperty(name="${name}")\n`;
+        if (override)
+            content += `    @Override\n`;
+        content += `    ${override ? 'public ' : ''}${isStatic ? 'static ' : ''}${typeName} get${upcaseName}();\n\n`;
+        content += `    @JsProperty(name="${name}")\n`;
+        if (override)
+            content += `    @Override\n`;
+        content += `    ${override ? 'public ' : ''}${isStatic ? 'static ' : ''}void set${upcaseName}(${typeName} value);\n`;
+
+        return content;
+    }
+
+    private makePropertySignatureContent(signature: ts.PropertySignature, override: boolean, program: ts.Program, typeHelper: TypeHelper) {
+        let type = program.getTypeChecker().getTypeAtLocation(signature);
+        let typeName = typeHelper.getTypeName(type);
+        let name = propertyName(signature.name);
+
+        typeHelper.imports['jsinterop.annotations.JsProperty'] = true;
+
+        let upcaseName = name.slice(0, 1).toUpperCase() + name.slice(1);
+
+        let isStatic = !!childrenOf(signature).find(c => c.kind == ts.SyntaxKind.StaticKeyword);
+
+        let inside = '';
+        if (signature.questionToken)
+            inside += `    /* optional property ${name}*/`;
+        inside += `    @JsProperty(name="${name}")\n`;
+        if (override)
+            inside += `    @Override\n`;
+        inside += `    ${override ? 'public ' : ''}${isStatic ? 'static ' : ''}${typeName} get${upcaseName}();\n\n`;
+        inside += `    @JsProperty(name="${name}")\n`;
+        if (override)
+            inside += `    @Override\n`;
+        inside += `    ${override ? 'public ' : ''}${isStatic ? 'static ' : ''}void set${upcaseName}(${typeName} value);\n`;
+
+        return inside;
+    }
+
+    private getExtendedClass(javaNode: Model.JavaNode, typeHelper: TypeHelper) {
+        if (javaNode.kind != Model.JavaNodeKind.Class)
+            return null;
+
+        let classBaseType = javaNode.tsType.getBaseTypes()
+            .filter(baseType => {
+                if (baseType.flags & ts.TypeFlags.Intersection) {
+                    console.log(`NOT YET IMPLEMENTED Intersection BaseType`);
+                    return false;
+                }
+                return true;
+            })
+            .find(baseType => {
+                return !!((baseType as ts.ObjectType).objectFlags & ts.ObjectFlags.Class);
+            });
+
+        if (classBaseType)
+            return typeHelper.getTypeName(classBaseType, {requiresClass: true});
+
+        return null;
+    }
+
+    private getImplementedInterfaces(javaNode: Model.JavaNode, typeHelper: TypeHelper, program: ts.Program) {
+        let interfaces = [];
+
         javaNode.tsType.getBaseTypes().forEach(baseType => {
             if (baseType.flags & ts.TypeFlags.Intersection) {
                 console.log(`NOT YET IMPLEMENTED Intersection BaseType`);
                 return;
             }
 
-            implementedJavaInterfaces.push(typeHelper.getTypeName(baseType));
+            if (javaNode.kind != Model.JavaNodeKind.Class || !((baseType as ts.ObjectType).objectFlags & ts.ObjectFlags.Class))
+                interfaces.push(typeHelper.getTypeName(baseType));
         });
 
-        this.exportJavaClassOrInterface(javaNode, typeParameters, null, implementedJavaInterfaces, typeHelper, program);
+        let heritageClauses = javaNode.tsSymbol.valueDeclaration && (javaNode.tsSymbol.valueDeclaration as ts.ClassLikeDeclaration).heritageClauses;
+        heritageClauses && heritageClauses && heritageClauses[1] && heritageClauses[1].types && heritageClauses[1].types.forEach((implementedTypeNodeObject: ts.ExpressionWithTypeArguments) => {
+            let implementedType = program.getTypeChecker().getTypeFromTypeNode(implementedTypeNodeObject);
+            //let ttt = program.getTypeChecker().getTypeAtLocation(implementedTypeNodeObject);
+            interfaces.push(typeHelper.getTypeName(implementedType));
+        });
+
+        return interfaces;
     }
 
-    private exportJavaClassOrInterface(javaNode: Model.JavaNode,
+    private exportJavaClassOrInterface(javaNode: Model.InterfaceNode | Model.InterfaceForClassNode | Model.ClassNode,
                                        typeParameters: string[],
                                        extendedJavaClass: string,
                                        implementedJavaInterfaces: string[],
+                                       insideContent: string,
                                        typeHelper: TypeHelper,
                                        program: ts.Program) {
         let content = '';
@@ -169,6 +411,7 @@ export class ExportPhase {
 
         content += `@JsType( isNative=true, namespace=${jsNamespace}, name="${jsName}" )\n`;
         content += `public ${javaType} ${javaNode.name}${typeParams}${classInheritance}${inheritance} {\n`;
+        content += insideContent;
         content += `}\n`;
 
         writeArtifact(javaNode.packageName, javaNode.name, content, typeHelper.imports);
@@ -186,7 +429,9 @@ export class ExportPhase {
             .filter(c => c.kind == ts.SyntaxKind.EnumMember)
             .forEach(member => {
                 let child = childrenOf(member);
-                if (child.length == 2 && child[0].kind == ts.SyntaxKind.Identifier && child[1].kind == ts.SyntaxKind.FirstLiteralToken)
+                if (child.length == 1 && child[0].kind == ts.SyntaxKind.Identifier)
+                    content += `    final int ${(<ts.Identifier>child[0]).text};\n`;
+                else if (child.length == 2 && child[0].kind == ts.SyntaxKind.Identifier && child[1].kind == ts.SyntaxKind.FirstLiteralToken)
                     content += `    final int ${(<ts.Identifier>child[0]).text} = ${(<ts.LiteralExpression>child[1]).text};\n`;
             });
 
@@ -196,16 +441,20 @@ export class ExportPhase {
     }
 }
 
-function childrenOf(node: ts.Node) {
-    let res = [];
-    ts.forEachChild(node, child => {
-        res.push(child);
-    });
-    return res;
-}
+function propertyName(name: ts.PropertyName) {
+    switch (name.kind) {
+        case ts.SyntaxKind.Identifier:
+            return name.text
 
-function firstChildOf(node: ts.Node) {
-    return childrenOf(node)[0];
+        case ts.SyntaxKind.StringLiteral:
+            return name.text
+
+        case ts.SyntaxKind.NumericLiteral:
+            return name.text
+
+        case ts.SyntaxKind.ComputedPropertyName:
+            return "[ComputedPropertyName]"
+    }
 }
 
 function generateHeaderComments(javaNode: Model.JavaNode, program: ts.Program) {
@@ -244,103 +493,10 @@ function writeArtifact(artifactPackageName: string, artifactName: string, conten
     listImports.sort()
         .forEach(i => prepend += `import ${i};\n`);
 
-    mkdirRec(path.join('out', artifactPackageName.replace(new RegExp('\\.', 'g'), '/')));
+    let fileDirectory = path.join('out', artifactPackageName.replace(new RegExp('\\.', 'g'), '/'));
 
-    let fileName = path.join('out', artifactPackageName.replace(new RegExp('\\.', 'g'), '/'), `${artifactName}.java`);
+    mkdirRec(fileDirectory);
+
+    let fileName = path.join(fileDirectory, `${artifactName}.java`);
     fs.writeFileSync(fileName, prepend + content, 'utf8');
-}
-
-function mkdirRec(p, opts = undefined, made = null) {
-    if (!opts || typeof opts !== 'object') {
-        opts = {mode: opts};
-    }
-
-    var mode = opts.mode;
-    var xfs = opts.fs || fs;
-
-    if (mode === undefined) {
-        mode = 0x777 & (~process.umask());
-    }
-    if (!made) made = null;
-
-    p = path.resolve(p);
-
-    try {
-        xfs.mkdirSync(p, mode);
-        made = made || p;
-    }
-    catch (err0) {
-        switch (err0.code) {
-            case 'ENOENT' :
-                made = mkdirRec(path.dirname(p), opts, made);
-                mkdirRec(p, opts, made);
-                break;
-
-            // In the case of any other error, just see if there's a dir
-            // there already.  If so, then hooray!  If not, then something
-            // is borked.
-            default:
-                var stat;
-                try {
-                    stat = xfs.statSync(p);
-                }
-                catch (err1) {
-                    throw err0;
-                }
-                if (!stat.isDirectory()) throw err0;
-                break;
-        }
-    }
-
-    return made;
-};
-
-
-function debugNode(node: ts.Node, space: string, rec: boolean = true) {
-    let text = '(unk name)'
-
-    switch (node.kind) {
-        case ts.SyntaxKind.SourceFile:
-            let t = <ts.SourceFile>node
-            text = `SOURCE ${t.fileName}`
-            break
-
-        case ts.SyntaxKind.InterfaceDeclaration:
-            text = 'INTERFACE ' + (<ts.InterfaceDeclaration>node).name.text;
-
-            (<ts.InterfaceDeclaration>node).members
-            break
-
-        case ts.SyntaxKind.ClassDeclaration:
-            let classDeclaration = <ts.ClassDeclaration>node
-
-            let modifiers: ts.Modifier[] = classDeclaration.modifiers
-            let elements: ts.ClassElement[] = classDeclaration.members
-            text = `CLASS ${classDeclaration.name.text} modifiers: ${modifiers && modifiers.map(e => ts.SyntaxKind[e.kind]).join()}`
-            break
-
-        case ts.SyntaxKind.MethodDeclaration: {
-            let methodDeclaration = <ts.MethodDeclaration>node
-
-            let modifiers: ts.Modifier[] = methodDeclaration.modifiers
-            text = `METHOD ${methodDeclaration.name.toString()} modifiers: ${modifiers && modifiers.map(e => ts.SyntaxKind[e.kind]).join()}`
-            break
-        }
-
-        case ts.SyntaxKind.PropertyDeclaration:
-            let propertyDeclaration = <ts.PropertyDeclaration>node
-
-            text = `PROPERTY ${propertyDeclaration.name.toString()}`
-            break
-
-        case ts.SyntaxKind.UnionType:
-            let unionType = <ts.UnionTypeNode>node
-            unionType.types
-            break
-    }
-
-    console.log(`${space}${text} of kind ${ts.SyntaxKind[node.kind]}`)
-
-    if (rec)
-        ts.forEachChild(node, child => debugNode(child, ' ' + space));
 }
