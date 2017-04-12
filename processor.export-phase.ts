@@ -11,7 +11,7 @@ export class ExportPhase {
     }
 
     exportNodes(program: ts.Program) {
-        this.syncPhase.nodes.forEach((javaNodes, tsNode) => {
+        this.syncPhase.symbols.forEach((javaNodes, symbol) => {
             javaNodes.forEach(javaNode => {
                 try {
                     this.exportNode(javaNode, program);
@@ -129,31 +129,34 @@ export class ExportPhase {
     private makeMethodsAndProperties(javaNode: Model.JavaNode, options: { generateConstructors: boolean; override: boolean; generateStatics: boolean; }, program: ts.Program, typeHelper: TypeHelper) {
         let inside = [];
 
-        let children = childrenOf(javaNode.tsNode);
-        children.byKind(ts.SyntaxKind.PropertySignature)
-            .forEach((child: ts.PropertySignature) => {
-                inside.push(this.makePropertySignatureContent(child, options.override, program, typeHelper));
-            });
+        // TODO : merge things together...
+        javaNode.tsNodes.forEach(tsNode => {
+            let children = childrenOf(tsNode);
+            children.byKind(ts.SyntaxKind.PropertySignature)
+                .forEach((child: ts.PropertySignature) => {
+                    inside.push(this.makePropertySignatureContent(child, options.override, program, typeHelper));
+                });
 
-        children.byKind(ts.SyntaxKind.PropertyDeclaration)
-            .forEach((child: ts.PropertyDeclaration) => {
-                inside.push(this.makePropertyDeclarationContent(child, options.override, program, typeHelper));
-            });
+            children.byKind(ts.SyntaxKind.PropertyDeclaration)
+                .forEach((child: ts.PropertyDeclaration) => {
+                    inside.push(this.makePropertyDeclarationContent(child, options.override, program, typeHelper));
+                });
 
-        options.generateConstructors && children.byKind(ts.SyntaxKind.Constructor)
-            .forEach((child: ts.ConstructorDeclaration) => {
-                inside.push(this.makeMethodContent(child, javaNode.name, false, program, typeHelper));
-            });
+            options.generateConstructors && children.byKind(ts.SyntaxKind.Constructor)
+                .forEach((child: ts.ConstructorDeclaration) => {
+                    inside.push(this.makeMethodContent(child, javaNode.name, false, program, typeHelper));
+                });
 
-        children.forEach((child) => {
-            switch (child.kind) {
-                case ts.SyntaxKind.MethodDeclaration:
-                case ts.SyntaxKind.MethodSignature: {
-                    if (options.generateStatics || childrenOf(child).find(c => c.kind == ts.SyntaxKind.StaticKeyword) == null)
-                        inside.push(this.makeMethodContent(child as ts.ConstructorDeclaration, javaNode.name, options.override, program, typeHelper));
-                    break;
+            children.forEach((child) => {
+                switch (child.kind) {
+                    case ts.SyntaxKind.MethodDeclaration:
+                    case ts.SyntaxKind.MethodSignature: {
+                        if (options.generateStatics || childrenOf(child).find(c => c.kind == ts.SyntaxKind.StaticKeyword) == null)
+                            inside.push(this.makeMethodContent(child as ts.ConstructorDeclaration, javaNode.name, options.override, program, typeHelper));
+                        break;
+                    }
                 }
-            }
+            });
         });
 
         return inside.join('\n');
@@ -428,14 +431,15 @@ export class ExportPhase {
     }
 
     private exportEnum(javaNode: Model.EnumNode, program: ts.Program) {
-        console.log(`generate enum ${javaNode.tsNode.name.text}`);
+        console.log(`generate enum ${javaNode.name}`);
 
         let content = '';
         content += generateHeaderComments(javaNode, program);
 
         content += `public interface ${javaNode.name} {\n`;
 
-        childrenOf(javaNode.tsNode)
+        // TODO CHECK THINGS TOGETHER...
+        childrenOf(javaNode.tsNodes[0])
             .filter(c => c.kind == ts.SyntaxKind.EnumMember)
             .forEach(member => {
                 let child = childrenOf(member);
@@ -469,7 +473,7 @@ function propertyName(name: ts.PropertyName) {
 
 function generateHeaderComments(javaNode: Model.JavaNode, program: ts.Program) {
     let relativePath = path.relative(program.getCurrentDirectory(), javaNode.sourceFile.fileName);
-    let symbol = program.getTypeChecker().getSymbolAtLocation(javaNode.tsNode.name);
+    let symbol = javaNode.tsSymbol; // program.getTypeChecker().getSymbolAtLocation(javaNode.tsNode.name);
 
     let content = `\n`;
     content += `/**\n`;

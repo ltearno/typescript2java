@@ -97,14 +97,15 @@ program.getSourceFiles().forEach(sourceFile => {
     console.log(`source ${sourceFile.fileName}`);
 
     let isInternalFile = !files.find(file => path.normalize(file) === path.normalize(sourceFile.fileName));
+    isInternalFile = false;
 
     syncPhase.addTypesFromSourceFile(sourceFile, !isInternalFile, program);
 });
 
-console.log(`Exporting nodes...`)
+console.log(`Exporting nodes...`);
 
 let exportPhase = new ExportPhase(syncPhase);
 
 exportPhase.exportNodes(program);
 
-console.log(`Finished.`)
+console.log(`Finished.`);

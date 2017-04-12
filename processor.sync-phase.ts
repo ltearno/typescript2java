@@ -2,6 +2,10 @@ import * as Model from './model';
 import * as ts from "typescript";
 import * as path from "path";
 
+function hasExportModifier(node: ts.Node) {
+    return !node.modifiers || !node.modifiers.find(e => e.kind == ts.SyntaxKind.ExportKeyword);
+}
+
 /**
  * Constructs the correspondance between Typescript types
  * and Java types.
@@ -9,7 +13,6 @@ import * as path from "path";
  * One typescript type can have several linked java types.
  */
 export class SyncPhase {
-    nodes: Map<ts.Node, Model.JavaNode[]> = new Map();
     symbols: Map<ts.Symbol, Model.JavaNode[]> = new Map();
 
     constructor(private baseJavaPackage: string,
@@ -18,97 +21,121 @@ export class SyncPhase {
 
     addTypesFromSourceFile(sourceFile: ts.SourceFile, onlyExportedSymbols: boolean, program: ts.Program) {
         ts.forEachChild(sourceFile, (node) => {
-            if (onlyExportedSymbols && ( !node.modifiers || !node.modifiers.find(e => e.kind == ts.SyntaxKind.ExportKeyword)))
+            if (onlyExportedSymbols && !hasExportModifier(node))
                 return;
 
-            let javaNodes: Model.JavaNode[];
+            if(node.kind==ts.SyntaxKind.VariableStatement){
+                (node as ts.VariableStatement).declarationList;
+            }
+
+            // skip fucked-up nodes
+            if (!('name' in node))
+                return;
+
+            let symbol = program.getTypeChecker().getSymbolAtLocation((node as ts.EnumDeclaration).name);
+
+            if (node.kind == ts.SyntaxKind.VariableDeclaration) {
+                console.log(`skip variable declaration`);
+                return;
+            }
+
+            //if (symbol.declarations && symbol.declarations.length > 1)
+            //    console.log(`symbol MAIN(${symbol.declarations.indexOf(symbol.valueDeclaration)}) ${symbol.name} has ${symbol.declarations.length} declarations : ${symbol.declarations.map(d => d.getSourceFile().fileName + ':' + d.pos + d.getFullText(d.getSourceFile())).join()}`);
+
+            let type = program.getTypeChecker().getTypeAtLocation(node);
 
             let jsNamespace = this.getJsPackageFromSourceFile(sourceFile, program.getCurrentDirectory());
 
-            switch (node.kind) {
-                case ts.SyntaxKind.EnumDeclaration:
-                    javaNodes = [{
-                        kind: Model.JavaNodeKind.Enum,
-                        packageName: this.getJavaPackageFromSourceFile(sourceFile, program.getCurrentDirectory()),
-                        name: (node as ts.EnumDeclaration).name.text,
-                        jsNamespace,
-                        tsNode: node as ts.EnumDeclaration,
-                        tsSymbol: program.getTypeChecker().getSymbolAtLocation((node as ts.EnumDeclaration).name),
-                        tsType: program.getTypeChecker().getTypeAtLocation(node),
-                        sourceFile: sourceFile
-                    }];
-                    break
+            let javaPackageName = this.getJavaPackageFromSourceFile(sourceFile, program.getCurrentDirectory());
+            let javaName = (node as any).name.text;
 
-                case ts.SyntaxKind.ClassDeclaration: {
-                    let className = (node as ts.ClassDeclaration).name.text;
-                    let interfaceName = 'I' + className;
-                    let implementationName = className;
+            // TOUTES LES DECLARATIONS D'UN SYMBOLE DOIVENT ETRE DU MEME TYPE
+            // SINON GROSSE ERREUR : DECLARATIONS INCOH2RENTES POUR LE SYMBOL XXX
 
-                    let classNode: Model.ClassNode = {
-                        kind: Model.JavaNodeKind.Class,
-                        packageName: this.getJavaPackageFromSourceFile(sourceFile, program.getCurrentDirectory()),
-                        name: className,
-                        jsNamespace,
-                        interfaceNode: null,
-                        tsNode: node as ts.ClassDeclaration,
-                        tsSymbol: program.getTypeChecker().getSymbolAtLocation((node as ts.ClassDeclaration).name),
-                        tsType: program.getTypeChecker().getTypeAtLocation(node),
-                        sourceFile: sourceFile
-                    };
-
-                    let interfaceNode: Model.InterfaceForClassNode = {
-                        kind: Model.JavaNodeKind.InterfaceForClass,
-                        packageName: this.getJavaPackageFromSourceFile(sourceFile, program.getCurrentDirectory()),
-                        name: 'I' + className,
-                        jsNamespace,
-                        tsNode: node as ts.ClassDeclaration,
-                        tsSymbol: program.getTypeChecker().getSymbolAtLocation((node as ts.ClassDeclaration).name),
-                        tsType: program.getTypeChecker().getTypeAtLocation(node),
-                        sourceFile: sourceFile,
-                        classNode
-                    };
-
-                    classNode.interfaceNode = interfaceNode;
-
-                    javaNodes = [
-                        interfaceNode,
-                        classNode
-                    ];
-
-                    break;
-                }
-
-                case ts.SyntaxKind.InterfaceDeclaration: {
-                    javaNodes = [{
-                        kind: Model.JavaNodeKind.Interface,
-                        packageName: this.getJavaPackageFromSourceFile(sourceFile, program.getCurrentDirectory()),
-                        name: (node as ts.ClassDeclaration).name.text,
-                        jsNamespace,
-                        tsNode: node as ts.InterfaceDeclaration,
-                        tsSymbol: program.getTypeChecker().getSymbolAtLocation((node as ts.InterfaceDeclaration).name),
-                        tsType: program.getTypeChecker().getTypeAtLocation(node),
-                        sourceFile: sourceFile
-                    }];
-                    break;
-                }
-
-                case ts.SyntaxKind.TypeAliasDeclaration:
-                    // TODO
-                    break;
-
-                default: {
-                    //toaster.debugNode(node, ' NOT EXPORTED ', false)
-                }
-            }
-
-            if (javaNodes) {
-                this.nodes.set(node, javaNodes);
-                let symbol = program.getTypeChecker().getSymbolAtLocation((node as ts.Declaration).name);
-                if (this.symbols.get(symbol)) {
-                    console.log(`ALREADY SOMETHING FOR SYMBOL ${symbol.name}`);
-                }
+            let javaNodes: Model.JavaNode[] = this.symbols.get(symbol);
+            if (!javaNodes) {
+                javaNodes = [];
                 this.symbols.set(symbol, javaNodes);
+
+                switch (node.kind) {
+                    case ts.SyntaxKind.EnumDeclaration:
+                        javaNodes = [{
+                            kind: Model.JavaNodeKind.Enum,
+                            packageName: javaPackageName,
+                            name: javaName,
+                            jsNamespace,
+                            tsSymbol: symbol,
+                            tsType: type,
+                            sourceFile: sourceFile,
+                            tsNodes: []
+                        }];
+                        break
+
+                    case ts.SyntaxKind.ClassDeclaration: {
+                        let classNode: Model.ClassNode = {
+                            kind: Model.JavaNodeKind.Class,
+                            packageName: javaPackageName,
+                            name: javaName,
+                            jsNamespace,
+                            interfaceNode: null,
+                            tsSymbol: symbol,
+                            tsType: type,
+                            sourceFile: sourceFile,
+                            tsNodes: []
+                        };
+
+                        let interfaceNode: Model.InterfaceForClassNode = {
+                            kind: Model.JavaNodeKind.InterfaceForClass,
+                            packageName: javaPackageName,
+                            name: 'I' + javaName,
+                            jsNamespace,
+                            tsSymbol: symbol,
+                            tsType: type,
+                            sourceFile: sourceFile,
+                            classNode,
+                            tsNodes: []
+                        };
+
+                        classNode.interfaceNode = interfaceNode;
+
+                        javaNodes = [
+                            interfaceNode,
+                            classNode
+                        ];
+
+                        break;
+                    }
+
+                    case ts.SyntaxKind.InterfaceDeclaration: {
+                        javaNodes = [{
+                            kind: Model.JavaNodeKind.Interface,
+                            packageName: javaPackageName,
+                            name: javaName,
+                            jsNamespace,
+                            tsSymbol: symbol,
+                            tsType: type,
+                            sourceFile: sourceFile,
+                            tsNodes: []
+                        }];
+                        break;
+                    }
+
+                    case ts.SyntaxKind.TypeAliasDeclaration:
+                    default: {
+                        //console.log(`ignored symbol ${symbol.name}`);
+                        return;
+                        //toaster.debugNode(node, ' NOT EXPORTED ', false)
+                    }
+                }
             }
+
+            javaNodes.forEach((javaNode) => {
+                (javaNode.tsNodes as ts.Node[]).push(node);
+
+                if (javaName == 'DOMTokenList') {
+                    console.log(`ARRAY DECL COUNT ${javaNode.tsNodes.length} ${symbol.declarations.length}`);
+                }
+            });
         });
     }
 

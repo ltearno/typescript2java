@@ -18,31 +18,27 @@ export interface Node {
     name: string;
     sourceFile: ts.SourceFile;
     jsNamespace: string;
-    tsNode: AcceptedTsNode;
     tsSymbol: ts.Symbol;
     tsType: ts.Type;
+    tsNodes: Array<ts.InterfaceDeclaration | ts.ClassDeclaration | ts.EnumDeclaration>;
 }
 
 export interface InterfaceNode extends Node {
     kind: JavaNodeKind.Interface;
-    tsNode: ts.InterfaceDeclaration;
 }
 
 export interface InterfaceForClassNode extends Node {
     kind: JavaNodeKind.InterfaceForClass;
     classNode: ClassNode;
-    tsNode: ts.ClassDeclaration;
 }
 
 export interface ClassNode extends Node {
     kind: JavaNodeKind.Class;
     interfaceNode: InterfaceForClassNode;
-    tsNode: ts.ClassDeclaration;
 }
 
 export interface EnumNode extends Node {
     kind: JavaNodeKind.Enum;
-    tsNode: ts.EnumDeclaration;
 }
 
 export type JavaNode = InterfaceNode | InterfaceForClassNode | ClassNode | EnumNode;
