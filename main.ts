@@ -3,6 +3,7 @@ import * as path from "path";
 import * as ts from "typescript";
 import {ExportPhase} from './processor.export-phase';
 import {SyncPhase} from "./processor.sync-phase";
+import {GatherPhase} from "./processor.gather-phase";
 
 /**
  * TODO
@@ -91,21 +92,18 @@ let javaPackages = {
     "tests/rxjs": "rxjs"
 }
 
-let syncPhase = new SyncPhase(baseJavaPackage, javaPackages);
+let syncPhase = new GatherPhase(baseJavaPackage, javaPackages);// new SyncPhase(baseJavaPackage, javaPackages);
 
 program.getSourceFiles().forEach(sourceFile => {
     console.log(`source ${sourceFile.fileName}`);
 
     let isInternalFile = !files.find(file => path.normalize(file) === path.normalize(sourceFile.fileName));
-    isInternalFile = false;
 
     syncPhase.addTypesFromSourceFile(sourceFile, !isInternalFile, program);
 });
 
-console.log(`Exporting nodes...`);
-
-let exportPhase = new ExportPhase(syncPhase);
-
-exportPhase.exportNodes(program);
+/*console.log(`Exporting nodes...`);
+ let exportPhase = new ExportPhase(syncPhase);
+ exportPhase.exportNodes(program);*/
 
 console.log(`Finished.`);
