@@ -1,9 +1,9 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as ts from "typescript";
-import {ExportPhase} from './processor.export-phase';
-import {SyncPhase} from "./processor.sync-phase";
-import {GatherPhase} from "./processor.gather-phase";
+import { ExportPhase } from './processor.export-phase';
+import { SyncPhase } from "./processor.sync-phase";
+import { GatherPhase } from "./processor.gather-phase";
 
 /**
  * TODO
@@ -65,7 +65,7 @@ allDiagnostics.forEach(diagnostic => {
     let message = ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n');
 
     if (diagnostic.file) {
-        let {line, character} = diagnostic.file.getLineAndCharacterOfPosition(diagnostic.start)
+        let { line, character } = diagnostic.file.getLineAndCharacterOfPosition(diagnostic.start)
         console.error(`${diagnostic.file.fileName} (${line + 1},${character + 1}): ${message}`);
     }
     else {
@@ -92,15 +92,17 @@ let javaPackages = {
     "tests/rxjs": "rxjs"
 }
 
-let syncPhase = new GatherPhase(baseJavaPackage, javaPackages);// new SyncPhase(baseJavaPackage, javaPackages);
+let syncPhase = new GatherPhase(baseJavaPackage, javaPackages, program);// new SyncPhase(baseJavaPackage, javaPackages);
 
 program.getSourceFiles().forEach(sourceFile => {
     console.log(`source ${sourceFile.fileName}`);
 
     let isInternalFile = !files.find(file => path.normalize(file) === path.normalize(sourceFile.fileName));
-
-    syncPhase.addTypesFromSourceFile(sourceFile, !isInternalFile, program);
+    if (!isInternalFile)
+        syncPhase.addTypesFromSourceFile(sourceFile, !isInternalFile);
 });
+
+syncPhase.sumup()
 
 /*console.log(`Exporting nodes...`);
  let exportPhase = new ExportPhase(syncPhase);

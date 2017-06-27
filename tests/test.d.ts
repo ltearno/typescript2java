@@ -14,9 +14,27 @@ export class PartialClass {
     deeper: PartialClass;
 }
 
+export interface TestI<T> {
+    a: PartialClass;
+}
+
 export interface PartialClass {
     c: string;
 }
+
+export let toto: PartialClass;
+
+export interface TestI<T> {
+    b: TestI<number>;
+    c: PartialClass;
+}
+
+export interface ConcreteAbstractPartialClass<U> extends PartialClass {
+    faireSomethink();
+
+    monTest: TestI<string | U>;
+}
+
 
 /*export namespace Duplicate {
  export let sDuplicate;
