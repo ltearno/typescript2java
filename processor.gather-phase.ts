@@ -56,12 +56,12 @@ export class GatherPhase {
     }
 
     analyzeType(type: ts.Type, deep: number = 0) {
-        if (deep > 5)
+        if (deep > 15)
             return
 
         let prefix = ''
         for (let i = 0; i < deep; i++)
-            prefix += ' '
+            prefix += '\t'
 
         if (type == null) {
             console.log(`${prefix}NO TYPE`)
@@ -75,6 +75,7 @@ export class GatherPhase {
 
         let keys = Object.keys(ts.TypeFlags)
 
+        console.log(`${prefix}RAW FLAG: ${flags}`)
         keys.filter(k => parseInt(k)).forEach(flag => {
             let f = parseInt(flag);
             if ((f & flags) === f)
@@ -84,17 +85,20 @@ export class GatherPhase {
         let baseTypes = type.getBaseTypes()
         if (baseTypes && baseTypes.length > 0) {
             console.log(`${prefix}BASE TYPES:`)
-            baseTypes.forEach((baseType => this.analyzeType(baseType, deep++)))
+            baseTypes.forEach((baseType => this.analyzeType(baseType, deep+1)))
         }
 
         let properties = type.getProperties()
         if (properties) {
             console.log(`${prefix}PROPERTIES`)
             for (let property of properties) {
+                if ("baobab" == property.getName())
+                    console.log(`yop`)
                 let propertyType = this.program.getTypeChecker().getTypeAtLocation(property.valueDeclaration)
+
                 //this.program.getTypeChecker().getDeclaredTypeOfSymbol(property)
                 console.log(`${prefix}PROPERTY ${property.getName()}`)
-                this.analyzeType(propertyType, deep++)
+                this.analyzeType(propertyType, deep+1)
                 console.log(`${prefix}END PROPERTY ${property.getName()}`)
             }
         }
