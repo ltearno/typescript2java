@@ -14,7 +14,7 @@ export class PartialClass {
     deeper: PartialClass;
 }
 
-export interface TestI<T> {
+export interface TestI<TTT> {
     a: PartialClass;
 }
 
@@ -24,13 +24,15 @@ export interface PartialClass {
 
 export let toto: PartialClass;
 
-export interface TestI<T> {
+export interface TestI<TTT> {
     baobab: TestI<number>;
     cc: PartialClass;
 }
 
 export interface ConcreteAbstractPartialClass<U> extends PartialClass {
     faireSomethink();
+
+    faireSomethins(i: number, toto: ConcreteAbstractPartialClass<U>);
 
     monTest: TestI<string | U>;
 }

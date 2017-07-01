@@ -56,9 +56,6 @@ export class GatherPhase {
     }
 
     analyzeType(type: ts.Type, deep: number = 0) {
-        if (deep > 15)
-            return
-
         let prefix = ''
         for (let i = 0; i < deep; i++)
             prefix += '\t'
@@ -69,12 +66,9 @@ export class GatherPhase {
         }
         let typeName = type.getSymbol() ? type.getSymbol().getName() : "(anonymous type)"
         console.log(`${prefix}TYPE : ${typeName}`);
+
         let flags = type.getFlags() as number
-
-        let o = ts.TypeFlags
-
         let keys = Object.keys(ts.TypeFlags)
-
         console.log(`${prefix}RAW FLAG: ${flags}`)
         keys.filter(k => parseInt(k)).forEach(flag => {
             let f = parseInt(flag);
@@ -82,10 +76,43 @@ export class GatherPhase {
                 console.log(`${prefix}FLAG : ${ts.TypeFlags[flag]}`)
         })
 
+        if ((flags & ts.TypeFlags.TypeParameter) === ts.TypeFlags.TypeParameter) {
+            console.log(`${prefix}TYPE PARAMETER TYPE`)
+            let typeParameter = type as ts.TypeParameter
+            if (typeParameter.constraint) {
+                console.log(`${prefix} CONSTRAINT`)
+                this.analyzeType(typeParameter.constraint, deep + 2)
+            }
+        }
+
+        if ((flags & ts.TypeFlags.Object) === ts.TypeFlags.Object) {
+            console.log(`${prefix}OBJECT TYPE`)
+            let objectType = type as ts.ObjectType
+            if (objectType.objectFlags & ts.ObjectFlags.ClassOrInterface) {
+                let interfaceType = objectType as ts.InterfaceType
+                console.log(`${prefix}OBJECTTYPE ${interfaceType.localTypeParameters} ${interfaceType.outerTypeParameters} ${interfaceType.typeParameters} ${interfaceType.aliasTypeArguments}`)
+
+                if (interfaceType.typeParameters && interfaceType.typeParameters.length) {
+                    console.log(`${prefix}TYPE PARAMETERS`)
+                    for (let typeParameter of interfaceType.typeParameters) {
+                        console.log(`${prefix} TYPE PARAMETER :`)
+                        this.analyzeType(typeParameter, deep + 2)
+                    }
+                }
+            }
+        }
+
+        if (deep > 2)
+            return
+
         let baseTypes = type.getBaseTypes()
         if (baseTypes && baseTypes.length > 0) {
             console.log(`${prefix}BASE TYPES:`)
-            baseTypes.forEach((baseType => this.analyzeType(baseType, deep+1)))
+            baseTypes.forEach((baseType => this.analyzeType(baseType, deep + 1)))
+        }
+
+        if (type.aliasTypeArguments && type.aliasTypeArguments.length) {
+            console.log(`ALIAS TYPE ARGUMENTS`)
         }
 
         let properties = type.getProperties()
@@ -97,9 +124,71 @@ export class GatherPhase {
                 let propertyType = this.program.getTypeChecker().getTypeAtLocation(property.valueDeclaration)
 
                 //this.program.getTypeChecker().getDeclaredTypeOfSymbol(property)
-                console.log(`${prefix}PROPERTY ${property.getName()}`)
-                this.analyzeType(propertyType, deep+1)
-                console.log(`${prefix}END PROPERTY ${property.getName()}`)
+                console.log(`${prefix} PROPERTY ${property.getName()}`)
+                this.analyzeType(propertyType, deep + 2)
+                console.log(`${prefix} END PROPERTY ${property.getName()}`)
+            }
+        }
+
+        let callSignatures = type.getCallSignatures()
+        if (callSignatures) {
+            console.log(`${prefix}CALL SIGNATURE`)
+            for (let callSignature of callSignatures) {
+                let parameters = callSignature.getParameters()
+                if (parameters && parameters.length) {
+                    console.log(`${prefix}PARAMETERS`)
+                    for (let parameter of parameters) {
+                        let parameteryType = this.program.getTypeChecker().getTypeAtLocation(parameter.valueDeclaration)
+                        console.log(`${prefix}${parameter.getName()}`)
+                        this.analyzeType(parameteryType, deep + 1)
+                    }
+                }
+
+                let returnType = callSignature.getReturnType()
+                if (returnType) {
+                    console.log(`${prefix}RETURN TYPE`)
+                    this.analyzeType(returnType, deep + 1)
+                }
+
+                let typeParameters = callSignature.getTypeParameters()
+                if (typeParameters && typeParameters.length) {
+                    console.log(`${prefix}TYPE PARAMETERS`)
+                    for (let typeParameter of typeParameters) {
+                        console.log(`${prefix}TYPE PARAMETER`)
+                        this.analyzeType(typeParameter, deep + 1)
+                    }
+                }
+            }
+        }
+
+        let constructSignatures = type.getConstructSignatures()
+        if (constructSignatures) {
+            console.log(`${prefix}CONSTRUCT SIGNATURE`)
+            for (let constructSignature of constructSignatures) {
+                let parameters = constructSignature.getParameters()
+                if (parameters && parameters.length) {
+                    console.log(`${prefix}PARAMETERS`)
+                    for (let parameter of parameters) {
+                        let parameteryType = this.program.getTypeChecker().getTypeAtLocation(parameter.valueDeclaration)
+                        console.log(`${prefix}${parameter.getName()}`)
+                        this.analyzeType(parameteryType, deep + 1)
+                    }
+                }
+
+                let returnType = constructSignature.getReturnType()
+                if (returnType) {
+                    console.log(`${prefix}RETURN TYPE`)
+                    this.analyzeType(returnType, deep + 1)
+                }
+
+                let typeParameters = constructSignature.getTypeParameters()
+                if (typeParameters && typeParameters.length) {
+                    console.log(`${prefix}TYPE PARAMETERS`)
+                    for (let typeParameter of typeParameters) {
+                        console.log(`${prefix}TYPE PARAMETER`)
+                        this.analyzeType(typeParameter, deep + 1)
+                    }
+                }
             }
         }
 
