@@ -21,7 +21,6 @@ function guessName(identifier: ts.Identifier | ts.BindingPattern): string {
  * One typescript type can have several linked java types.
  */
 export class GatherPhase {
-    symbols: Map<ts.Symbol, Model.JavaNode[]> = new Map();
     types: Set<ts.Type> = new Set()
 
     variables: {
@@ -47,11 +46,121 @@ export class GatherPhase {
             this.types.add(type)
     }
 
-    seen: Set<any> = new Set();
-
     sumup() {
-        for (let type of this.types.values()) {
-            this.analyzeType(type)
+        let typeSet = new Set<ts.Type>()
+        for (let type of this.types.values())
+            this.addDeeperTypes(type, typeSet)
+
+        let nbAnonymous = 0
+        for (let type of typeSet.values()) {
+            if (type.getSymbol())
+                console.log(`-> ${type.getSymbol().getName()}`)
+            else
+                nbAnonymous++
+        }
+        if (nbAnonymous)
+            console.log(`-> and ${nbAnonymous} anonymous types`)
+
+        //for (let type of this.types.values())
+        //    this.analyzeType(type)
+    }
+
+    private addDeeperTypes(type: ts.Type, typeSet: Set<ts.Type>) {
+        if (typeSet.has(type))
+            return
+
+        typeSet.add(type)
+
+        if ((type.flags & ts.TypeFlags.TypeParameter) === ts.TypeFlags.TypeParameter) {
+            let typeParameter = type as ts.TypeParameter
+            if (typeParameter.constraint)
+                this.addDeeperTypes(typeParameter.constraint, typeSet)
+        }
+
+        if ((type.flags & ts.TypeFlags.Object) === ts.TypeFlags.Object) {
+            let objectType = type as ts.ObjectType
+            if (objectType.objectFlags & ts.ObjectFlags.ClassOrInterface) {
+                let interfaceType = objectType as ts.InterfaceType
+                if (interfaceType.typeParameters && interfaceType.typeParameters.length) {
+                    for (let typeParameter of interfaceType.typeParameters)
+                        this.addDeeperTypes(typeParameter, typeSet)
+                }
+            }
+        }
+
+        let baseTypes = type.getBaseTypes()
+        if (baseTypes && baseTypes.length > 0)
+            baseTypes.forEach((baseType => this.addDeeperTypes(baseType, typeSet)))
+
+        let properties = type.getProperties()
+        if (properties) {
+            for (let property of properties) {
+                if (!property.valueDeclaration)
+                    continue
+
+                /**
+                 * TODO
+                 * 
+                 * One TS property is projected in the java as one or many
+                 * - attribute of primitive type (int, char, ...)
+                 * - attribute of reference type (Object...)
+                 * - method
+                 */
+                let propertyType = this.program.getTypeChecker().getTypeAtLocation(property.valueDeclaration)
+                this.addDeeperTypes(propertyType, typeSet)
+            }
+        }
+
+        /**
+         * TODO
+         * 
+         * Call and Construct signatures are methods and constructors in the containing type
+         */
+
+        let callSignatures = type.getCallSignatures()
+        if (callSignatures) {
+            for (let callSignature of callSignatures) {
+                let parameters = callSignature.getParameters()
+                if (parameters && parameters.length) {
+                    for (let parameter of parameters) {
+                        let parameteryType = this.program.getTypeChecker().getTypeAtLocation(parameter.valueDeclaration)
+                        this.addDeeperTypes(parameteryType, typeSet)
+                    }
+                }
+
+                let returnType = callSignature.getReturnType()
+                if (returnType)
+                    this.addDeeperTypes(returnType, typeSet)
+
+                let typeParameters = callSignature.getTypeParameters()
+                if (typeParameters && typeParameters.length) {
+                    for (let typeParameter of typeParameters)
+                        this.addDeeperTypes(typeParameter, typeSet)
+                }
+            }
+        }
+
+        let constructSignatures = type.getConstructSignatures()
+        if (constructSignatures) {
+            for (let constructSignature of constructSignatures) {
+                let parameters = constructSignature.getParameters()
+                if (parameters && parameters.length) {
+                    for (let parameter of parameters) {
+                        let parameteryType = this.program.getTypeChecker().getTypeAtLocation(parameter.valueDeclaration)
+                        this.addDeeperTypes(parameteryType, typeSet)
+                    }
+                }
+
+                let returnType = constructSignature.getReturnType()
+                if (returnType)
+                    this.addDeeperTypes(returnType, typeSet)
+
+                let typeParameters = constructSignature.getTypeParameters()
+                if (typeParameters && typeParameters.length) {
+                    for (let typeParameter of typeParameters)
+                        this.addDeeperTypes(typeParameter, typeSet)
+                }
+            }
         }
     }
 
@@ -202,41 +311,13 @@ export class GatherPhase {
                 return;
             }
 
-            if (node.kind == ts.SyntaxKind.InterfaceDeclaration) {
-                (node as ts.InterfaceDeclaration);
+            if (node.kind == ts.SyntaxKind.InterfaceDeclaration || node.kind == ts.SyntaxKind.ClassDeclaration) {
                 let type = this.program.getTypeChecker().getTypeAtLocation(node);
                 this.registerType(type);
-                let symbol = type.symbol;
-                while (symbol.flags & ts.SymbolFlags.Alias) {
-                    console.log(`aliased ${symbol.name}`);
-                    symbol = this.program.getTypeChecker().getAliasedSymbol(symbol);
-                }
-                console.log(`INTERFACE ${guessName((node as ts.InterfaceDeclaration).name)} ${type} ${symbol.name}`);
-                this.checkSeen(type, 'type');
-                this.checkSeen(symbol, 'symbol');
                 return;
             }
 
-            if (node.kind == ts.SyntaxKind.ClassDeclaration) {
-                let type = this.program.getTypeChecker().getTypeAtLocation(node);
-                this.registerType(type);
-                let symbol = type.symbol;
-                console.log(`CLASS ${guessName((node as ts.ClassDeclaration).name)} ${type} ${symbol.name}`);
-                this.checkSeen(type, 'type');
-                this.checkSeen(symbol, 'symbol');
-                return;
-            }
-
-            console.log(`SyntaxKind: ${ts.SyntaxKind[node.kind]}`);
+            console.log(`Ignored SyntaxKind: ${ts.SyntaxKind[node.kind]}`);
         });
-    }
-
-    checkSeen(object, title = '') {
-        if (this.seen.has(object)) {
-            console.log(`seen ${title} already seen ${object}`);
-            return;
-        }
-
-        this.seen.add(object);
     }
 }
