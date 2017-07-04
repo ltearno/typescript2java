@@ -46,10 +46,157 @@ export class GatherPhase {
             this.types.add(type)
     }
 
+    private getTypeName(type: ts.Type) {
+        if (type.getSymbol())
+            return type.getSymbol().getName()
+        if (type.flags & ts.TypeFlags.Any)
+            return "Object"
+        if (type.flags & ts.TypeFlags.StringLike)
+            return "String"
+        if (type.flags & ts.TypeFlags.StringLiteral)
+            return "String"
+        if (type.flags & ts.TypeFlags.Number)
+            return "Number"
+        if (type.flags & ts.TypeFlags.NumberLiteral)
+            return "Number"
+        if (type.flags & ts.TypeFlags.NumberLike)
+            return "Number"
+        if (type.flags & ts.TypeFlags.Boolean)
+            return "Boolean"
+        if (type.flags & ts.TypeFlags.BooleanLiteral)
+            return "Boolean"
+        if (type.flags & ts.TypeFlags.BooleanLike)
+            return "Boolean"
+        if (type.flags & ts.TypeFlags.Void)
+            return "void"
+        if (type.flags & ts.TypeFlags.Undefined)
+            return "void"
+        if (type.flags & ts.TypeFlags.Null)
+            return "Void"
+        if (type.flags & ts.TypeFlags.Never)
+            return "Void"
+
+        //Enum
+        //EnumLiteral
+        //EnumLike
+        //ESSymbol
+        //TypeParameter
+        //Object
+        //Union
+        //Intersection
+        //UnionOrIntersection
+        //Index
+        //IndexedAccess
+        //NonPrimitive
+        //Literal
+        //StringOrNumberLiteral
+        //PossiblyFalsy
+        //StructuredType
+        //StructuredOrTypeVariable
+        //TypeVariable
+        //Narrowable
+        //NotUnionOrUnit
+
+        return "(type without symbol)"
+    }
+
+    private toJava(type: ts.Type) {
+        let tab = '    '
+
+        if (type.getSymbol()) {
+            console.log(`// FQN : ${this.program.getTypeChecker().getFullyQualifiedName(type.getSymbol())}`);
+
+            let comments = type.getSymbol().getDocumentationComment()
+            if (comments && comments.length) {
+                console.log(`/**`)
+                for (let comment of comments) {
+                    let text = comment.text
+                    console.log(` * ${text.split('\n').join('\n * ')}`)
+                }
+                console.log(` */`)
+            }
+        }
+
+        console.log(`@JsType( isNative=true )`)
+        console.log(`public class ${this.getTypeName(type)}`)
+        console.log(`{`)
+
+        let symbol = type.getSymbol()
+        if (symbol && symbol.valueDeclaration) {
+            let constructorType = this.program.getTypeChecker().getTypeOfSymbolAtLocation(symbol, symbol.valueDeclaration)
+            let constructors = constructorType.getConstructSignatures()
+            if (constructors && constructors.length) {
+                for (let constructorSignature of constructors) {
+                    let paramsDump = this.serializeSignatureParameters(constructorSignature)
+                    console.log(`${tab}${this.getTypeName(type)}(${paramsDump}) {`)
+                    console.log(`${tab}}`)
+                }
+            }
+        }
+
+        let baseTypes = type.getBaseTypes()
+        let constructors = type.getConstructSignatures()
+
+        let properties = type.getProperties()
+        if (properties && properties.length) {
+            for (let property of properties) {
+                this.generatePropertiesOrMethods(property)
+            }
+        }
+        console.log(`}`)
+    }
+
+    private serializeSignatureParameters(signature: ts.Signature) {
+        return signature.getParameters().map(p => {
+            let parameteryType = this.program.getTypeChecker().getTypeAtLocation(p.valueDeclaration)
+            return this.getTypeName(parameteryType) + ' ' + p.getName()
+        }).join()
+    }
+
+    private generatePropertiesOrMethods(property: ts.Symbol) {
+        if (!property || !property.valueDeclaration)
+            return
+
+        let tab = '    '
+
+        let propertyType = this.program.getTypeChecker().getTypeAtLocation(property.valueDeclaration)
+
+        let name = property.getName()
+        let upcaseName = name.slice(0, 1).toLocaleUpperCase() + name.slice(1)
+
+        // type of property =>
+        // for each callable signature, generate a method
+
+        let callSignatures = propertyType.getCallSignatures()
+        if (callSignatures && callSignatures.length) {
+            console.log(`/* CALL SIGNATURES ${callSignatures.length} */`)
+            for (let callSignature of callSignatures) {
+                let paramsDump = this.serializeSignatureParameters(callSignature)
+                console.log(`${tab}public final native ${this.getTypeName(callSignature.getReturnType())} ${name}(${paramsDump});`)
+                console.log()
+            }
+        }
+
+        console.log(`${tab}public ${this.getTypeName(propertyType)} ${name};`)
+        console.log()
+
+        // getter and setter
+        console.log(`${tab}@JsProperty( name = "${name}")`)
+        console.log(`${tab}public final native ${this.getTypeName(propertyType)} get${upcaseName}();`)
+        console.log()
+
+        console.log(`${tab}@JsProperty( name = "${name}")`)
+        console.log(`${tab}public final native void set${upcaseName}( ${this.getTypeName(propertyType)} value );`)
+        console.log()
+    }
+
     sumup() {
         let typeSet = new Set<ts.Type>()
-        for (let type of this.types.values())
+        for (let type of this.types.values()) {
+            console.log(`Searching types from ${this.getTypeName(type)}`)
+            this.toJava(type)
             this.addDeeperTypes(type, typeSet)
+        }
 
         let nbAnonymous = 0
         for (let type of typeSet.values()) {
@@ -60,6 +207,12 @@ export class GatherPhase {
         }
         if (nbAnonymous)
             console.log(`-> and ${nbAnonymous} anonymous types`)
+
+        // create the set of all required top-level ts types
+        // represent those types in the hybrid AST (type, methods, attributes)
+        // (each ts type can generate multiple elements in the Java type)
+        // (this AST has a much lighter grammar than ts' one)
+        // for each of the top-level types, generate a java type
 
         //for (let type of this.types.values())
         //    this.analyzeType(type)

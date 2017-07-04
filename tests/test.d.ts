@@ -5,13 +5,28 @@
  }*/
 
 export interface PartialClass {
+    (n: string): number;
 }
 
 export type Toto = PartialClass;
 
+/**
+ * This is something or not, and is named PartialClass
+ * What if I put many lines ?
+ * 
+ * And empty lines ?
+ */
 export class PartialClass {
     a: number;
     deeper: PartialClass;
+    aFunction(n: number, s: string): number;
+
+    constructor(a: string, b, c, d, e);
+}
+
+export declare class CompileAnimationStateDeclarationMetadata {
+    stateNameExpr: Toto;
+    constructor(stateNameExpr: string, styles: PartialClass);
 }
 
 export interface TestI<TTT> {
