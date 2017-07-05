@@ -21,6 +21,9 @@ function guessName(identifier: ts.Identifier | ts.BindingPattern): string {
  * One typescript type can have several linked java types.
  */
 export class GatherPhase {
+    private BY_INDEX_SETTER = `JsTools.setItem`
+    private BY_INDEX_GETTER = `JsTools.getItem`
+
     types: Set<ts.Type> = new Set()
 
     variables: {
@@ -49,6 +52,7 @@ export class GatherPhase {
     private getTypeName(type: ts.Type) {
         if (type.getSymbol())
             return type.getSymbol().getName()
+
         if (type.flags & ts.TypeFlags.Any)
             return "Object"
         if (type.flags & ts.TypeFlags.StringLike)
@@ -76,18 +80,36 @@ export class GatherPhase {
         if (type.flags & ts.TypeFlags.Never)
             return "Void"
 
+        if (type.flags & ts.TypeFlags.ESSymbol)
+            return "ESSymbol"
+
+        if (type.flags & ts.TypeFlags.Union) {
+            let unionType = type as ts.UnionType
+            return unionType.types.map(t => this.getTypeName(t)).join('Or')
+        }
+
+        if (type.flags & ts.TypeFlags.Intersection) {
+            let unionType = type as ts.IntersectionType
+            return unionType.types.map(t => this.getTypeName(t)).join('And')
+        }
+
+        if (type.flags & ts.TypeFlags.NonPrimitive)
+            return "Object"
+
+        if (type.flags & ts.TypeFlags.Object)
+            return "Object/*StructuredUnnamed*/"
+
+        if (type.flags & ts.TypeFlags.IndexedAccess) {
+            let indexedAccess = type as ts.IndexedAccessType
+            return "INDEXEDACCESS"
+        }
+
         //Enum
         //EnumLiteral
         //EnumLike
-        //ESSymbol
         //TypeParameter
-        //Object
-        //Union
-        //Intersection
         //UnionOrIntersection
         //Index
-        //IndexedAccess
-        //NonPrimitive
         //Literal
         //StringOrNumberLiteral
         //PossiblyFalsy
@@ -104,7 +126,8 @@ export class GatherPhase {
         let tab = '    '
 
         if (type.getSymbol()) {
-            console.log(`// FQN : ${this.program.getTypeChecker().getFullyQualifiedName(type.getSymbol())}`);
+            console.log(`// FQN : ${this.program.getTypeChecker().getFullyQualifiedName(type.getSymbol())}`)
+            console.log(`type flags : ${type.flags}`)
 
             let comments = type.getSymbol().getDocumentationComment()
             if (comments && comments.length) {
@@ -121,6 +144,7 @@ export class GatherPhase {
         console.log(`public class ${this.getTypeName(type)}`)
         console.log(`{`)
 
+
         let symbol = type.getSymbol()
         if (symbol && symbol.valueDeclaration) {
             let constructorType = this.program.getTypeChecker().getTypeOfSymbolAtLocation(symbol, symbol.valueDeclaration)
@@ -132,6 +156,36 @@ export class GatherPhase {
                     console.log(`${tab}}`)
                 }
             }
+        }
+
+        let nit = type.getNumberIndexType()
+        if (nit) {
+            console.log(`${tab}@JsOverlay`)
+            console.log(`${tab}public void setByIndex(int index, ${this.getTypeName(nit)} value) {`)
+            console.log(`${tab}${tab}${this.BY_INDEX_SETTER}(index, value);`)
+            console.log(`${tab}}`)
+            console.log(``)
+
+            console.log(`${tab}@JsOverlay`)
+            console.log(`${tab}public ${this.getTypeName(nit)} getByIndex(int index) {`)
+            console.log(`${tab}${tab}return ${this.getTypeName(nit)}(Object) ${this.BY_INDEX_GETTER}(index);`)
+            console.log(`${tab}}`)
+            console.log(``)
+        }
+
+        let sit = type.getStringIndexType()
+        if (sit) {
+            console.log(`${tab}@JsOverlay`)
+            console.log(`${tab}public void setByIndex(String index, ${this.getTypeName(sit)} value) {`)
+            console.log(`${tab}${tab}${this.BY_INDEX_SETTER}(index, value);`)
+            console.log(`${tab}}`)
+            console.log(``)
+
+            console.log(`${tab}@JsOverlay`)
+            console.log(`${tab}public ${this.getTypeName(sit)} getByIndex(String index) {`)
+            console.log(`${tab}${tab}return ${this.getTypeName(sit)}(Object) ${this.BY_INDEX_GETTER}(index);`)
+            console.log(`${tab}}`)
+            console.log(``)
         }
 
         let baseTypes = type.getBaseTypes()
@@ -169,8 +223,8 @@ export class GatherPhase {
 
         let callSignatures = propertyType.getCallSignatures()
         if (callSignatures && callSignatures.length) {
-            console.log(`/* CALL SIGNATURES ${callSignatures.length} */`)
             for (let callSignature of callSignatures) {
+                console.log(`${tab}/* Call signature */`)
                 let paramsDump = this.serializeSignatureParameters(callSignature)
                 console.log(`${tab}public final native ${this.getTypeName(callSignature.getReturnType())} ${name}(${paramsDump});`)
                 console.log()
@@ -180,7 +234,6 @@ export class GatherPhase {
         console.log(`${tab}public ${this.getTypeName(propertyType)} ${name};`)
         console.log()
 
-        // getter and setter
         console.log(`${tab}@JsProperty( name = "${name}")`)
         console.log(`${tab}public final native ${this.getTypeName(propertyType)} get${upcaseName}();`)
         console.log()
@@ -191,6 +244,8 @@ export class GatherPhase {
     }
 
     sumup() {
+        console.log(this.variables.map(v => v.name).join(`\n`))
+
         let typeSet = new Set<ts.Type>()
         for (let type of this.types.values()) {
             console.log(`Searching types from ${this.getTypeName(type)}`)

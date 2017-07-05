@@ -2,7 +2,11 @@
 
  export enum Duplicate{
  Toto
- }*/
+}*/
+
+export interface JeSuisInterface { }
+
+export class JeSuisClasse { }
 
 export interface PartialClass {
     (n: string): number;
