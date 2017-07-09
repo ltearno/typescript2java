@@ -17,8 +17,6 @@ function guessName(identifier: ts.Identifier | ts.BindingPattern): string {
 /**
  * Constructs the correspondance between Typescript types
  * and Java types.
- *
- * One typescript type can have several linked java types.
  */
 export class GatherPhase {
     private BY_INDEX_SETTER = `JsTools.setItem`
@@ -36,12 +34,27 @@ export class GatherPhase {
         private program: ts.Program) {
     }
 
-    private addVariableStatement(statement: ts.VariableStatement) {
+    private registerVariable(statement: ts.VariableStatement) {
         statement.declarationList.declarations.forEach((declaration) => {
             let t = this.program.getTypeChecker().getTypeFromTypeNode(declaration.type)
+
+            let cs = t.getConstructSignatures()
+            if (cs && cs.length) {
+                cs.forEach(constructorSignature => {
+                    if (constructorSignature.getReturnType()) {
+                        this.registerType(constructorSignature.getReturnType())
+                        console.log(`A DISGUISED CLASS : JsType('${guessName(declaration.name)}') is the class ${this.getTypeName(constructorSignature.getReturnType())}`)
+                        // this class should be added the constructor that we are inspecting
+                    }
+                })
+            }
+
             this.registerType(t)
             this.variables.push({ declarationNode: declaration, name: guessName(declaration.name) });
         });
+
+        // more than that is that we should have a static global variable named after the declared symbol,
+        // which has the type of the variable minus the constructors (which are sent to create classes)
     }
 
     private registerType(type: ts.Type) {
@@ -515,8 +528,10 @@ export class GatherPhase {
     addTypesFromSourceFile(sourceFile: ts.SourceFile, onlyExportedSymbols: boolean) {
         ts.forEachChild(sourceFile, (node) => {
             if (node.kind == ts.SyntaxKind.VariableStatement) {
-                this.addVariableStatement(node as ts.VariableStatement);
-                return;
+                let variable = node as ts.VariableStatement
+                //if (variable.modifiers.find(m => m.kind == ts.SyntaxKind.ExportKeyword))
+                this.registerVariable(variable)
+                return
             }
 
             if (node.kind == ts.SyntaxKind.InterfaceDeclaration || node.kind == ts.SyntaxKind.ClassDeclaration) {
