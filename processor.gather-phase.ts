@@ -539,25 +539,26 @@ export class GatherPhase {
             if (cs && cs.length) {
                 cs.forEach(constructorSignature => {
                     if (constructorSignature.getReturnType()) {
-
                         let preJava = this.typeMap.getOrCreatePreJavaTypeForTsType(constructorSignature.getReturnType())
-
                         if (preJava.kind == PreJavaTypeKind.CLASS_OR_INTERFACE) {
-                            (preJava as ClassOrInterfacePreJavaType).setPrototypeName(null, guessName(declaration.name));
+                            (preJava as ClassOrInterfacePreJavaType).addPrototypeName(null, guessName(declaration.name));
                             (preJava as ClassOrInterfacePreJavaType).addConstructorSignature(constructorSignature)
                         }
+
+                        this.processClassOrInterfaceDeclaration(constructorSignature.getReturnType())
                     }
                 })
             }
 
-            this.processClassOrInterfaceDeclaration(t)
+            if (t.getNumberIndexType()
+                || t.getStringIndexType()
+                || (t.getCallSignatures() && t.getCallSignatures().some(s => s.declaration && s.declaration.name && s.declaration.name.getText() != '__call'))
+                || (t.getProperties() && t.getProperties().some(p => p.name != 'prototype'))) {
+                this.processClassOrInterfaceDeclaration(t)
 
-            this.registerType(t)
-            this.variables.push({ declarationNode: declaration, name: guessName(declaration.name) });
-        });
-
-        // more than that is that we should have a static global variable named after the declared symbol,
-        // which has the type of the variable minus the constructors (which are sent to create classes)
+                this.variables.push({ declarationNode: declaration, name: guessName(declaration.name) });
+            }
+        })
     }
 
     private processClassOrInterfaceDeclaration(type: ts.Type) {
@@ -566,9 +567,6 @@ export class GatherPhase {
         if (preJava.kind == PreJavaTypeKind.CLASS_OR_INTERFACE) {
             let realPreJavaType = preJava as ClassOrInterfacePreJavaType
 
-            // TODO : PreJavaType doit avoir des refs que vers des types PreJavaType
-            // TODO : il faut donc parcourir tous les types ts et faire la translation pour chacun de ts Type rencontrés
-
             if (realPreJavaType.sourceTypes.has(type)) {
                 realPreJavaType.addSourceType(type)
 
@@ -576,7 +574,7 @@ export class GatherPhase {
 
                 if (symbol) {
                     if (symbol.getDeclarations().some(d => d.kind == ts.SyntaxKind.ClassDeclaration))
-                        realPreJavaType.setPrototypeName(null, this.getTypeName(type))
+                        realPreJavaType.addPrototypeName(null, this.getTypeName(type))
 
                     if (symbol.valueDeclaration) {
                         let constructorType = this.program.getTypeChecker().getTypeOfSymbolAtLocation(symbol, symbol.valueDeclaration)
@@ -587,18 +585,24 @@ export class GatherPhase {
                 }
 
                 let nit = type.getNumberIndexType()
-                if (nit)
-                    realPreJavaType.setNumberIndexType(nit)
+                if (nit) {
+                    this.processClassOrInterfaceDeclaration(nit)
+
+                    realPreJavaType.setNumberIndexType(this.typeMap.getOrCreatePreJavaTypeForTsType(nit))
+                }
 
                 let sit = type.getStringIndexType()
-                if (sit)
-                    realPreJavaType.setStringIndexType(sit)
+                if (sit) {
+                    this.processClassOrInterfaceDeclaration(sit)
+
+                    realPreJavaType.setStringIndexType(this.typeMap.getOrCreatePreJavaTypeForTsType(sit))
+                }
 
                 let baseTypes = type.getBaseTypes()
                 if (baseTypes) {
                     baseTypes.forEach(baseType => {
                         this.processClassOrInterfaceDeclaration(baseType)
-                        realPreJavaType.baseTypes.add(this.typeMap.getOrCreatePreJavaTypeForTsType(baseType))
+                        realPreJavaType.addBaseType(this.typeMap.getOrCreatePreJavaTypeForTsType(baseType))
                     })
                 }
 
@@ -607,8 +611,6 @@ export class GatherPhase {
                     properties.forEach(property => realPreJavaType.addPropertyOrMethod(property))
             }
         }
-
-        this.registerType(type);
     }
 }
 
@@ -621,6 +623,16 @@ export interface PreJavaType {
     kind: PreJavaTypeKind
 }
 
+export interface PreJavaTypeParameter {
+    name: string
+    // TODO : constraints
+}
+
+export interface PreJavaTypeReference {
+    type: PreJavaType
+    typeParameters: PreJavaTypeParameter[]
+}
+
 export interface BuiltinJavaType extends PreJavaType {
     kind: PreJavaTypeKind.BUILTIN
     fqn: string
@@ -631,20 +643,21 @@ export interface ClassOrInterfacePreJavaType extends PreJavaType {
 
     sourceTypes: Set<ts.Type>
 
-    baseTypes: Set<PreJavaType>
-    prototypeNamespace: string
-    prototypeName: string
+    /*baseTypes: Set<PreJavaType>
+    prototypeNames: Set<string>
     constructorSignatures: ts.Signature[]
     propertiesOrMethods: ts.Symbol[]
     numberIndexType: ts.Type
-    stringIndexType: ts.Type
+    stringIndexType: ts.Type*/
 
     addSourceType(type: ts.Type)
-    setPrototypeName(namespace: string, name: string)
+    addPrototypeName(namespace: string, name: string)
+
+    addBaseType(baseType: PreJavaType)
     addConstructorSignature(signature: ts.Signature)
     addPropertyOrMethod(property: ts.Symbol)
-    setNumberIndexType(type: ts.Type)
-    setStringIndexType(type: ts.Type)
+    setNumberIndexType(type: PreJavaType)
+    setStringIndexType(type: PreJavaType)
 }
 
 export class ClassOrInterfacePreJavaType implements ClassOrInterfacePreJavaType {
@@ -653,25 +666,29 @@ export class ClassOrInterfacePreJavaType implements ClassOrInterfacePreJavaType 
     sourceTypes = new Set<ts.Type>()
 
     baseTypes = new Set<PreJavaType>()
-    prototypeNamespace: string
-    prototypeName: string
+    prototypeNames = new Set<string>()
 
     constructorSignatures: ts.Signature[] = []
     propertiesOrMethods: ts.Symbol[] = []
 
-    numberIndexType: ts.Type
-    stringIndexType: ts.Type
+    numberIndexType: PreJavaType
+    stringIndexType: PreJavaType
 
     addSourceType(type: ts.Type) {
         this.sourceTypes.add(type)
     }
 
-    setPrototypeName(namespace: string, name: string) {
-        if ((this.prototypeNamespace || this.prototypeName) && (this.prototypeName != name || this.prototypeNamespace != namespace))
-            console.log(`ALERT XBZETH ${this.prototypeNamespace}.${this.prototypeName} / ${namespace}.${name}`)
+    addPrototypeName(namespace: string, name: string) {
+        name = namespace ? `${namespace}.${name}` : name
 
-        this.prototypeNamespace = namespace
-        this.prototypeName = name
+        if (this.prototypeNames.size && !this.prototypeNames.has(name))
+            console.log(`MULTIPLE PROTOTYPES ${this.prototypeNames} + ${name}`)
+
+        this.prototypeNames.add(name)
+    }
+
+    addBaseType(baseType: PreJavaType) {
+        this.baseTypes.add(baseType)
     }
 
     addConstructorSignature(signature: ts.Signature) {
@@ -682,12 +699,17 @@ export class ClassOrInterfacePreJavaType implements ClassOrInterfacePreJavaType 
         this.propertiesOrMethods.push(property)
     }
 
-    setNumberIndexType(type: ts.Type) {
+    setNumberIndexType(type: PreJavaType) {
         this.numberIndexType = type
     }
 
-    setStringIndexType(type: ts.Type) {
+    setStringIndexType(type: PreJavaType) {
         this.stringIndexType = type
+    }
+
+    private toJava() {
+        this.propertiesOrMethods.forEach(property => {
+        })
     }
 }
 
