@@ -23,6 +23,7 @@ export class GatherPhase {
     private BY_INDEX_GETTER = `JsTools.getItem`
 
     types: Set<ts.Type> = new Set()
+    private typeMap = new TsToPreJavaTypemap()
 
     variables: {
         declarationNode: ts.Node;
@@ -32,29 +33,6 @@ export class GatherPhase {
     constructor(private baseJavaPackage: string,
         private javaPackages: { [key: string]: string },
         private program: ts.Program) {
-    }
-
-    private registerVariable(statement: ts.VariableStatement) {
-        statement.declarationList.declarations.forEach((declaration) => {
-            let t = this.program.getTypeChecker().getTypeFromTypeNode(declaration.type)
-
-            let cs = t.getConstructSignatures()
-            if (cs && cs.length) {
-                cs.forEach(constructorSignature => {
-                    if (constructorSignature.getReturnType()) {
-                        this.registerType(constructorSignature.getReturnType())
-                        console.log(`A DISGUISED CLASS : JsType('${guessName(declaration.name)}') is the class ${this.getTypeName(constructorSignature.getReturnType())}`)
-                        // this class should be added the constructor that we are inspecting
-                    }
-                })
-            }
-
-            this.registerType(t)
-            this.variables.push({ declarationNode: declaration, name: guessName(declaration.name) });
-        });
-
-        // more than that is that we should have a static global variable named after the declared symbol,
-        // which has the type of the variable minus the constructors (which are sent to create classes)
     }
 
     private registerType(type: ts.Type) {
@@ -254,36 +232,6 @@ export class GatherPhase {
         console.log(`${tab}@JsProperty( name = "${name}")`)
         console.log(`${tab}public final native void set${upcaseName}( ${this.getTypeName(propertyType)} value );`)
         console.log()
-    }
-
-    sumup() {
-        console.log(this.variables.map(v => v.name).join(`\n`))
-
-        let typeSet = new Set<ts.Type>()
-        for (let type of this.types.values()) {
-            console.log(`Searching types from ${this.getTypeName(type)}`)
-            this.toJava(type)
-            this.addDeeperTypes(type, typeSet)
-        }
-
-        let nbAnonymous = 0
-        for (let type of typeSet.values()) {
-            if (type.getSymbol())
-                console.log(`-> ${type.getSymbol().getName()}`)
-            else
-                nbAnonymous++
-        }
-        if (nbAnonymous)
-            console.log(`-> and ${nbAnonymous} anonymous types`)
-
-        // create the set of all required top-level ts types
-        // represent those types in the hybrid AST (type, methods, attributes)
-        // (each ts type can generate multiple elements in the Java type)
-        // (this AST has a much lighter grammar than ts' one)
-        // for each of the top-level types, generate a java type
-
-        //for (let type of this.types.values())
-        //    this.analyzeType(type)
     }
 
     private addDeeperTypes(type: ts.Type, typeSet: Set<ts.Type>) {
@@ -528,19 +476,267 @@ export class GatherPhase {
     addTypesFromSourceFile(sourceFile: ts.SourceFile, onlyExportedSymbols: boolean) {
         ts.forEachChild(sourceFile, (node) => {
             if (node.kind == ts.SyntaxKind.VariableStatement) {
-                let variable = node as ts.VariableStatement
-                //if (variable.modifiers.find(m => m.kind == ts.SyntaxKind.ExportKeyword))
-                this.registerVariable(variable)
+                this.processVariableStatement(node as ts.VariableStatement)
                 return
             }
 
             if (node.kind == ts.SyntaxKind.InterfaceDeclaration || node.kind == ts.SyntaxKind.ClassDeclaration) {
-                let type = this.program.getTypeChecker().getTypeAtLocation(node);
-                this.registerType(type);
+                this.processClassOrInterfaceDeclaration(this.program.getTypeChecker().getTypeAtLocation(node))
                 return;
             }
 
             console.log(`Ignored SyntaxKind: ${ts.SyntaxKind[node.kind]}`);
         });
+    }
+
+    sumup() {
+        console.log(this.variables.map(v => 'variable : ' + v.name).join(`\n`))
+
+        this.typeMap.typeMap.forEach((v, k) => {
+            let files = k.getSymbol() ? k.getSymbol().declarations.map(d => d.getSourceFile().fileName + ':' + d.getFullStart()).join() : ''
+            let fqn = k.getSymbol() ? this.program.getTypeChecker().getFullyQualifiedName(k.getSymbol()) : ''
+            console.log(`type ${k['id']} ${k.flags} ${fqn} ${files} : ${this.getTypeName(k)}`)
+        })
+
+        // explore types deeper
+        // maybe prune and reduce some types
+        // export to java
+
+        // todo typemap : builtin-types (String, number, ...)
+
+        /*let typeSet = new Set<ts.Type>()
+        for (let type of this.types.values()) {
+            console.log(`Searching types from ${this.getTypeName(type)}`)
+            this.toJava(type)
+            this.addDeeperTypes(type, typeSet)
+        }
+
+        let nbAnonymous = 0
+        for (let type of typeSet.values()) {
+            if (type.getSymbol())
+                console.log(`-> ${type.getSymbol().getName()}`)
+            else
+                nbAnonymous++
+        }
+        if (nbAnonymous)
+            console.log(`-> and ${nbAnonymous} anonymous types`)*/
+
+        // create the set of all required top-level ts types
+        // represent those types in the hybrid AST (type, methods, attributes)
+        // (each ts type can generate multiple elements in the Java type)
+        // (this AST has a much lighter grammar than ts' one)
+        // for each of the top-level types, generate a java type
+
+        //for (let type of this.types.values())
+        //    this.analyzeType(type)
+    }
+
+    private processVariableStatement(statement: ts.VariableStatement) {
+        statement.declarationList.declarations.forEach((declaration) => {
+            let t = this.program.getTypeChecker().getTypeFromTypeNode(declaration.type)
+
+            let cs = t.getConstructSignatures()
+            if (cs && cs.length) {
+                cs.forEach(constructorSignature => {
+                    if (constructorSignature.getReturnType()) {
+
+                        let preJava = this.typeMap.getOrCreatePreJavaTypeForTsType(constructorSignature.getReturnType())
+
+                        if (preJava.kind == PreJavaTypeKind.CLASS_OR_INTERFACE) {
+                            (preJava as ClassOrInterfacePreJavaType).setPrototypeName(null, guessName(declaration.name));
+                            (preJava as ClassOrInterfacePreJavaType).addConstructorSignature(constructorSignature)
+                        }
+                    }
+                })
+            }
+
+            this.processClassOrInterfaceDeclaration(t)
+
+            this.registerType(t)
+            this.variables.push({ declarationNode: declaration, name: guessName(declaration.name) });
+        });
+
+        // more than that is that we should have a static global variable named after the declared symbol,
+        // which has the type of the variable minus the constructors (which are sent to create classes)
+    }
+
+    private processClassOrInterfaceDeclaration(type: ts.Type) {
+        let preJava = this.typeMap.getOrCreatePreJavaTypeForTsType(type)
+
+        if (preJava.kind == PreJavaTypeKind.CLASS_OR_INTERFACE) {
+            let realPreJavaType = preJava as ClassOrInterfacePreJavaType
+
+            // TODO : PreJavaType doit avoir des refs que vers des types PreJavaType
+            // TODO : il faut donc parcourir tous les types ts et faire la translation pour chacun de ts Type rencontrés
+
+            if (realPreJavaType.sourceTypes.has(type)) {
+                realPreJavaType.addSourceType(type)
+
+                let symbol = type.getSymbol()
+
+                if (symbol) {
+                    if (symbol.getDeclarations().some(d => d.kind == ts.SyntaxKind.ClassDeclaration))
+                        realPreJavaType.setPrototypeName(null, this.getTypeName(type))
+
+                    if (symbol.valueDeclaration) {
+                        let constructorType = this.program.getTypeChecker().getTypeOfSymbolAtLocation(symbol, symbol.valueDeclaration)
+                        let constructors = constructorType.getConstructSignatures()
+                        if (constructors)
+                            constructors.forEach(constructorSignature => realPreJavaType.addConstructorSignature(constructorSignature))
+                    }
+                }
+
+                let nit = type.getNumberIndexType()
+                if (nit)
+                    realPreJavaType.setNumberIndexType(nit)
+
+                let sit = type.getStringIndexType()
+                if (sit)
+                    realPreJavaType.setStringIndexType(sit)
+
+                let baseTypes = type.getBaseTypes()
+                if (baseTypes) {
+                    baseTypes.forEach(baseType => {
+                        this.processClassOrInterfaceDeclaration(baseType)
+                        realPreJavaType.baseTypes.add(this.typeMap.getOrCreatePreJavaTypeForTsType(baseType))
+                    })
+                }
+
+                let properties = type.getProperties()
+                if (properties)
+                    properties.forEach(property => realPreJavaType.addPropertyOrMethod(property))
+            }
+        }
+
+        this.registerType(type);
+    }
+}
+
+export enum PreJavaTypeKind {
+    BUILTIN,
+    CLASS_OR_INTERFACE
+}
+
+export interface PreJavaType {
+    kind: PreJavaTypeKind
+}
+
+export interface BuiltinJavaType extends PreJavaType {
+    kind: PreJavaTypeKind.BUILTIN
+    fqn: string
+}
+
+export interface ClassOrInterfacePreJavaType extends PreJavaType {
+    kind: PreJavaTypeKind.CLASS_OR_INTERFACE
+
+    sourceTypes: Set<ts.Type>
+
+    baseTypes: Set<PreJavaType>
+    prototypeNamespace: string
+    prototypeName: string
+    constructorSignatures: ts.Signature[]
+    propertiesOrMethods: ts.Symbol[]
+    numberIndexType: ts.Type
+    stringIndexType: ts.Type
+
+    addSourceType(type: ts.Type)
+    setPrototypeName(namespace: string, name: string)
+    addConstructorSignature(signature: ts.Signature)
+    addPropertyOrMethod(property: ts.Symbol)
+    setNumberIndexType(type: ts.Type)
+    setStringIndexType(type: ts.Type)
+}
+
+export class ClassOrInterfacePreJavaType implements ClassOrInterfacePreJavaType {
+    kind: PreJavaTypeKind.CLASS_OR_INTERFACE = PreJavaTypeKind.CLASS_OR_INTERFACE
+
+    sourceTypes = new Set<ts.Type>()
+
+    baseTypes = new Set<PreJavaType>()
+    prototypeNamespace: string
+    prototypeName: string
+
+    constructorSignatures: ts.Signature[] = []
+    propertiesOrMethods: ts.Symbol[] = []
+
+    numberIndexType: ts.Type
+    stringIndexType: ts.Type
+
+    addSourceType(type: ts.Type) {
+        this.sourceTypes.add(type)
+    }
+
+    setPrototypeName(namespace: string, name: string) {
+        if ((this.prototypeNamespace || this.prototypeName) && (this.prototypeName != name || this.prototypeNamespace != namespace))
+            console.log(`ALERT XBZETH ${this.prototypeNamespace}.${this.prototypeName} / ${namespace}.${name}`)
+
+        this.prototypeNamespace = namespace
+        this.prototypeName = name
+    }
+
+    addConstructorSignature(signature: ts.Signature) {
+        this.constructorSignatures.push(signature)
+    }
+
+    addPropertyOrMethod(property: ts.Symbol) {
+        this.propertiesOrMethods.push(property)
+    }
+
+    setNumberIndexType(type: ts.Type) {
+        this.numberIndexType = type
+    }
+
+    setStringIndexType(type: ts.Type) {
+        this.stringIndexType = type
+    }
+}
+
+const BUILTIN_TYPE_OBJECT = { kind: PreJavaTypeKind.BUILTIN, fqn: 'java.lang.Object' }
+const BUILTIN_TYPE_STRING = { kind: PreJavaTypeKind.BUILTIN, fqn: 'java.lang.String' }
+const BUILTIN_TYPE_NUMBER = { kind: PreJavaTypeKind.BUILTIN, fqn: 'java.lang.Number' }
+const BUILTIN_TYPE_BOOLEAN = { kind: PreJavaTypeKind.BUILTIN, fqn: 'java.lang.Boolean' }
+const BUILTIN_TYPE_UNIT = { kind: PreJavaTypeKind.BUILTIN, fqn: 'void' }
+const BUILTIN_TYPE_VOID = { kind: PreJavaTypeKind.BUILTIN, fqn: 'java.lang.Void' }
+
+export class TsToPreJavaTypemap {
+    typeMap = new Map<ts.Type, PreJavaType>()
+
+    getOrCreatePreJavaTypeForTsType(tsType: ts.Type): PreJavaType {
+        if (tsType.flags & ts.TypeFlags.Any)
+            return BUILTIN_TYPE_OBJECT
+        if (tsType.flags & ts.TypeFlags.StringLike)
+            return BUILTIN_TYPE_STRING
+        if (tsType.flags & ts.TypeFlags.StringLiteral)
+            return BUILTIN_TYPE_STRING
+        if (tsType.flags & ts.TypeFlags.Number)
+            return BUILTIN_TYPE_NUMBER
+        if (tsType.flags & ts.TypeFlags.NumberLiteral)
+            return BUILTIN_TYPE_NUMBER
+        if (tsType.flags & ts.TypeFlags.NumberLike)
+            return BUILTIN_TYPE_NUMBER
+        if (tsType.flags & ts.TypeFlags.Boolean)
+            return BUILTIN_TYPE_BOOLEAN
+        if (tsType.flags & ts.TypeFlags.BooleanLiteral)
+            return BUILTIN_TYPE_BOOLEAN
+        if (tsType.flags & ts.TypeFlags.BooleanLike)
+            return BUILTIN_TYPE_BOOLEAN
+        if (tsType.flags & ts.TypeFlags.Void)
+            return BUILTIN_TYPE_UNIT
+        if (tsType.flags & ts.TypeFlags.Undefined)
+            return BUILTIN_TYPE_UNIT
+        if (tsType.flags & ts.TypeFlags.Null)
+            return BUILTIN_TYPE_VOID
+        if (tsType.flags & ts.TypeFlags.Never)
+            return BUILTIN_TYPE_VOID
+
+        if (this.typeMap.has(tsType))
+            return this.typeMap.get(tsType)
+
+        let preJavaType = new ClassOrInterfacePreJavaType()
+        preJavaType.addSourceType(tsType)
+
+        this.typeMap.set(tsType, preJavaType)
+
+        return preJavaType
     }
 }
