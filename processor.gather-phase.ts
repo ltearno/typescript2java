@@ -602,7 +602,20 @@ export class GatherPhase {
                 if (baseTypes) {
                     baseTypes.forEach(baseType => {
                         this.processClassOrInterfaceDeclaration(baseType)
-                        realPreJavaType.addBaseType(this.typeMap.getOrCreatePreJavaTypeForTsType(baseType))
+
+                        if ((baseType.flags & ts.TypeFlags.Object) && ((baseType as ts.ObjectType).objectFlags & ts.ObjectFlags.Reference)) {
+                            let reference = baseType as ts.TypeReference
+                            realPreJavaType.addBaseType({
+                                type: this.typeMap.getOrCreatePreJavaTypeForTsType(reference.target),
+                                typeParameters: reference.typeArguments.map(typeArgument => this.typeMap.getOrCreatePreJavaTypeForTsType(typeArgument))
+                            })
+                        }
+                        else {
+                            realPreJavaType.addBaseType({
+                                type: this.typeMap.getOrCreatePreJavaTypeForTsType(baseType),
+                                typeParameters: null
+                            })
+                        }
                     })
                 }
 
@@ -614,27 +627,31 @@ export class GatherPhase {
     }
 }
 
+export interface PreJavaTypeReference {
+    type: PreJavaType
+    typeParameters: PreJavaType[]
+}
+
 export enum PreJavaTypeKind {
     BUILTIN,
-    CLASS_OR_INTERFACE
+    CLASS_OR_INTERFACE,
+    TYPE_PARAMETER
 }
 
 export interface PreJavaType {
     kind: PreJavaTypeKind
 }
 
-export interface PreJavaTypeParameter {
+export interface PreJavaTypeParameter extends PreJavaType {
+    kind: PreJavaTypeKind.TYPE_PARAMETER
+
     name: string
     // TODO : constraints
 }
 
-export interface PreJavaTypeReference {
-    type: PreJavaType
-    typeParameters: PreJavaTypeParameter[]
-}
-
 export interface BuiltinJavaType extends PreJavaType {
     kind: PreJavaTypeKind.BUILTIN
+
     fqn: string
 }
 
@@ -653,7 +670,7 @@ export interface ClassOrInterfacePreJavaType extends PreJavaType {
     addSourceType(type: ts.Type)
     addPrototypeName(namespace: string, name: string)
 
-    addBaseType(baseType: PreJavaType)
+    addBaseType(baseType: PreJavaTypeReference)
     addConstructorSignature(signature: ts.Signature)
     addPropertyOrMethod(property: ts.Symbol)
     setNumberIndexType(type: PreJavaType)
@@ -665,7 +682,7 @@ export class ClassOrInterfacePreJavaType implements ClassOrInterfacePreJavaType 
 
     sourceTypes = new Set<ts.Type>()
 
-    baseTypes = new Set<PreJavaType>()
+    baseTypes = new Set<PreJavaTypeReference>()
     prototypeNames = new Set<string>()
 
     constructorSignatures: ts.Signature[] = []
@@ -687,7 +704,7 @@ export class ClassOrInterfacePreJavaType implements ClassOrInterfacePreJavaType 
         this.prototypeNames.add(name)
     }
 
-    addBaseType(baseType: PreJavaType) {
+    addBaseType(baseType: PreJavaTypeReference) {
         this.baseTypes.add(baseType)
     }
 
@@ -750,6 +767,15 @@ export class TsToPreJavaTypemap {
             return BUILTIN_TYPE_VOID
         if (tsType.flags & ts.TypeFlags.Never)
             return BUILTIN_TYPE_VOID
+
+        if (tsType.flags & ts.TypeFlags.TypeParameter) {
+            let res: PreJavaTypeParameter = {
+                kind: PreJavaTypeKind.TYPE_PARAMETER,
+                name: (tsType as ts.TypeParameter).symbol.getName()
+            }
+
+            return res
+        }
 
         if (this.typeMap.has(tsType))
             return this.typeMap.get(tsType)
