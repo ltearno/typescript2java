@@ -502,6 +502,10 @@ export class GatherPhase {
             }
         }
 
+        this.currentIdAnonymousTypes = this.typeMap.ensureAllTypesHaveName(this.currentIdAnonymousTypes)
+        this.typeMap.removeIndexedAccessTypes()
+        this.typeMap.developMethodOverridesForUnionParameters()
+
         console.log(this.variables.map(v => 'variable : ' + v.name).join(`\n`))
 
         this.typeMap.typeMap.forEach((type, k) => {
@@ -639,7 +643,10 @@ export class GatherPhase {
 
             let callSignatures = type.getCallSignatures()
             if (callSignatures && callSignatures.length == 1) {
-                realPreJavaType.addMethod(this.convertSignature('FUNCTIONAL_CALL', callSignatures[0]))
+                // TODO : Check that the method is alone so that it is a correct functional type
+                // TODO : check if it can be melted down with other similar types
+                // TODO : try to get a name for it from where it has been created (callback of a function, ...)
+                realPreJavaType.addMethod(this.convertSignature('execute', callSignatures[0]))
             }
         }
     }

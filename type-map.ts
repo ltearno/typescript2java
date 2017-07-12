@@ -41,7 +41,7 @@ export interface PreJavaTypeParameter extends PreJavaType {
     kind: PreJavaTypeKind.TYPE_PARAMETER
 
     name: string
-    // TODO : constraints
+    constraint: PreJavaType
 }
 
 export interface BuiltinJavaType extends PreJavaType {
@@ -122,6 +122,13 @@ export class ClassOrInterfacePreJavaType implements ClassOrInterfacePreJavaType 
                 console.log(`${this.getTypeName(property.type)} ${property.name} ${property.writable ? '' : 'READ-ONLY'}`)
         }
 
+        if (this.numberIndexType) {
+            console.log(`index by number : ${this.getTypeName(this.numberIndexType)}`)
+        }
+        if (this.stringIndexType) {
+            console.log(`index by string : ${this.getTypeName(this.stringIndexType)}`)
+        }
+
         if (this.methods && this.methods.length) {
             console.log(`methods`)
             for (let method of this.methods) {
@@ -132,12 +139,20 @@ export class ClassOrInterfacePreJavaType implements ClassOrInterfacePreJavaType 
 
     private serializeSignature(signature: PreJavaTypeCallSignature, defaultName: string = null) {
         let res = ''
-        if (signature.typeParameters)
-            res += `<${signature.typeParameters.map(tp => tp.name).join()}> `
+
+        if (signature.typeParameters) {
+            res += '<'
+            res += signature.typeParameters.map(tp => {
+                return tp.name + (tp.constraint ? ` extends ${this.getTypeName(tp.constraint)}` : '')
+            }).join()
+            res += '> '
+        }
+
         if (signature.name)
             res += `${this.getTypeName(signature.returnType)} ${signature.name}`
         else if (defaultName)
             res += `${defaultName}`
+
         if (signature.parameters && signature.parameters.length)
             res += `(${signature.parameters.map(p => this.getTypeName(p.type) + ' ' + p.name).join()})`
         else
@@ -164,6 +179,8 @@ export class ClassOrInterfacePreJavaType implements ClassOrInterfacePreJavaType 
             case PreJavaTypeKind.UNION:
                 return `UnionOf${(type as PreJavaTypeUnion).types.map(t => this.getTypeName(t)).join('And')}`
         }
+
+        return 'UNNAMMABLE NAME'
     }
 
     addSourceType(type: ts.Type) {
@@ -230,6 +247,45 @@ const FAKE_TYPE_INDEXEDACCESS = { kind: PreJavaTypeKind.BUILTIN, fqn: 'java.lang
 export class TsToPreJavaTypemap {
     typeMap = new Map<ts.Type, PreJavaType>()
 
+    ensureAllTypesHaveName(currentIdAnonymousTypes: number) {
+        for (let type of this.typeMap.values())
+            if (type.kind == PreJavaTypeKind.CLASS_OR_INTERFACE) {
+                let t = type as ClassOrInterfacePreJavaType
+                if (t.name == null)
+                    t.name = `AnonymousType_${currentIdAnonymousTypes++}`
+            }
+        return currentIdAnonymousTypes
+    }
+
+    removeIndexedAccessTypes() {
+        function signatureHasIndexedType(sig: PreJavaTypeCallSignature) {
+            return (sig.returnType === FAKE_TYPE_INDEXEDACCESS)
+                || (sig.typeParameters && sig.typeParameters.some(tp => tp.constraint === FAKE_TYPE_INDEXEDACCESS))
+                || (sig.parameters && sig.parameters.some(p => p.type === FAKE_TYPE_INDEXEDACCESS))
+        }
+
+        let pruneType = (type: ClassOrInterfacePreJavaType) => {
+            type.baseTypes.delete(FAKE_TYPE_INDEXEDACCESS)
+            type.constructorSignatures = type.constructorSignatures.filter(s => !signatureHasIndexedType(s))
+            type.methods = type.methods.filter(s => !signatureHasIndexedType(s))
+            type.properties = type.properties.filter(p => p.type !== FAKE_TYPE_INDEXEDACCESS)
+        }
+
+        for (let type of this.typeMap.values())
+            if (type.kind == PreJavaTypeKind.CLASS_OR_INTERFACE)
+                pruneType(type as ClassOrInterfacePreJavaType)
+    }
+
+    developMethodOverridesForUnionParameters() {
+        let developMethods = (type: ClassOrInterfacePreJavaType) => {
+            // constructors and methods with union type parameters or inside parameters...
+        }
+
+        for (let type of this.typeMap.values())
+            if (type.kind == PreJavaTypeKind.CLASS_OR_INTERFACE)
+                developMethods(type as ClassOrInterfacePreJavaType)
+    }
+
     getNotProcessedTypes(): ClassOrInterfacePreJavaType[] {
         let res: ClassOrInterfacePreJavaType[] = []
         this.typeMap.forEach(preJavaType => {
@@ -240,6 +296,9 @@ export class TsToPreJavaTypemap {
     }
 
     getOrCreatePreJavaTypeForTsType(tsType: ts.Type): PreJavaType {
+        if (!tsType)
+            return null
+
         if (tsType.flags & ts.TypeFlags.Any)
             return BUILTIN_TYPE_OBJECT
         if (tsType.flags & ts.TypeFlags.NonPrimitive)
@@ -294,7 +353,8 @@ export class TsToPreJavaTypemap {
             let symbol = (tsType as ts.TypeParameter).getSymbol()
             let res: PreJavaTypeParameter = {
                 kind: PreJavaTypeKind.TYPE_PARAMETER,
-                name: symbol ? symbol.getName() : '?'
+                name: symbol ? symbol.getName() : '?',
+                constraint: this.getOrCreatePreJavaTypeForTsType((tsType as ts.TypeParameter).constraint)
             }
 
             return res
