@@ -6,133 +6,74 @@ source C:/Documents/Repos/typescript2java/node_modules/typescript/lib/lib.es6.d.
 source tests/test.d.ts
 Ignored SyntaxKind: TypeAliasDeclaration
 Ignored SyntaxKind: EndOfFileToken
-variable : Rock
-variable : toto
-
-
-type 51 32768 "tests/test".Rock tests/test.d.ts:0,tests/test.d.ts:146 : Rock
-name: Rock
-prototypes
-Rock
-constructors
-Rock(java.lang.String a,java.lang.Number b)
-Rock(java.lang.String a,java.lang.Number b)
-properties
-undefined moimoi 
-methods
-java.lang.String moimoi(java.lang.String a)
-
-
-type 53 32768 "tests/test".Rock.moimoi tests/test.d.ts:90 : moimoi
-name: MoimoiCaller
-
-
-type 52 32768 __type tests/test.d.ts:152 : __type
-name: null
-properties
-java.lang.Number SAVE_ME 
-
-
-type 55 32768 __type tests/test.d.ts:286 : __type
-name: SpaceShip
-prototypes
-SpaceShip
-constructors
-SpaceShip(java.lang.String a,java.lang.Number b)
-properties
-undefined mimi 
-methods
-undefined<...> mimi(java.lang.Number mati)
-
-
-type 35 32768 Array C:/Documents/Repos/typescript2java/node_modules/typescript/lib/lib.es6.d.ts:48601,C:/Documents/Repos/typescript2java/node_modules/typescript/lib/lib.es6.d.ts:60570,C:/Documents/Repos/typescript2java/node_modules/typescript/lib/lib.es6.d.ts:199010,C:/Documents/Repos/typescript2java/node_modules/typescript/lib/lib.es6.d.ts:221840,C:/Documents/Repos/typescript2java/node_modules/typescript/lib/lib.es6.d.ts:250254 : Array
-name: null
-
-
-type 56 32768 __type.mimi tests/test.d.ts:288 : mimi
-name: MimiCaller
-
-
-type 58 32768 "tests/test".JeSuisInterface tests/test.d.ts:336 : JeSuisInterface
-name: JeSuisInterface
-
-
-type 59 32768 "tests/test".JeSuisClasse tests/test.d.ts:376 : JeSuisClasse
-name: JeSuisClasse
-prototypes
-JeSuisClasse
-constructors
-JeSuisClasse()
-
-
-type 62 32768 "tests/test".PartialClass tests/test.d.ts:409,tests/test.d.ts:509,tests/test.d.ts:1016 : PartialClass
-name: PartialClass
-prototypes
-PartialClass
-constructors
-PartialClass(java.lang.String a,java.lang.Object b,java.lang.Object c,java.lang.Object d,java.lang.Object e)
-properties
-java.lang.Number a 
-PartialClass deeper 
-undefined aFunction 
-java.lang.String c 
-methods
-java.lang.Number deeper(java.lang.String n)
-java.lang.Number aFunction(java.lang.Number n,java.lang.String s)
-
-
-type 65 32768 "tests/test".PartialClass.aFunction tests/test.d.ts:707 : aFunction
-name: AFunctionCaller
-
-
-type 66 32768 "tests/test".CompileAnimationStateDeclarationMetadata tests/test.d.ts:799 : CompileAnimationStateDeclarationMetadata
-name: CompileAnimationStateDeclarationMetadata
-prototypes
-CompileAnimationStateDeclarationMetadata
-constructors
-CompileAnimationStateDeclarationMetadata(java.lang.String stateNameExpr,PartialClass styles)
-properties
-PartialClass stateNameExpr 
-methods
-java.lang.Number stateNameExpr(java.lang.String n)
-
-
-type 69 32768 "tests/test".TestI tests/test.d.ts:958,tests/test.d.ts:1104 : TestI
-name: TestI
-properties
-PartialClass a 
-undefined<...> baobab 
-PartialClass cc 
-methods
-java.lang.Number a(java.lang.String n)
-java.lang.Number cc(java.lang.String n)
-
-
-type 73 32768 "tests/test".ConcreteAbstractPartialClass tests/test.d.ts:1191 : ConcreteAbstractPartialClass
-name: ConcreteAbstractPartialClass
-properties
-undefined faireSomethink 
-undefined faireSomethins 
-undefined<...> monTest 
-java.lang.Number a 
-PartialClass deeper 
-undefined aFunction 
-java.lang.String c 
-methods
-java.lang.Object faireSomethink()
-java.lang.Object faireSomethins(java.lang.Number i,undefined toto)
-java.lang.Number deeper(java.lang.String n)
-java.lang.Number aFunction(java.lang.Number n,java.lang.String s)
-
-
-type 77 32768 "tests/test".ConcreteAbstractPartialClass.faireSomethink tests/test.d.ts:1266 : faireSomethink
-name: FaireSomethinkCaller
-
-
-type 78 32768 "tests/test".ConcreteAbstractPartialClass.faireSomethins tests/test.d.ts:1289 : faireSomethins
-name: FaireSomethinsCaller
-
-
-type 79 65536   : StringOrU
-name: null
-Finished.
+processing types...
+processing Rock
+processing null
+processing SpaceShip
+processing null
+processing null
+processing null
+processing null
+processing null
+processing null
+processing MoimoiCaller
+processing null
+processing MimiCaller
+processing AFunctionCaller
+processing FaireSomethinkCaller
+processing FaireSomethinsCaller
+processing null
+processing ToStringCaller
+processing ToLocaleStringCaller
+processing PushCaller
+processing PopCaller
+processing null
+processing ConcatCaller
+processing JoinCaller
+processing ReverseCaller
+processing ShiftCaller
+processing SliceCaller
+processing null
+processing SortCaller
+processing SpliceCaller
+processing UnshiftCaller
+processing IndexOfCaller
+processing LastIndexOfCaller
+processing null
+processing EveryCaller
+processing null
+processing SomeCaller
+processing null
+processing ForEachCaller
+processing null
+processing null
+processing null
+processing null
+processing null
+processing null
+processing null
+processing null
+processing null
+processing MapCaller
+processing null
+processing FilterCaller
+processing null
+processing null
+processing ReduceCaller
+processing null
+processing null
+processing ReduceRightCaller
+processing null
+processing FindCaller
+processing null
+processing FindIndexCaller
+processing FillCaller
+processing CopyWithinCaller
+processing null
+processing __@iteratorCaller
+processing EntriesCaller
+processing KeysCaller
+processing ValuesCaller
+processing null
+processing __@unscopablesCaller
+processing null

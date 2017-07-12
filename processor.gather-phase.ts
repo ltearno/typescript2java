@@ -481,7 +481,7 @@ export class GatherPhase {
             }
 
             if (node.kind == ts.SyntaxKind.InterfaceDeclaration || node.kind == ts.SyntaxKind.ClassDeclaration) {
-                this.processClassOrInterfaceDeclaration(this.program.getTypeChecker().getTypeAtLocation(node))
+                this.typeMap.getOrCreatePreJavaTypeForTsType(this.program.getTypeChecker().getTypeAtLocation(node))
                 return;
             }
 
@@ -490,6 +490,17 @@ export class GatherPhase {
     }
 
     sumup() {
+        console.log(`processing types...`)
+        while (true) {
+            let notProcessed = this.typeMap.getNotProcessedTypes()
+            if (notProcessed == null || notProcessed.length <= 0)
+                break
+
+            for (let preJavaType of notProcessed) {
+                this.processClassOrInterfaceDeclaration(preJavaType)
+            }
+        }
+
         console.log(this.variables.map(v => 'variable : ' + v.name).join(`\n`))
 
         this.typeMap.typeMap.forEach((type, k) => {
@@ -507,38 +518,6 @@ export class GatherPhase {
                 }
             }
         })
-
-        // explore types deeper
-        // maybe prune and reduce some types
-        // export to java
-
-        // todo typemap : builtin-types (String, number, ...)
-
-        /*let typeSet = new Set<ts.Type>()
-        for (let type of this.types.values()) {
-            console.log(`Searching types from ${this.getTypeName(type)}`)
-            this.toJava(type)
-            this.addDeeperTypes(type, typeSet)
-        }
-
-        let nbAnonymous = 0
-        for (let type of typeSet.values()) {
-            if (type.getSymbol())
-                console.log(`-> ${type.getSymbol().getName()}`)
-            else
-                nbAnonymous++
-        }
-        if (nbAnonymous)
-            console.log(`-> and ${nbAnonymous} anonymous types`)*/
-
-        // create the set of all required top-level ts types
-        // represent those types in the hybrid AST (type, methods, attributes)
-        // (each ts type can generate multiple elements in the Java type)
-        // (this AST has a much lighter grammar than ts' one)
-        // for each of the top-level types, generate a java type
-
-        //for (let type of this.types.values())
-        //    this.analyzeType(type)
     }
 
     private processVariableStatement(statement: ts.VariableStatement) {
@@ -555,8 +534,6 @@ export class GatherPhase {
                             (preJava as ClassOrInterfacePreJavaType).maybeSetTypeName(guessName(declaration.name));
                             (preJava as ClassOrInterfacePreJavaType).addConstructorSignature(this.convertSignature(null, constructorSignature))
                         }
-
-                        this.processClassOrInterfaceDeclaration(constructorSignature.getReturnType())
                     }
                 })
             }
@@ -565,25 +542,23 @@ export class GatherPhase {
                 || t.getStringIndexType()
                 || (t.getCallSignatures() && t.getCallSignatures().some(s => s.declaration && s.declaration.name && s.declaration.name.getText() != '__call'))
                 || (t.getProperties() && t.getProperties().some(p => p.name != 'prototype'))) {
-                this.processClassOrInterfaceDeclaration(t)
+                this.typeMap.getOrCreatePreJavaTypeForTsType(t)
 
                 this.variables.push({ declarationNode: declaration, name: guessName(declaration.name) });
             }
         })
     }
 
-    private processClassOrInterfaceDeclaration(type: ts.Type) {
-        let preJava = this.typeMap.getOrCreatePreJavaTypeForTsType(type)
+    private processClassOrInterfaceDeclaration(preJava: ClassOrInterfacePreJavaType) {
+        let realPreJavaType = preJava as ClassOrInterfacePreJavaType
 
-        if (preJava.kind == PreJavaTypeKind.CLASS_OR_INTERFACE) {
-            let realPreJavaType = preJava as ClassOrInterfacePreJavaType
+        if (realPreJavaType.processed)
+            return
+        realPreJavaType.processed = true
 
-            if (realPreJavaType.processed)
-                return
-            realPreJavaType.processed = true
+        console.log(`processing ${realPreJavaType.name}`)
 
-            realPreJavaType.addSourceType(type)
-
+        for (let type of realPreJavaType.sourceTypes) {
             let symbol = type.getSymbol()
 
             if (symbol) {
@@ -603,23 +578,17 @@ export class GatherPhase {
 
             let nit = type.getNumberIndexType()
             if (nit) {
-                this.processClassOrInterfaceDeclaration(nit)
-
                 realPreJavaType.setNumberIndexType(this.typeMap.getOrCreatePreJavaTypeForTsType(nit))
             }
 
             let sit = type.getStringIndexType()
             if (sit) {
-                this.processClassOrInterfaceDeclaration(sit)
-
                 realPreJavaType.setStringIndexType(this.typeMap.getOrCreatePreJavaTypeForTsType(sit))
             }
 
             let baseTypes = type.getBaseTypes()
             if (baseTypes) {
                 baseTypes.forEach(baseType => {
-                    this.processClassOrInterfaceDeclaration(baseType)
-
                     realPreJavaType.addBaseType(this.typeMap.getOrCreatePreJavaTypeForTsType(baseType))
                 })
             }
@@ -628,6 +597,9 @@ export class GatherPhase {
             if (properties) {
                 properties.forEach(property => {
                     let propertyName = property.getName()
+                    
+                    if (!property.valueDeclaration)
+                        return
                     let propertyType = this.program.getTypeChecker().getTypeAtLocation(property.valueDeclaration)
 
                     let callSignatures = propertyType.getCallSignatures()
@@ -880,6 +852,15 @@ const BUILTIN_TYPE_VOID = { kind: PreJavaTypeKind.BUILTIN, fqn: 'java.lang.Void'
 
 export class TsToPreJavaTypemap {
     typeMap = new Map<ts.Type, PreJavaType>()
+
+    getNotProcessedTypes(): ClassOrInterfacePreJavaType[] {
+        let res: ClassOrInterfacePreJavaType[] = []
+        this.typeMap.forEach(preJavaType => {
+            if (preJavaType.kind == PreJavaTypeKind.CLASS_OR_INTERFACE && !(preJavaType as ClassOrInterfacePreJavaType).processed)
+                res.push(preJavaType as ClassOrInterfacePreJavaType)
+        })
+        return res
+    }
 
     getOrCreatePreJavaTypeForTsType(tsType: ts.Type): PreJavaType {
         if (tsType.flags & ts.TypeFlags.Any)
