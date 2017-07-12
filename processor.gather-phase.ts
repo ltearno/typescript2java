@@ -504,8 +504,12 @@ export class GatherPhase {
 
         this.currentIdAnonymousTypes = this.typeMap.ensureAllTypesHaveName(this.currentIdAnonymousTypes)
         this.typeMap.removeIndexedAccessTypes()
+        this.typeMap.removeSymbolType()
         this.typeMap.developMethodOverridesForUnionParameters()
-
+        // simplify : merge types with same name and same structure
+        // by default for properties : do not generate Caller
+        // Array => JsArray and so on for similar custom native types replacement\\freebox
+        
         console.log(this.variables.map(v => 'variable : ' + v.name).join(`\n`))
 
         this.typeMap.typeMap.forEach((type, k) => {

@@ -257,23 +257,36 @@ export class TsToPreJavaTypemap {
         return currentIdAnonymousTypes
     }
 
-    removeIndexedAccessTypes() {
+    private removeTypeInTypes(typeToRemove: PreJavaType) {
         function signatureHasIndexedType(sig: PreJavaTypeCallSignature) {
-            return (sig.returnType === FAKE_TYPE_INDEXEDACCESS)
-                || (sig.typeParameters && sig.typeParameters.some(tp => tp.constraint === FAKE_TYPE_INDEXEDACCESS))
-                || (sig.parameters && sig.parameters.some(p => p.type === FAKE_TYPE_INDEXEDACCESS))
+            return (sig.returnType === typeToRemove)
+                || (sig.typeParameters && sig.typeParameters.some(tp => tp.constraint === typeToRemove))
+                || (sig.parameters && sig.parameters.some(p => p.type === typeToRemove))
         }
 
         let pruneType = (type: ClassOrInterfacePreJavaType) => {
-            type.baseTypes.delete(FAKE_TYPE_INDEXEDACCESS)
+            type.baseTypes.delete(typeToRemove)
             type.constructorSignatures = type.constructorSignatures.filter(s => !signatureHasIndexedType(s))
             type.methods = type.methods.filter(s => !signatureHasIndexedType(s))
-            type.properties = type.properties.filter(p => p.type !== FAKE_TYPE_INDEXEDACCESS)
+            type.properties = type.properties.filter(p => p.type != typeToRemove)
         }
 
-        for (let type of this.typeMap.values())
+        for (let type of this.typeMap.values()) {
             if (type.kind == PreJavaTypeKind.CLASS_OR_INTERFACE)
                 pruneType(type as ClassOrInterfacePreJavaType)
+            else if (type.kind == PreJavaTypeKind.UNION) {
+                let union = type as PreJavaTypeUnion
+                union.types = union.types ? union.types.filter(t => t != typeToRemove) : null
+            }
+        }
+    }
+
+    removeIndexedAccessTypes() {
+        this.removeTypeInTypes(FAKE_TYPE_INDEXEDACCESS)
+    }
+
+    removeSymbolType() {
+        this.removeTypeInTypes(FAKE_TYPE_ESSYMBOL)
     }
 
     developMethodOverridesForUnionParameters() {
@@ -328,21 +341,6 @@ export class TsToPreJavaTypemap {
         if (tsType.flags & ts.TypeFlags.Never)
             return BUILTIN_TYPE_VOID
 
-        if (tsType.flags & ts.TypeFlags.Union) {
-            let unionType = tsType as ts.UnionType
-
-            let res: PreJavaTypeUnion = {
-                kind: PreJavaTypeKind.UNION,
-                types: unionType.types.map(t => this.getOrCreatePreJavaTypeForTsType(t))
-            }
-            return res
-        }
-
-        if (tsType.flags & ts.TypeFlags.Intersection) {
-            // TODO : implement that
-            return FAKE_TYPE_INTERSECTION
-        }
-
         if (tsType.flags & ts.TypeFlags.ESSymbol)
             return FAKE_TYPE_ESSYMBOL
 
@@ -374,6 +372,24 @@ export class TsToPreJavaTypemap {
 
         if (this.typeMap.has(tsType))
             return this.typeMap.get(tsType)
+
+        if (tsType.flags & ts.TypeFlags.Union) {
+            let unionType = tsType as ts.UnionType
+
+            let res: PreJavaTypeUnion = {
+                kind: PreJavaTypeKind.UNION,
+                types: unionType.types.map(t => this.getOrCreatePreJavaTypeForTsType(t))
+            }
+
+            this.typeMap.set(tsType, res)
+
+            return res
+        }
+
+        if (tsType.flags & ts.TypeFlags.Intersection) {
+            // TODO : implement that
+            return FAKE_TYPE_INTERSECTION
+        }
 
         if (tsType.flags & ts.TypeFlags.Object) {
             let preJavaType = new ClassOrInterfacePreJavaType()
