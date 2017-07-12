@@ -59,6 +59,7 @@ export interface ClassOrInterfacePreJavaType extends PreJavaType {
     addSourceType(type: ts.Type)
     addPrototypeName(namespace: string, name: string)
     maybeSetTypeName(name: string)
+    setTypeParameters(typeParameters: PreJavaTypeParameter[])
 
     addBaseType(baseType: PreJavaType)
     addConstructorSignature(signature: PreJavaTypeCallSignature)
@@ -77,6 +78,8 @@ export class ClassOrInterfacePreJavaType implements ClassOrInterfacePreJavaType 
 
     name: string = null
 
+    typeParameters: PreJavaTypeParameter[] = null
+
     baseTypes = new Set<PreJavaType>()
     prototypeNames = new Set<string>()
 
@@ -89,6 +92,10 @@ export class ClassOrInterfacePreJavaType implements ClassOrInterfacePreJavaType 
 
     dump() {
         console.log(`name: ${this.name}`)
+
+        if (this.typeParameters && this.typeParameters.length) {
+            console.log(`type parameters : ${this.typeParameters.map(tp => tp.name).join(', ')}`)
+        }
 
         if (this.prototypeNames && this.prototypeNames.size) {
             console.log(`prototypes`)
@@ -140,10 +147,12 @@ export class ClassOrInterfacePreJavaType implements ClassOrInterfacePreJavaType 
                 return (type as PreJavaTypeParameter).name
 
             case PreJavaTypeKind.CLASS_OR_INTERFACE:
-                return (type as ClassOrInterfacePreJavaType).prototypeNames.values().next().value
+                return (type as ClassOrInterfacePreJavaType).name
 
-            case PreJavaTypeKind.REFERENCE:
-                return this.getTypeName((type as PreJavaTypeReference).type) + '<...>'
+            case PreJavaTypeKind.REFERENCE: {
+                let reference = type as PreJavaTypeReference
+                return this.getTypeName(reference.type) + `<${reference.typeParameters.map(tp => this.getTypeName(tp)).join(', ')}>`
+            }
         }
     }
 
@@ -165,6 +174,11 @@ export class ClassOrInterfacePreJavaType implements ClassOrInterfacePreJavaType 
             return
         if (this.name == null)
             this.name = name
+    }
+
+    setTypeParameters(typeParameters: PreJavaTypeParameter[]) {
+        if (typeParameters)
+            this.typeParameters = typeParameters
     }
 
     addBaseType(baseType: PreJavaType) {
@@ -199,6 +213,11 @@ const BUILTIN_TYPE_BOOLEAN = { kind: PreJavaTypeKind.BUILTIN, fqn: 'java.lang.Bo
 const BUILTIN_TYPE_UNIT = { kind: PreJavaTypeKind.BUILTIN, fqn: 'void' }
 const BUILTIN_TYPE_VOID = { kind: PreJavaTypeKind.BUILTIN, fqn: 'java.lang.Void' }
 
+const FAKE_TYPE_UNION = { kind: PreJavaTypeKind.BUILTIN, fqn: 'java.lang.Object' }
+const FAKE_TYPE_INTERSECTION = { kind: PreJavaTypeKind.BUILTIN, fqn: 'java.lang.Object' }
+const FAKE_TYPE_ESSYMBOL = { kind: PreJavaTypeKind.BUILTIN, fqn: 'java.lang.EsSymbol' }
+const FAKE_TYPE_INDEXEDACCESS = { kind: PreJavaTypeKind.BUILTIN, fqn: 'java.lang.IndexedAccess' }
+
 export class TsToPreJavaTypemap {
     typeMap = new Map<ts.Type, PreJavaType>()
 
@@ -213,6 +232,8 @@ export class TsToPreJavaTypemap {
 
     getOrCreatePreJavaTypeForTsType(tsType: ts.Type): PreJavaType {
         if (tsType.flags & ts.TypeFlags.Any)
+            return BUILTIN_TYPE_OBJECT
+        if (tsType.flags & ts.TypeFlags.NonPrimitive)
             return BUILTIN_TYPE_OBJECT
         if (tsType.flags & ts.TypeFlags.StringLike)
             return BUILTIN_TYPE_STRING
@@ -239,6 +260,22 @@ export class TsToPreJavaTypemap {
         if (tsType.flags & ts.TypeFlags.Never)
             return BUILTIN_TYPE_VOID
 
+        if (tsType.flags & ts.TypeFlags.Union) {
+            // TODO : implement that
+            return FAKE_TYPE_UNION
+        }
+
+        if (tsType.flags & ts.TypeFlags.Intersection) {
+            // TODO : implement that
+            return FAKE_TYPE_INTERSECTION
+        }
+
+        if (tsType.flags & ts.TypeFlags.ESSymbol)
+            return FAKE_TYPE_ESSYMBOL
+
+        if (tsType.flags & ts.TypeFlags.IndexedAccess)
+            return FAKE_TYPE_INDEXEDACCESS
+
         if (tsType.flags & ts.TypeFlags.TypeParameter) {
             let res: PreJavaTypeParameter = {
                 kind: PreJavaTypeKind.TYPE_PARAMETER,
@@ -263,11 +300,16 @@ export class TsToPreJavaTypemap {
         if (this.typeMap.has(tsType))
             return this.typeMap.get(tsType)
 
-        let preJavaType = new ClassOrInterfacePreJavaType()
-        preJavaType.addSourceType(tsType)
+        if (tsType.flags & ts.TypeFlags.Object) {
+            let preJavaType = new ClassOrInterfacePreJavaType()
+            preJavaType.addSourceType(tsType)
 
-        this.typeMap.set(tsType, preJavaType)
+            this.typeMap.set(tsType, preJavaType)
 
-        return preJavaType
+            return preJavaType
+        }
+
+        console.warn(`no mapping for ts type ${tsType}`)
+        return BUILTIN_TYPE_OBJECT
     }
 }

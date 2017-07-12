@@ -24,7 +24,7 @@ export class GatherPhase {
     private BY_INDEX_GETTER = `JsTools.getItem`
 
     types: Set<ts.Type> = new Set()
-    private typeMap = new TsToPreJavaTypemap()
+    private typeMap = new TypeMap.TsToPreJavaTypemap()
 
     variables: {
         declarationNode: ts.Node;
@@ -505,7 +505,7 @@ export class GatherPhase {
         console.log(this.variables.map(v => 'variable : ' + v.name).join(`\n`))
 
         this.typeMap.typeMap.forEach((type, k) => {
-            let files = k.getSymbol() ? k.getSymbol().declarations.map(d => d.getSourceFile().fileName + ':' + d.getFullStart()).join() : ''
+            let files = (k.getSymbol() && k.getSymbol().declarations) ? k.getSymbol().declarations.map(d => d.getSourceFile().fileName + ':' + d.getFullStart()).join() : ''
             let fqn = k.getSymbol() ? this.program.getTypeChecker().getFullyQualifiedName(k.getSymbol()) : ''
 
             console.log()
@@ -550,6 +550,8 @@ export class GatherPhase {
         })
     }
 
+    private currentIdAnonymousTypes = 1
+
     private processClassOrInterfaceDeclaration(preJava: TypeMap.ClassOrInterfacePreJavaType) {
         let realPreJavaType = preJava as TypeMap.ClassOrInterfacePreJavaType
 
@@ -557,13 +559,16 @@ export class GatherPhase {
             return
         realPreJavaType.processed = true
 
-        console.log(`processing ${realPreJavaType.name}`)
-
         for (let type of realPreJavaType.sourceTypes) {
             let symbol = type.getSymbol()
 
             if (symbol) {
-                if (symbol.getDeclarations().some(d => d.kind == ts.SyntaxKind.ClassDeclaration)) {
+                if ((symbol.flags & ts.SymbolFlags.Class) || (symbol.flags & ts.SymbolFlags.Interface))
+                    realPreJavaType.maybeSetTypeName(symbol.getName())
+                else if (symbol.flags & ts.SymbolFlags.TypeLiteral)
+                    realPreJavaType.maybeSetTypeName(`AnonymousType_${this.currentIdAnonymousTypes++}`)
+
+                if (symbol.getDeclarations() && symbol.getDeclarations().some(d => d.kind == ts.SyntaxKind.ClassDeclaration)) {
                     realPreJavaType.addPrototypeName(null, this.getTypeName(type))
                 }
 
@@ -574,7 +579,16 @@ export class GatherPhase {
                         constructors.forEach(constructorSignature => realPreJavaType.addConstructorSignature(this.convertSignature(null, constructorSignature)))
                 }
 
-                realPreJavaType.maybeSetTypeName(symbol.getName())
+            }
+
+            if (type.flags & ts.TypeFlags.Object) {
+                let objectType = type as ts.ObjectType
+                if (objectType.objectFlags & ts.ObjectFlags.Class || objectType.objectFlags & ts.ObjectFlags.Interface) {
+                    let interfaceType = objectType as ts.InterfaceType
+                    if (interfaceType.typeParameters && interfaceType.typeParameters.length) {
+                        realPreJavaType.setTypeParameters(interfaceType.typeParameters.map(tp => ({ kind: TypeMap.PreJavaTypeKind.TYPE_PARAMETER, name: tp.symbol.getName() } as TypeMap.PreJavaTypeParameter)))
+                    }
+                }
             }
 
             let nit = type.getNumberIndexType()

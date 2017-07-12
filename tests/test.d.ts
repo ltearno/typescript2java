@@ -69,6 +69,9 @@ export interface ConcreteAbstractPartialClass<U> extends PartialClass {
 
     faireSomethins(i: number, toto: ConcreteAbstractPartialClass<U>);
 
+    toto: TestI<U>
+    titi: TestI<string>
+
     monTest: TestI<string | U>;
 }
 
