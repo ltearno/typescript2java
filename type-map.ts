@@ -22,7 +22,8 @@ export enum PreJavaTypeKind {
     BUILTIN,
     CLASS_OR_INTERFACE,
     TYPE_PARAMETER,
-    REFERENCE
+    REFERENCE,
+    UNION
 }
 
 export interface PreJavaType {
@@ -67,6 +68,12 @@ export interface ClassOrInterfacePreJavaType extends PreJavaType {
     addMethod(method: PreJavaTypeCallSignature)
     setNumberIndexType(type: PreJavaType)
     setStringIndexType(type: PreJavaType)
+}
+
+export interface PreJavaTypeUnion extends PreJavaType {
+    kind: PreJavaTypeKind.UNION
+
+    types: PreJavaType[]
 }
 
 export class ClassOrInterfacePreJavaType implements ClassOrInterfacePreJavaType {
@@ -153,6 +160,9 @@ export class ClassOrInterfacePreJavaType implements ClassOrInterfacePreJavaType 
                 let reference = type as PreJavaTypeReference
                 return this.getTypeName(reference.type) + `<${reference.typeParameters.map(tp => this.getTypeName(tp)).join(', ')}>`
             }
+
+            case PreJavaTypeKind.UNION:
+                return `UnionOf${(type as PreJavaTypeUnion).types.map(t => this.getTypeName(t)).join('And')}`
         }
     }
 
@@ -213,7 +223,6 @@ const BUILTIN_TYPE_BOOLEAN = { kind: PreJavaTypeKind.BUILTIN, fqn: 'java.lang.Bo
 const BUILTIN_TYPE_UNIT = { kind: PreJavaTypeKind.BUILTIN, fqn: 'void' }
 const BUILTIN_TYPE_VOID = { kind: PreJavaTypeKind.BUILTIN, fqn: 'java.lang.Void' }
 
-const FAKE_TYPE_UNION = { kind: PreJavaTypeKind.BUILTIN, fqn: 'java.lang.Object' }
 const FAKE_TYPE_INTERSECTION = { kind: PreJavaTypeKind.BUILTIN, fqn: 'java.lang.Object' }
 const FAKE_TYPE_ESSYMBOL = { kind: PreJavaTypeKind.BUILTIN, fqn: 'java.lang.EsSymbol' }
 const FAKE_TYPE_INDEXEDACCESS = { kind: PreJavaTypeKind.BUILTIN, fqn: 'java.lang.IndexedAccess' }
@@ -261,8 +270,13 @@ export class TsToPreJavaTypemap {
             return BUILTIN_TYPE_VOID
 
         if (tsType.flags & ts.TypeFlags.Union) {
-            // TODO : implement that
-            return FAKE_TYPE_UNION
+            let unionType = tsType as ts.UnionType
+
+            let res: PreJavaTypeUnion = {
+                kind: PreJavaTypeKind.UNION,
+                types: unionType.types.map(t => this.getOrCreatePreJavaTypeForTsType(t))
+            }
+            return res
         }
 
         if (tsType.flags & ts.TypeFlags.Intersection) {
@@ -277,9 +291,10 @@ export class TsToPreJavaTypemap {
             return FAKE_TYPE_INDEXEDACCESS
 
         if (tsType.flags & ts.TypeFlags.TypeParameter) {
+            let symbol = (tsType as ts.TypeParameter).getSymbol()
             let res: PreJavaTypeParameter = {
                 kind: PreJavaTypeKind.TYPE_PARAMETER,
-                name: (tsType as ts.TypeParameter).symbol.getName()
+                name: symbol ? symbol.getName() : '?'
             }
 
             return res

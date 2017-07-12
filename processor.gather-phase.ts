@@ -636,6 +636,11 @@ export class GatherPhase {
                     })
                 })
             }
+
+            let callSignatures = type.getCallSignatures()
+            if (callSignatures && callSignatures.length == 1) {
+                realPreJavaType.addMethod(this.convertSignature('FUNCTIONAL_CALL', callSignatures[0]))
+            }
         }
     }
 
