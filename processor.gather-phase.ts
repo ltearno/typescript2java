@@ -492,10 +492,20 @@ export class GatherPhase {
     sumup() {
         console.log(this.variables.map(v => 'variable : ' + v.name).join(`\n`))
 
-        this.typeMap.typeMap.forEach((v, k) => {
+        this.typeMap.typeMap.forEach((type, k) => {
             let files = k.getSymbol() ? k.getSymbol().declarations.map(d => d.getSourceFile().fileName + ':' + d.getFullStart()).join() : ''
             let fqn = k.getSymbol() ? this.program.getTypeChecker().getFullyQualifiedName(k.getSymbol()) : ''
+
+            console.log()
+            console.log()
             console.log(`type ${k['id']} ${k.flags} ${fqn} ${files} : ${this.getTypeName(k)}`)
+
+            switch (type.kind) {
+                case PreJavaTypeKind.CLASS_OR_INTERFACE: {
+                    (type as ClassOrInterfacePreJavaType).dump()
+                    break
+                }
+            }
         })
 
         // explore types deeper
@@ -542,7 +552,8 @@ export class GatherPhase {
                         let preJava = this.typeMap.getOrCreatePreJavaTypeForTsType(constructorSignature.getReturnType())
                         if (preJava.kind == PreJavaTypeKind.CLASS_OR_INTERFACE) {
                             (preJava as ClassOrInterfacePreJavaType).addPrototypeName(null, guessName(declaration.name));
-                            (preJava as ClassOrInterfacePreJavaType).addConstructorSignature(constructorSignature)
+                            (preJava as ClassOrInterfacePreJavaType).maybeSetTypeName(guessName(declaration.name));
+                            (preJava as ClassOrInterfacePreJavaType).addConstructorSignature(this.convertSignature(null, constructorSignature))
                         }
 
                         this.processClassOrInterfaceDeclaration(constructorSignature.getReturnType())
@@ -567,79 +578,134 @@ export class GatherPhase {
         if (preJava.kind == PreJavaTypeKind.CLASS_OR_INTERFACE) {
             let realPreJavaType = preJava as ClassOrInterfacePreJavaType
 
-            if (realPreJavaType.sourceTypes.has(type)) {
-                realPreJavaType.addSourceType(type)
+            if (realPreJavaType.processed)
+                return
+            realPreJavaType.processed = true
 
-                let symbol = type.getSymbol()
+            realPreJavaType.addSourceType(type)
 
-                if (symbol) {
-                    if (symbol.getDeclarations().some(d => d.kind == ts.SyntaxKind.ClassDeclaration))
-                        realPreJavaType.addPrototypeName(null, this.getTypeName(type))
+            let symbol = type.getSymbol()
 
-                    if (symbol.valueDeclaration) {
-                        let constructorType = this.program.getTypeChecker().getTypeOfSymbolAtLocation(symbol, symbol.valueDeclaration)
-                        let constructors = constructorType.getConstructSignatures()
-                        if (constructors)
-                            constructors.forEach(constructorSignature => realPreJavaType.addConstructorSignature(constructorSignature))
+            if (symbol) {
+                if (symbol.getDeclarations().some(d => d.kind == ts.SyntaxKind.ClassDeclaration)) {
+                    realPreJavaType.addPrototypeName(null, this.getTypeName(type))
+                }
+
+                if (symbol.valueDeclaration) {
+                    let constructorType = this.program.getTypeChecker().getTypeOfSymbolAtLocation(symbol, symbol.valueDeclaration)
+                    let constructors = constructorType.getConstructSignatures()
+                    if (constructors)
+                        constructors.forEach(constructorSignature => realPreJavaType.addConstructorSignature(this.convertSignature(null, constructorSignature)))
+                }
+
+                realPreJavaType.maybeSetTypeName(symbol.getName())
+            }
+
+            let nit = type.getNumberIndexType()
+            if (nit) {
+                this.processClassOrInterfaceDeclaration(nit)
+
+                realPreJavaType.setNumberIndexType(this.typeMap.getOrCreatePreJavaTypeForTsType(nit))
+            }
+
+            let sit = type.getStringIndexType()
+            if (sit) {
+                this.processClassOrInterfaceDeclaration(sit)
+
+                realPreJavaType.setStringIndexType(this.typeMap.getOrCreatePreJavaTypeForTsType(sit))
+            }
+
+            let baseTypes = type.getBaseTypes()
+            if (baseTypes) {
+                baseTypes.forEach(baseType => {
+                    this.processClassOrInterfaceDeclaration(baseType)
+
+                    realPreJavaType.addBaseType(this.typeMap.getOrCreatePreJavaTypeForTsType(baseType))
+                })
+            }
+
+            let properties = type.getProperties()
+            if (properties) {
+                properties.forEach(property => {
+                    let propertyName = property.getName()
+                    let propertyType = this.program.getTypeChecker().getTypeAtLocation(property.valueDeclaration)
+
+                    let callSignatures = propertyType.getCallSignatures()
+                    if (callSignatures && callSignatures.length) {
+                        for (let callSignature of callSignatures) {
+                            realPreJavaType.addMethod(this.convertSignature(propertyName, callSignature))
+                        }
                     }
-                }
 
-                let nit = type.getNumberIndexType()
-                if (nit) {
-                    this.processClassOrInterfaceDeclaration(nit)
+                    let propertyPreJavaType = this.typeMap.getOrCreatePreJavaTypeForTsType(propertyType)
+                    if (propertyPreJavaType.kind == PreJavaTypeKind.CLASS_OR_INTERFACE) {
+                        (propertyPreJavaType as ClassOrInterfacePreJavaType).maybeSetTypeName(`${propertyName.slice(0, 1).toUpperCase() + propertyName.slice(1)}Caller`)
+                    }
 
-                    realPreJavaType.setNumberIndexType(this.typeMap.getOrCreatePreJavaTypeForTsType(nit))
-                }
-
-                let sit = type.getStringIndexType()
-                if (sit) {
-                    this.processClassOrInterfaceDeclaration(sit)
-
-                    realPreJavaType.setStringIndexType(this.typeMap.getOrCreatePreJavaTypeForTsType(sit))
-                }
-
-                let baseTypes = type.getBaseTypes()
-                if (baseTypes) {
-                    baseTypes.forEach(baseType => {
-                        this.processClassOrInterfaceDeclaration(baseType)
-
-                        if ((baseType.flags & ts.TypeFlags.Object) && ((baseType as ts.ObjectType).objectFlags & ts.ObjectFlags.Reference)) {
-                            let reference = baseType as ts.TypeReference
-                            realPreJavaType.addBaseType({
-                                type: this.typeMap.getOrCreatePreJavaTypeForTsType(reference.target),
-                                typeParameters: reference.typeArguments.map(typeArgument => this.typeMap.getOrCreatePreJavaTypeForTsType(typeArgument))
-                            })
-                        }
-                        else {
-                            realPreJavaType.addBaseType({
-                                type: this.typeMap.getOrCreatePreJavaTypeForTsType(baseType),
-                                typeParameters: null
-                            })
-                        }
+                    realPreJavaType.addProperty({
+                        name: propertyName,
+                        type: propertyPreJavaType,
+                        writable: true
                     })
-                }
-
-                let properties = type.getProperties()
-                if (properties)
-                    properties.forEach(property => realPreJavaType.addPropertyOrMethod(property))
+                })
             }
         }
     }
+
+    private convertSignature(name: string, tsSignature: ts.Signature): PreJavaTypeCallSignature {
+        let methodSignature: PreJavaTypeCallSignature = {
+            typeParameters: tsSignature.getTypeParameters() ? tsSignature.getTypeParameters().map(t => {
+                let res = this.typeMap.getOrCreatePreJavaTypeForTsType(t) as PreJavaTypeParameter
+                if (res.kind != PreJavaTypeKind.TYPE_PARAMETER)
+                    console.error(`BLABLABLA`)
+                return res
+            }) : null,
+            returnType: this.typeMap.getOrCreatePreJavaTypeForTsType(tsSignature.getReturnType()),
+            name: name,
+            parameters: tsSignature.getParameters() ? tsSignature.getParameters().map(p => {
+                let parameteryType = this.program.getTypeChecker().getTypeAtLocation(p.valueDeclaration)
+                return { name: p.name, type: this.typeMap.getOrCreatePreJavaTypeForTsType(parameteryType) } as PreJavaTypeFormalParameter
+            }) : null
+        }
+
+        return methodSignature
+    }
 }
 
-export interface PreJavaTypeReference {
+export interface PreJavaTypeFormalParameter {
+    name: string
     type: PreJavaType
-    typeParameters: PreJavaType[]
+}
+
+export interface PreJavaTypeCallSignature {
+    typeParameters: PreJavaTypeParameter[]
+    returnType: PreJavaType
+    name: string
+    parameters: PreJavaTypeFormalParameter[]
+}
+
+export interface PreJavaTypeProperty {
+    name: string
+    type: PreJavaType
+    writable?: boolean
 }
 
 export enum PreJavaTypeKind {
     BUILTIN,
     CLASS_OR_INTERFACE,
-    TYPE_PARAMETER
+    TYPE_PARAMETER,
+    REFERENCE
 }
 
 export interface PreJavaType {
     kind: PreJavaTypeKind
+}
+
+export interface PreJavaTypeReference extends PreJavaType {
+    kind: PreJavaTypeKind.REFERENCE
+
+    type: PreJavaType
+    typeParameters: PreJavaType[]
 }
 
 export interface PreJavaTypeParameter extends PreJavaType {
@@ -667,12 +733,16 @@ export interface ClassOrInterfacePreJavaType extends PreJavaType {
     numberIndexType: ts.Type
     stringIndexType: ts.Type*/
 
+    dump()
+
     addSourceType(type: ts.Type)
     addPrototypeName(namespace: string, name: string)
+    maybeSetTypeName(name: string)
 
-    addBaseType(baseType: PreJavaTypeReference)
-    addConstructorSignature(signature: ts.Signature)
-    addPropertyOrMethod(property: ts.Symbol)
+    addBaseType(baseType: PreJavaType)
+    addConstructorSignature(signature: PreJavaTypeCallSignature)
+    addProperty(property: PreJavaTypeProperty)
+    addMethod(method: PreJavaTypeCallSignature)
     setNumberIndexType(type: PreJavaType)
     setStringIndexType(type: PreJavaType)
 }
@@ -682,14 +752,79 @@ export class ClassOrInterfacePreJavaType implements ClassOrInterfacePreJavaType 
 
     sourceTypes = new Set<ts.Type>()
 
-    baseTypes = new Set<PreJavaTypeReference>()
+    processed: boolean = false
+
+    name: string = null
+
+    baseTypes = new Set<PreJavaType>()
     prototypeNames = new Set<string>()
 
-    constructorSignatures: ts.Signature[] = []
-    propertiesOrMethods: ts.Symbol[] = []
+    constructorSignatures: PreJavaTypeCallSignature[] = []
+    properties: PreJavaTypeProperty[] = []
+    methods: PreJavaTypeCallSignature[] = []
 
     numberIndexType: PreJavaType
     stringIndexType: PreJavaType
+
+    dump() {
+        console.log(`name: ${this.name}`)
+
+        if (this.prototypeNames && this.prototypeNames.size) {
+            console.log(`prototypes`)
+            this.prototypeNames.forEach(name => console.log(name))
+        }
+
+        if (this.constructorSignatures && this.constructorSignatures.length) {
+            console.log(`constructors`)
+            for (let constructorSignature of this.constructorSignatures) {
+                console.log(this.serializeSignature(constructorSignature, this.name))
+            }
+        }
+
+        if (this.properties && this.properties.length) {
+            console.log(`properties`)
+            for (let property of this.properties)
+                console.log(`${this.getTypeName(property.type)} ${property.name} ${property.writable ? '' : 'READ-ONLY'}`)
+        }
+
+        if (this.methods && this.methods.length) {
+            console.log(`methods`)
+            for (let method of this.methods) {
+                console.log(this.serializeSignature(method))
+            }
+        }
+    }
+
+    private serializeSignature(signature: PreJavaTypeCallSignature, defaultName: string = null) {
+        let res = ''
+        if (signature.typeParameters)
+            res += `<${signature.typeParameters.map(tp => tp.name).join()}> `
+        if (signature.name)
+            res += `${this.getTypeName(signature.returnType)} ${signature.name}`
+        else if (defaultName)
+            res += `${defaultName}`
+        if (signature.parameters && signature.parameters.length)
+            res += `(${signature.parameters.map(p => this.getTypeName(p.type) + ' ' + p.name).join()})`
+        else
+            res += '()'
+        return res
+    }
+
+    private getTypeName(type: PreJavaType): string {
+        switch (type.kind) {
+            case PreJavaTypeKind.BUILTIN:
+                return (type as BuiltinJavaType).fqn
+
+            case PreJavaTypeKind.TYPE_PARAMETER:
+                return (type as PreJavaTypeParameter).name
+
+            case PreJavaTypeKind.CLASS_OR_INTERFACE:
+                return (type as ClassOrInterfacePreJavaType).prototypeNames.values().next().value
+
+            case PreJavaTypeKind.REFERENCE:
+                return this.getTypeName((type as PreJavaTypeReference).type) + '<...>'
+        }
+    }
 
     addSourceType(type: ts.Type) {
         this.sourceTypes.add(type)
@@ -704,16 +839,27 @@ export class ClassOrInterfacePreJavaType implements ClassOrInterfacePreJavaType 
         this.prototypeNames.add(name)
     }
 
-    addBaseType(baseType: PreJavaTypeReference) {
+    maybeSetTypeName(name: string) {
+        if (name == '__type')
+            return
+        if (this.name == null)
+            this.name = name
+    }
+
+    addBaseType(baseType: PreJavaType) {
         this.baseTypes.add(baseType)
     }
 
-    addConstructorSignature(signature: ts.Signature) {
+    addConstructorSignature(signature: PreJavaTypeCallSignature) {
         this.constructorSignatures.push(signature)
     }
 
-    addPropertyOrMethod(property: ts.Symbol) {
-        this.propertiesOrMethods.push(property)
+    addProperty(property: PreJavaTypeProperty) {
+        this.properties.push(property)
+    }
+
+    addMethod(method: PreJavaTypeCallSignature) {
+        this.methods.push(method)
     }
 
     setNumberIndexType(type: PreJavaType) {
@@ -722,11 +868,6 @@ export class ClassOrInterfacePreJavaType implements ClassOrInterfacePreJavaType 
 
     setStringIndexType(type: PreJavaType) {
         this.stringIndexType = type
-    }
-
-    private toJava() {
-        this.propertiesOrMethods.forEach(property => {
-        })
     }
 }
 
@@ -775,6 +916,18 @@ export class TsToPreJavaTypemap {
             }
 
             return res
+        }
+
+        if ((tsType.flags & ts.TypeFlags.Object) && ((tsType as ts.ObjectType).objectFlags & ts.ObjectFlags.Reference)) {
+            let reference = tsType as ts.TypeReference
+            if (reference.target != tsType) {
+                let res: PreJavaTypeReference = {
+                    kind: PreJavaTypeKind.REFERENCE,
+                    type: this.getOrCreatePreJavaTypeForTsType(reference.target),
+                    typeParameters: reference.typeArguments ? reference.typeArguments.map(typeArgument => this.getOrCreatePreJavaTypeForTsType(typeArgument)) : null
+                }
+                return res
+            }
         }
 
         if (this.typeMap.has(tsType))

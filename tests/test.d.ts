@@ -4,6 +4,22 @@
  Toto
 }*/
 
+export interface Rock {
+    moimoi(a: string): string
+}
+
+export declare var Rock: {
+    new (a: string, b: number): Rock
+
+    SAVE_ME: number
+}
+
+export declare var SpaceShip: {
+    new (a: string, b: number): {
+        mimi(mati: number): number[]
+    }
+}
+
 export interface JeSuisInterface { }
 
 export class JeSuisClasse { }
