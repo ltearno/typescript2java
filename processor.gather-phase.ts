@@ -27,9 +27,11 @@ export class GatherPhase {
     private typeMap = new TypeMap.TsToPreJavaTypemap()
 
     variables: {
-        declarationNode: ts.Node;
+        type: TypeMap.PreJavaType;
         name: string;
     }[] = [];
+
+    globalMethods: TypeMap.PreJavaTypeCallSignature[] = []
 
     constructor(private baseJavaPackage: string,
         private javaPackages: { [key: string]: string },
@@ -481,8 +483,19 @@ export class GatherPhase {
                 return
             }
 
+            if (node.kind == ts.SyntaxKind.FunctionDeclaration) {
+                this.processFunctionDeclaration(node as ts.FunctionDeclaration)
+                return
+            }
+
             if (node.kind == ts.SyntaxKind.InterfaceDeclaration || node.kind == ts.SyntaxKind.ClassDeclaration) {
                 this.typeMap.getOrCreatePreJavaTypeForTsType(this.program.getTypeChecker().getTypeAtLocation(node))
+                return;
+            }
+
+            if (node.kind == ts.SyntaxKind.EnumDeclaration) {
+                let t = this.program.getTypeChecker().getTypeAtLocation(node)
+                this.typeMap.getOrCreatePreJavaTypeForTsType(t)
                 return;
             }
 
@@ -509,8 +522,11 @@ export class GatherPhase {
         // simplify : merge types with same name and same structure
         // by default for properties : do not generate Caller
         // Array => JsArray and so on for similar custom native types replacement\\freebox
-        
-        console.log(this.variables.map(v => 'variable : ' + v.name).join(`\n`))
+        // remove unreferenced types ?
+
+        console.log(this.variables.map(v => `variable : ${TypeMap.ClassOrInterfacePreJavaType.getTypeName(v.type)} ${v.name}`).join(`\n`))
+
+        console.log(this.globalMethods.map(m => `global method : ${TypeMap.ClassOrInterfacePreJavaType.serializeSignature(m)}`).join('\n'))
 
         this.typeMap.typeMap.forEach((type, k) => {
             let files = (k.getSymbol() && k.getSymbol().declarations) ? k.getSymbol().declarations.map(d => d.getSourceFile().fileName + ':' + d.getFullStart()).join() : ''
@@ -518,7 +534,7 @@ export class GatherPhase {
 
             console.log()
             console.log()
-            console.log(`type ${k['id']} ${k.flags} ${fqn} ${files} : ${this.getTypeName(k)}`)
+            console.log(`ts type ${k['id']} ${k.flags} ${fqn} ${files} : ${this.getTypeName(k)}`)
 
             switch (type.kind) {
                 case TypeMap.PreJavaTypeKind.CLASS_OR_INTERFACE: {
@@ -551,11 +567,24 @@ export class GatherPhase {
                 || t.getStringIndexType()
                 || (t.getCallSignatures() && t.getCallSignatures().some(s => s.declaration && s.declaration.name && s.declaration.name.getText() != '__call'))
                 || (t.getProperties() && t.getProperties().some(p => p.name != 'prototype'))) {
-                this.typeMap.getOrCreatePreJavaTypeForTsType(t)
+                let variableType = this.typeMap.getOrCreatePreJavaTypeForTsType(t)
 
-                this.variables.push({ declarationNode: declaration, name: guessName(declaration.name) });
+                this.variables.push({ type: variableType, name: guessName(declaration.name) });
             }
         })
+    }
+
+    private processFunctionDeclaration(declaration: ts.FunctionDeclaration) {
+        let t = this.program.getTypeChecker().getTypeAtLocation(declaration)
+
+        let name = declaration && declaration.name && declaration.name.text
+        if (!name)
+            return
+
+        let callSignatures = t.getCallSignatures()
+        if (callSignatures && callSignatures.length == 1) {
+            this.globalMethods.push(this.convertSignature(name, callSignatures[0]))
+        }
     }
 
     private currentIdAnonymousTypes = 1

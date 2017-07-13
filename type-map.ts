@@ -112,55 +112,55 @@ export class ClassOrInterfacePreJavaType implements ClassOrInterfacePreJavaType 
         if (this.constructorSignatures && this.constructorSignatures.length) {
             console.log(`constructors`)
             for (let constructorSignature of this.constructorSignatures) {
-                console.log(this.serializeSignature(constructorSignature, this.name))
+                console.log(ClassOrInterfacePreJavaType.serializeSignature(constructorSignature, this.name))
             }
         }
 
         if (this.properties && this.properties.length) {
             console.log(`properties`)
             for (let property of this.properties)
-                console.log(`${this.getTypeName(property.type)} ${property.name} ${property.writable ? '' : 'READ-ONLY'}`)
+                console.log(`${ClassOrInterfacePreJavaType.getTypeName(property.type)} ${property.name} ${property.writable ? '' : 'READ-ONLY'}`)
         }
 
         if (this.numberIndexType) {
-            console.log(`index by number : ${this.getTypeName(this.numberIndexType)}`)
+            console.log(`index by number : ${ClassOrInterfacePreJavaType.getTypeName(this.numberIndexType)}`)
         }
         if (this.stringIndexType) {
-            console.log(`index by string : ${this.getTypeName(this.stringIndexType)}`)
+            console.log(`index by string : ${ClassOrInterfacePreJavaType.getTypeName(this.stringIndexType)}`)
         }
 
         if (this.methods && this.methods.length) {
             console.log(`methods`)
             for (let method of this.methods) {
-                console.log(this.serializeSignature(method))
+                console.log(ClassOrInterfacePreJavaType.serializeSignature(method))
             }
         }
     }
 
-    private serializeSignature(signature: PreJavaTypeCallSignature, defaultName: string = null) {
+    static serializeSignature(signature: PreJavaTypeCallSignature, defaultName: string = null) {
         let res = ''
 
         if (signature.typeParameters) {
             res += '<'
             res += signature.typeParameters.map(tp => {
-                return tp.name + (tp.constraint ? ` extends ${this.getTypeName(tp.constraint)}` : '')
+                return tp.name + (tp.constraint ? ` extends ${ClassOrInterfacePreJavaType.getTypeName(tp.constraint)}` : '')
             }).join()
             res += '> '
         }
 
         if (signature.name)
-            res += `${this.getTypeName(signature.returnType)} ${signature.name}`
+            res += `${ClassOrInterfacePreJavaType.getTypeName(signature.returnType)} ${signature.name}`
         else if (defaultName)
             res += `${defaultName}`
 
         if (signature.parameters && signature.parameters.length)
-            res += `(${signature.parameters.map(p => this.getTypeName(p.type) + ' ' + p.name).join()})`
+            res += `(${signature.parameters.map(p => ClassOrInterfacePreJavaType.getTypeName(p.type) + ' ' + p.name).join()})`
         else
             res += '()'
         return res
     }
 
-    private getTypeName(type: PreJavaType): string {
+    static getTypeName(type: PreJavaType): string {
         switch (type.kind) {
             case PreJavaTypeKind.BUILTIN:
                 return (type as BuiltinJavaType).fqn
@@ -316,21 +316,15 @@ export class TsToPreJavaTypemap {
             return BUILTIN_TYPE_OBJECT
         if (tsType.flags & ts.TypeFlags.NonPrimitive)
             return BUILTIN_TYPE_OBJECT
-        if (tsType.flags & ts.TypeFlags.StringLike)
-            return BUILTIN_TYPE_STRING
         if (tsType.flags & ts.TypeFlags.StringLiteral)
             return BUILTIN_TYPE_STRING
         if (tsType.flags & ts.TypeFlags.Number)
             return BUILTIN_TYPE_NUMBER
         if (tsType.flags & ts.TypeFlags.NumberLiteral)
             return BUILTIN_TYPE_NUMBER
-        if (tsType.flags & ts.TypeFlags.NumberLike)
-            return BUILTIN_TYPE_NUMBER
         if (tsType.flags & ts.TypeFlags.Boolean)
             return BUILTIN_TYPE_BOOLEAN
         if (tsType.flags & ts.TypeFlags.BooleanLiteral)
-            return BUILTIN_TYPE_BOOLEAN
-        if (tsType.flags & ts.TypeFlags.BooleanLike)
             return BUILTIN_TYPE_BOOLEAN
         if (tsType.flags & ts.TypeFlags.Void)
             return BUILTIN_TYPE_UNIT
@@ -399,6 +393,33 @@ export class TsToPreJavaTypemap {
 
             return preJavaType
         }
+
+        if (tsType.flags & ts.TypeFlags.Enum) {
+            let enumType = tsType as ts.EnumType
+            let enumDeclaration = tsType.getSymbol().valueDeclaration as ts.EnumDeclaration
+            if (enumDeclaration.members && enumDeclaration.members.length) {
+                for (let enumMember of enumDeclaration.members) {
+                    let propertyName = enumMember.name
+                    if (propertyName.kind == ts.SyntaxKind.Identifier) {
+                        console.log('enum member name ' + (propertyName as ts.Identifier).text)
+                    }
+                    else {
+                        // WARNING NOT SUPPORTED YET !
+                    }
+                }
+            }
+
+            if (enumType.memberTypes && enumType.memberTypes.length) {
+                console.log('yo')
+            }
+        }
+
+        if (tsType.flags & ts.TypeFlags.StringLike)
+            return BUILTIN_TYPE_STRING
+        if (tsType.flags & ts.TypeFlags.NumberLike)
+            return BUILTIN_TYPE_NUMBER
+        if (tsType.flags & ts.TypeFlags.BooleanLike)
+            return BUILTIN_TYPE_BOOLEAN
 
         console.warn(`no mapping for ts type ${tsType}`)
         return BUILTIN_TYPE_OBJECT

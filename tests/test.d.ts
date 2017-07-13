@@ -4,7 +4,21 @@
  Toto
 }*/
 
+export enum MonEnum1 {
+    Un,
+    Deux,
+    Cinq = 5,
+    Sept
+}
+
+export enum MonEnum2 {
+    Yo,
+    Yi,
+    Ya
+}
+
 export interface Rock {
+    tototo?: MonEnum1
     moimoi(a: string): string
 }
 
