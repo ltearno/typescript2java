@@ -50,6 +50,41 @@ export class PreJavaTypeCallSignature {
             res += '()'
         return res
     }
+
+    substituteType(replacer: TypeReplacer, cache: Map<PreJavaType, PreJavaType>, passThroughTypes: Set<PreJavaType>): PreJavaTypeCallSignature {
+        let noCache = cache as Map<any, any>
+        if (noCache.has(this))
+            return noCache.get(this)
+
+        let res = (() => {
+            if (this.returnType) {
+                this.returnType = this.returnType.substituteType(replacer, cache, passThroughTypes)
+                if (!this.returnType)
+                    return null
+            }
+
+            if (this.typeParameters)
+                this.typeParameters = this.typeParameters.map(tp => tp.substituteType(replacer, cache, passThroughTypes)).filter(tp => tp != null) as PreJavaTypeParameter[]
+
+            if (this.parameters) {
+                this.parameters = this.parameters.map(p => {
+                    p.type = p.type.substituteType(replacer, cache, passThroughTypes)
+                    if (!p.type)
+                        return null
+                    return p
+                })
+
+                if (this.parameters.some(p => p == null))
+                    return null
+            }
+
+            return this
+        })()
+
+        noCache.set(this, res)
+
+        return res
+    }
 }
 
 export interface PreJavaTypeProperty {
@@ -64,6 +99,8 @@ export interface CompletablePreJavaType {
     setProcessed()
 }
 
+export type TypeReplacer = { (type: PreJavaType): PreJavaType }
+
 export abstract class PreJavaType {
     sourceTypes: Set<ts.Type>
 
@@ -76,6 +113,23 @@ export abstract class PreJavaType {
     abstract dump()
 
     abstract isCompletablePreJavaType(): CompletablePreJavaType
+
+    /** returns the type by which it should be substituted */
+    abstract substituteTypeReal(replacer: TypeReplacer, cache: Map<PreJavaType, PreJavaType>, passThroughTypes: Set<PreJavaType>): PreJavaType
+    substituteType(replacer: TypeReplacer, cache: Map<PreJavaType, PreJavaType>, passThroughTypes: Set<PreJavaType>): PreJavaType {
+        if (cache.has(this))
+            return cache.get(this)
+
+        if (passThroughTypes == null)
+            passThroughTypes = new Set()
+        else if (passThroughTypes.has(this))
+            return this
+        passThroughTypes.add(this)
+
+        let res = this.substituteTypeReal(replacer, cache, passThroughTypes)
+        cache.set(this, res)
+        return res
+    }
 
     addSourceType(type: ts.Type) {
         if (!this.sourceTypes)
@@ -115,6 +169,21 @@ export class PreJavaTypeReference extends PreJavaType implements CompletablePreJ
 
     isProcessed() { return this.processed }
     setProcessed() { this.processed = true }
+
+    substituteTypeReal(replacer: TypeReplacer, cache: Map<PreJavaType, PreJavaType>, passThroughTypes: Set<PreJavaType>): PreJavaType {
+        let stay = replacer(this)
+        if (!stay || stay != this)
+            return null
+
+        this.type = replacer(this.type)
+        if (!this.type)
+            return null
+
+        if (this.typeParameters)
+            this.typeParameters = this.typeParameters.map(p => p.substituteType(replacer, cache, passThroughTypes)).filter(p => p != null)
+
+        return this
+    }
 }
 
 export class PreJavaTypeEnum extends PreJavaType implements CompletablePreJavaType {
@@ -156,6 +225,8 @@ export class PreJavaTypeEnum extends PreJavaType implements CompletablePreJavaTy
 
     isProcessed() { return this.processed }
     setProcessed() { this.processed = true }
+
+    substituteTypeReal(replacer: TypeReplacer, cache: Map<PreJavaType, PreJavaType>): PreJavaType { return replacer(this) }
 }
 
 export class PreJavaTypeParameter extends PreJavaType {
@@ -184,6 +255,17 @@ export class PreJavaTypeParameter extends PreJavaType {
     setPackageName(name: string) { }
 
     isCompletablePreJavaType() { return null }
+
+    substituteTypeReal(replacer: TypeReplacer, cache: Map<PreJavaType, PreJavaType>, passThroughTypes: Set<PreJavaType>): PreJavaType {
+        let stay = replacer(this)
+        if (!stay || stay != this)
+            return null
+
+        if (this.constraint)
+            this.constraint = this.constraint.substituteType(replacer, cache, passThroughTypes)
+
+        return this
+    }
 }
 
 export class PreJavaTypeBuiltinJavaType extends PreJavaType {
@@ -209,6 +291,8 @@ export class PreJavaTypeBuiltinJavaType extends PreJavaType {
     setPackageName(name: string) { }
 
     isCompletablePreJavaType() { return null }
+
+    substituteTypeReal(replacer: TypeReplacer, cache: Map<PreJavaType, PreJavaType>): PreJavaType { return replacer(this) }
 }
 
 export class PreJavaTypeFakeType extends PreJavaTypeBuiltinJavaType {
@@ -259,6 +343,17 @@ export class PreJavaTypeUnion extends PreJavaType implements CompletablePreJavaT
     isProcessed() { return this.processed }
     setProcessed() { this.processed = true }
 
+    substituteTypeReal(replacer: TypeReplacer, cache: Map<PreJavaType, PreJavaType>, passThroughTypes: Set<PreJavaType>): PreJavaType {
+        let stay = replacer(this)
+        if (!stay || stay != this)
+            return stay
+
+        if (this.types)
+            this.types = this.types.map(t => t.substituteType(replacer, cache, passThroughTypes)).filter(t => t != null)
+
+        return this
+    }
+
     private transformTypeName(type: PreJavaType) {
         if (type instanceof PreJavaTypeClassOrInterface) {
             let res = type.name
@@ -278,7 +373,6 @@ export class PreJavaTypeUnion extends PreJavaType implements CompletablePreJavaT
 
         return type.getName()
     }
-
 }
 
 export class PreJavaTypeClassOrInterface extends PreJavaType implements CompletablePreJavaType {
@@ -300,6 +394,48 @@ export class PreJavaTypeClassOrInterface extends PreJavaType implements Completa
     stringIndexType: PreJavaType
 
     comments: string[]
+
+    substituteTypeReal(replacer: TypeReplacer, cache: Map<PreJavaType, PreJavaType>, passThroughTypes: Set<PreJavaType>): PreJavaType {
+        let stay = replacer(this)
+        if (!stay || stay != this)
+            return stay
+
+        if (this.typeParameters)
+            this.typeParameters = this.typeParameters.map(tp => tp.substituteType(replacer, cache, passThroughTypes)).filter(tp => tp != null) as PreJavaTypeParameter[]
+
+        let baseTypes = this.baseTypes
+        if (baseTypes) {
+            this.baseTypes = new Set()
+            baseTypes.forEach(type => {
+                let sub = type.substituteType(replacer, cache, passThroughTypes)
+                if (sub)
+                    this.baseTypes.add(sub)
+            })
+        }
+
+        if (this.constructorSignatures)
+            this.constructorSignatures = this.constructorSignatures.map(s => s.substituteType(replacer, cache, passThroughTypes)).filter(s => s != null)
+
+        if (this.properties) {
+            this.properties = this.properties.map(p => {
+                p.type = replacer(p.type)
+                if (!p.type)
+                    return null
+                return p
+            }).filter(p => p != null)
+        }
+
+        if (this.methods)
+            this.methods = this.methods.map(s => s.substituteType(replacer, cache, passThroughTypes)).filter(s => s != null)
+
+        if (this.numberIndexType)
+            this.numberIndexType = this.numberIndexType.substituteType(replacer, cache, passThroughTypes)
+
+        if (this.stringIndexType)
+            this.stringIndexType = this.stringIndexType.substituteType(replacer, cache, passThroughTypes)
+
+        return this
+    }
 
     getPackageName() {
         return this.packageName
@@ -476,26 +612,41 @@ export class TsToPreJavaTypemap {
     }
 
     private removeTypeInTypes(typeToRemove: PreJavaType) {
-        let signatureHasIndexedType = (sig: PreJavaTypeCallSignature) => {
-            return (this.doesTypeUsesType(sig.returnType, typeToRemove))
-                || (sig.typeParameters && sig.typeParameters.some(tp => this.doesTypeUsesType(tp.constraint, typeToRemove)))
-                || (sig.parameters && sig.parameters.some(p => this.doesTypeUsesType(p.type, typeToRemove)))
-        }
+        this.substituteType((type) => type != typeToRemove ? type : null)
+    }
 
-        let pruneType = (type: PreJavaTypeClassOrInterface) => {
-            type.baseTypes.delete(typeToRemove)
-            type.constructorSignatures = type.constructorSignatures.filter(s => !signatureHasIndexedType(s))
-            type.methods = type.methods.filter(s => !signatureHasIndexedType(s))
-            type.properties = type.properties.filter(p => !this.doesTypeUsesType(p.type, typeToRemove))
+    private substituteType(replacer: TypeReplacer) {
+        let cache = new Map<PreJavaType, PreJavaType>()
+
+        for (let [tsType, type] of this.typeMap.entries()) {
+            let substitute = type.substituteType(replacer, cache, new Set())
+            if (!substitute)
+                this.typeMap.delete(tsType)
+            else if (substitute != type)
+                this.typeMap.set(tsType, substitute)
         }
+    }
+
+    simplifyUnions() {
+        let typesToSimplifyToObject: PreJavaType[] = []
+        let typesToSimplifyToOnlyType: PreJavaType[] = []
 
         for (let type of this.typeMap.values()) {
-            if (type instanceof PreJavaTypeClassOrInterface)
-                pruneType(type)
-            else if (type instanceof PreJavaTypeUnion) {
-                type.types = type.types ? type.types.filter(t => t != typeToRemove) : null
+            if (type instanceof PreJavaTypeUnion) {
+                if (!type.types || !type.types.length)
+                    typesToSimplifyToObject.push(type)
+                else if (type.types.length == 1)
+                    typesToSimplifyToOnlyType.push(type)
             }
         }
+
+        typesToSimplifyToObject.forEach(type => this.substituteType(t => t != type ? t : BUILTIN_TYPE_OBJECT))
+        typesToSimplifyToOnlyType.forEach(type => this.substituteType(t => {
+            if (t != type)
+                return t
+            else
+                return (type as PreJavaTypeUnion).types[0]
+        }))
     }
 
     removeIndexedAccessTypes() {

@@ -381,6 +381,7 @@ export class GatherPhase {
         this.typeMap.removeIndexedAccessTypes()
         this.typeMap.removeSymbolType()
         this.typeMap.developMethodOverridesForUnionParameters()
+        this.typeMap.simplifyUnions()
         // simplify : merge types with same name and same structure
         // by default for properties : do not generate Caller
         // Array => JsArray and so on for similar custom native types replacement\\freebox

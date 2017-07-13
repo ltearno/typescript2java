@@ -302,11 +302,17 @@ Object valueOf()
 /* Determines whether an object has a property with the specified name. */
 /* Determines whether an object has a property with the specified name. */
 Boolean hasOwnProperty(String v)
+/* Determines whether an object has a property with the specified name. */
+/* Determines whether an object has a property with the specified name. */
+Boolean hasOwnProperty(UnionOfStringAndNumber v)
 /* Determines whether an object exists in another object's prototype chain. */
 Boolean isPrototypeOf(Object v)
 /* Determines whether a specified property is enumerable. */
 /* Determines whether a specified property is enumerable. */
 Boolean propertyIsEnumerable(String v)
+/* Determines whether a specified property is enumerable. */
+/* Determines whether a specified property is enumerable. */
+Boolean propertyIsEnumerable(UnionOfStringAndNumber v)
 
 
 ts type 62 32768 ObjectConstructor C:/Documents/Repos/typescript2java/node_modules/typescript/lib/lib.es6.d.ts:4175,C:/Documents/Repos/typescript2java/node_modules/typescript/lib/lib.es6.d.ts:208678 : ObjectConstructor
@@ -323,6 +329,12 @@ An own property descriptor is one that is defined directly on the object and is 
 An own property descriptor is one that is defined directly on the object and is not
 inherited from the object's prototype. */
 PropertyDescriptor getOwnPropertyDescriptor(Object o,String p)
+/* Gets the own property descriptor of the specified object.
+An own property descriptor is one that is defined directly on the object and is not inherited from the object's prototype. */
+/* Gets the own property descriptor of the specified object.
+An own property descriptor is one that is defined directly on the object and is not
+inherited from the object's prototype. */
+PropertyDescriptor getOwnPropertyDescriptor(Object o,UnionOfStringAndNumber propertyKey)
 /* Returns the names of the own properties of an object. The own properties of an object are those that are defined directly
 on that object, and are not inherited from the object's prototype. The properties of an object include both fields (objects) and functions. */
 Array<String> getOwnPropertyNames(Object o)
@@ -335,6 +347,9 @@ Object create(Object o,PropertyDescriptorMap properties)
 /* Adds a property to an object, or modifies attributes of an existing property. */
 /* Adds a property to an object, or modifies attributes of an existing property. */
 Object defineProperty(Object o,String p,PropertyDescriptor attributes)
+/* Adds a property to an object, or modifies attributes of an existing property. */
+/* Adds a property to an object, or modifies attributes of an existing property. */
+Object defineProperty(Object o,UnionOfStringAndNumber propertyKey,PropertyDescriptor attributes)
 /* Adds one or more properties to an object, and/or modifies attributes of existing properties. */
 Object defineProperties(Object o,PropertyDescriptorMap properties)
 /* Prevents the modification of attributes of existing properties, and prevents the addition of new properties. */
@@ -397,6 +412,8 @@ target object. Returns the target object. */
 /* Copy the values of all of the enumerable own properties from one or more source objects to a
 target object. Returns the target object. */
 Object assign(Object target,Array<Object> sources)
+/* Returns an array of all symbol properties found directly on object o. */
+Array<> getOwnPropertySymbols(Object o)
 /* Returns true if the values are the same value, false otherwise. */
 Boolean is(Object value1,Object value2)
 /* Sets the prototype of a specified object o to  object proto or null. Returns the object o. */
@@ -725,7 +742,7 @@ Boolean endsWith(String searchString,Number endPosition)
 named by form as specified in Unicode Standard Annex #15, Unicode Normalization Forms. */
 /* Returns the String value result of normalizing the string into the normalization form
 named by form as specified in Unicode Standard Annex #15, Unicode Normalization Forms. */
-String normalize(UnionOfString form)
+String normalize(String form)
 /* Returns the String value result of normalizing the string into the normalization form
 named by form as specified in Unicode Standard Annex #15, Unicode Normalization Forms. */
 /* Returns the String value result of normalizing the string into the normalization form
@@ -3967,6 +3984,14 @@ Object getPrototypeOf(T target)
 Boolean setPrototypeOf(T target,Object v)
 Boolean isExtensible(T target)
 Boolean preventExtensions(T target)
+PropertyDescriptor getOwnPropertyDescriptor(T target,UnionOfStringAndNumber p)
+Boolean has(T target,UnionOfStringAndNumber p)
+Object get(T target,UnionOfStringAndNumber p,Object receiver)
+Boolean set(T target,UnionOfStringAndNumber p,Object value,Object receiver)
+Boolean deleteProperty(T target,UnionOfStringAndNumber p)
+Boolean defineProperty(T target,UnionOfStringAndNumber p,PropertyDescriptor attributes)
+Array<UnionOfStringAndNumber> enumerate(T target)
+Array<UnionOfStringAndNumber> ownKeys(T target)
 Object apply(T target,Object thisArg,Object argArray)
 Object construct(T target,Object argArray,Object newTarget)
 
@@ -7610,11 +7635,17 @@ Object valueOf()
 /* Determines whether an object has a property with the specified name. */
 /* Determines whether an object has a property with the specified name. */
 Boolean hasOwnProperty(String v)
+/* Determines whether an object has a property with the specified name. */
+/* Determines whether an object has a property with the specified name. */
+Boolean hasOwnProperty(UnionOfStringAndNumber v)
 /* Determines whether an object exists in another object's prototype chain. */
 Boolean isPrototypeOf(Object v)
 /* Determines whether a specified property is enumerable. */
 /* Determines whether a specified property is enumerable. */
 Boolean propertyIsEnumerable(String v)
+/* Determines whether a specified property is enumerable. */
+/* Determines whether a specified property is enumerable. */
+Boolean propertyIsEnumerable(UnionOfStringAndNumber v)
 void arc(Number x,Number y,Number radius,Number startAngle,Number endAngle,Boolean anticlockwise)
 void arcTo(Number x1,Number y1,Number x2,Number y2,Number radius)
 void bezierCurveTo(Number cp1x,Number cp1y,Number cp2x,Number cp2y,Number x,Number y)
@@ -8082,11 +8113,17 @@ Object valueOf()
 /* Determines whether an object has a property with the specified name. */
 /* Determines whether an object has a property with the specified name. */
 Boolean hasOwnProperty(String v)
+/* Determines whether an object has a property with the specified name. */
+/* Determines whether an object has a property with the specified name. */
+Boolean hasOwnProperty(UnionOfStringAndNumber v)
 /* Determines whether an object exists in another object's prototype chain. */
 Boolean isPrototypeOf(Object v)
 /* Determines whether a specified property is enumerable. */
 /* Determines whether a specified property is enumerable. */
 Boolean propertyIsEnumerable(String v)
+/* Determines whether a specified property is enumerable. */
+/* Determines whether a specified property is enumerable. */
+Boolean propertyIsEnumerable(UnionOfStringAndNumber v)
 ArrayBufferView getRandomValues(ArrayBufferView array)
 
 
@@ -13380,7 +13417,7 @@ methods:
 /* Returns an object that provides methods and properties for drawing and manipulating images and graphics on a canvas element in a document. A context object includes information about colors, line widths, fonts, and other graphic parameters that can be drawn on a canvas. */
 CanvasRenderingContext2D getContext(String contextId,Canvas2DContextAttributes contextAttributes)
 /* Returns an object that provides methods and properties for drawing and manipulating images and graphics on a canvas element in a document. A context object includes information about colors, line widths, fonts, and other graphic parameters that can be drawn on a canvas. */
-WebGLRenderingContext getContext(UnionOfString contextId,WebGLContextAttributes contextAttributes)
+WebGLRenderingContext getContext(String contextId,WebGLContextAttributes contextAttributes)
 /* Returns an object that provides methods and properties for drawing and manipulating images and graphics on a canvas element in a document. A context object includes information about colors, line widths, fonts, and other graphic parameters that can be drawn on a canvas. */
 UnionOfCanvasRenderingContext2DAndWebGLRenderingContext getContext(String contextId,AnonymousType_277 contextAttributes)
 /* Returns a blob object encoded as a Portable Network Graphics (PNG) format from a canvas image or drawing. */
@@ -32533,7 +32570,7 @@ History()
 properties:
 Number length 
 Object state 
-UnionOfString scrollRestoration 
+String scrollRestoration 
 methods:
 void back()
 void forward()
@@ -35120,11 +35157,17 @@ Object valueOf()
 /* Determines whether an object has a property with the specified name. */
 /* Determines whether an object has a property with the specified name. */
 Boolean hasOwnProperty(String v)
+/* Determines whether an object has a property with the specified name. */
+/* Determines whether an object has a property with the specified name. */
+Boolean hasOwnProperty(UnionOfStringAndNumber v)
 /* Determines whether an object exists in another object's prototype chain. */
 Boolean isPrototypeOf(Object v)
 /* Determines whether a specified property is enumerable. */
 /* Determines whether a specified property is enumerable. */
 Boolean propertyIsEnumerable(String v)
+/* Determines whether a specified property is enumerable. */
+/* Determines whether a specified property is enumerable. */
+Boolean propertyIsEnumerable(UnionOfStringAndNumber v)
 Boolean confirmSiteSpecificTrackingException(ConfirmSiteSpecificExceptionsInformation args)
 Boolean confirmWebWideTrackingException(ExceptionInformation args)
 void removeSiteSpecificTrackingException(ExceptionInformation args)
@@ -35684,11 +35727,17 @@ Object valueOf()
 /* Determines whether an object has a property with the specified name. */
 /* Determines whether an object has a property with the specified name. */
 Boolean hasOwnProperty(String v)
+/* Determines whether an object has a property with the specified name. */
+/* Determines whether an object has a property with the specified name. */
+Boolean hasOwnProperty(UnionOfStringAndNumber v)
 /* Determines whether an object exists in another object's prototype chain. */
 Boolean isPrototypeOf(Object v)
 /* Determines whether a specified property is enumerable. */
 /* Determines whether a specified property is enumerable. */
 Boolean propertyIsEnumerable(String v)
+/* Determines whether a specified property is enumerable. */
+/* Determines whether a specified property is enumerable. */
+Boolean propertyIsEnumerable(UnionOfStringAndNumber v)
 void arc(Number x,Number y,Number radius,Number startAngle,Number endAngle,Boolean anticlockwise)
 void arcTo(Number x1,Number y1,Number x2,Number y2,Number radius)
 void bezierCurveTo(Number cp1x,Number cp1y,Number cp2x,Number cp2y,Number x,Number y)
@@ -37169,11 +37218,17 @@ Object valueOf()
 /* Determines whether an object has a property with the specified name. */
 /* Determines whether an object has a property with the specified name. */
 Boolean hasOwnProperty(String v)
+/* Determines whether an object has a property with the specified name. */
+/* Determines whether an object has a property with the specified name. */
+Boolean hasOwnProperty(UnionOfStringAndNumber v)
 /* Determines whether an object exists in another object's prototype chain. */
 Boolean isPrototypeOf(Object v)
 /* Determines whether a specified property is enumerable. */
 /* Determines whether a specified property is enumerable. */
 Boolean propertyIsEnumerable(String v)
+/* Determines whether a specified property is enumerable. */
+/* Determines whether a specified property is enumerable. */
+Boolean propertyIsEnumerable(UnionOfStringAndNumber v)
 Promise<ArrayBuffer> arrayBuffer()
 Promise<Blob> blob()
 Promise<Object> json()
@@ -37218,11 +37273,17 @@ Object valueOf()
 /* Determines whether an object has a property with the specified name. */
 /* Determines whether an object has a property with the specified name. */
 Boolean hasOwnProperty(String v)
+/* Determines whether an object has a property with the specified name. */
+/* Determines whether an object has a property with the specified name. */
+Boolean hasOwnProperty(UnionOfStringAndNumber v)
 /* Determines whether an object exists in another object's prototype chain. */
 Boolean isPrototypeOf(Object v)
 /* Determines whether a specified property is enumerable. */
 /* Determines whether a specified property is enumerable. */
 Boolean propertyIsEnumerable(String v)
+/* Determines whether a specified property is enumerable. */
+/* Determines whether a specified property is enumerable. */
+Boolean propertyIsEnumerable(UnionOfStringAndNumber v)
 Promise<ArrayBuffer> arrayBuffer()
 Promise<Blob> blob()
 Promise<Object> json()
@@ -52474,13 +52535,13 @@ PromiseLike<CryptoKey> deriveKey(UnionOfStringAndEcdhKeyDeriveParamsAndDhKeyDeri
 PromiseLike<ArrayBuffer> digest(UnionOfStringAndAlgorithm algorithm,UnionOfArrayBufferAndArrayBufferView data)
 PromiseLike<ArrayBuffer> encrypt(UnionOfStringAndRsaOaepParamsAndAesCtrParamsAndAesCbcParamsAndAesCmacParamsAndAesGcmParamsAndAesCfbParams algorithm,CryptoKey key,UnionOfArrayBufferAndArrayBufferView data)
 PromiseLike<JsonWebKey> exportKey(String format,CryptoKey key)
-PromiseLike<ArrayBuffer> exportKey(UnionOfString format,CryptoKey key)
+PromiseLike<ArrayBuffer> exportKey(String format,CryptoKey key)
 PromiseLike<UnionOfArrayBufferAndJsonWebKey> exportKey(String format,CryptoKey key)
 PromiseLike<UnionOfCryptoKeyAndCryptoKeyPair> generateKey(String algorithm,Boolean extractable,Array<String> keyUsages)
 PromiseLike<CryptoKeyPair> generateKey(UnionOfRsaHashedKeyGenParamsAndEcKeyGenParamsAndDhKeyGenParams algorithm,Boolean extractable,Array<String> keyUsages)
 PromiseLike<CryptoKey> generateKey(UnionOfAesKeyGenParamsAndHmacKeyGenParamsAndPbkdf2Params algorithm,Boolean extractable,Array<String> keyUsages)
 PromiseLike<CryptoKey> importKey(String format,JsonWebKey keyData,UnionOfStringAndRsaHashedImportParamsAndEcKeyImportParamsAndHmacImportParamsAndDhImportKeyParams algorithm,Boolean extractable,Array<String> keyUsages)
-PromiseLike<CryptoKey> importKey(UnionOfString format,UnionOfArrayBufferAndArrayBufferView keyData,UnionOfStringAndRsaHashedImportParamsAndEcKeyImportParamsAndHmacImportParamsAndDhImportKeyParams algorithm,Boolean extractable,Array<String> keyUsages)
+PromiseLike<CryptoKey> importKey(String format,UnionOfArrayBufferAndArrayBufferView keyData,UnionOfStringAndRsaHashedImportParamsAndEcKeyImportParamsAndHmacImportParamsAndDhImportKeyParams algorithm,Boolean extractable,Array<String> keyUsages)
 PromiseLike<CryptoKey> importKey(String format,UnionOfArrayBufferAndArrayBufferViewAndJsonWebKey keyData,UnionOfStringAndRsaHashedImportParamsAndEcKeyImportParamsAndHmacImportParamsAndDhImportKeyParams algorithm,Boolean extractable,Array<String> keyUsages)
 PromiseLike<ArrayBuffer> sign(UnionOfStringAndRsaPssParamsAndEcdsaParamsAndAesCmacParams algorithm,CryptoKey key,UnionOfArrayBufferAndArrayBufferView data)
 PromiseLike<CryptoKey> unwrapKey(String format,UnionOfArrayBufferAndArrayBufferView wrappedKey,CryptoKey unwrappingKey,UnionOfStringAndAlgorithm unwrapAlgorithm,UnionOfStringAndAlgorithm unwrappedKeyAlgorithm,Boolean extractable,Array<String> keyUsages)
@@ -54777,11 +54838,17 @@ Object valueOf()
 /* Determines whether an object has a property with the specified name. */
 /* Determines whether an object has a property with the specified name. */
 Boolean hasOwnProperty(String v)
+/* Determines whether an object has a property with the specified name. */
+/* Determines whether an object has a property with the specified name. */
+Boolean hasOwnProperty(UnionOfStringAndNumber v)
 /* Determines whether an object exists in another object's prototype chain. */
 Boolean isPrototypeOf(Object v)
 /* Determines whether a specified property is enumerable. */
 /* Determines whether a specified property is enumerable. */
 Boolean propertyIsEnumerable(String v)
+/* Determines whether a specified property is enumerable. */
+/* Determines whether a specified property is enumerable. */
+Boolean propertyIsEnumerable(UnionOfStringAndNumber v)
 void clearImmediate(Number handle)
 Number setImmediate(AnonymousType_447 handler)
 Number setImmediate(Object handler,Array<Object> args)
@@ -56029,11 +56096,17 @@ Object valueOf()
 /* Determines whether an object has a property with the specified name. */
 /* Determines whether an object has a property with the specified name. */
 Boolean hasOwnProperty(String v)
+/* Determines whether an object has a property with the specified name. */
+/* Determines whether an object has a property with the specified name. */
+Boolean hasOwnProperty(UnionOfStringAndNumber v)
 /* Determines whether an object exists in another object's prototype chain. */
 Boolean isPrototypeOf(Object v)
 /* Determines whether a specified property is enumerable. */
 /* Determines whether a specified property is enumerable. */
 Boolean propertyIsEnumerable(String v)
+/* Determines whether a specified property is enumerable. */
+/* Determines whether a specified property is enumerable. */
+Boolean propertyIsEnumerable(UnionOfStringAndNumber v)
 void clearImmediate(Number handle)
 Number setImmediate(AnonymousType_447 handler)
 Number setImmediate(Object handler,Array<Object> args)
@@ -56146,7 +56219,7 @@ void handleEvent(Event evt)
 ts type 1564 32768 ScrollOptions C:/Documents/Repos/typescript2java/node_modules/typescript/lib/lib.es6.d.ts:743419 : ScrollOptions
 name: ScrollOptions
 properties:
-UnionOfString behavior 
+String behavior 
 
 
 ts type 1565 32768 ScrollToOptions C:/Documents/Repos/typescript2java/node_modules/typescript/lib/lib.es6.d.ts:743479 : ScrollToOptions
@@ -56156,7 +56229,7 @@ base types:
 properties:
 Number left 
 Number top 
-UnionOfString behavior 
+String behavior 
 
 
 ts type 1566 32768 ScrollIntoViewOptions C:/Documents/Repos/typescript2java/node_modules/typescript/lib/lib.es6.d.ts:743569 : ScrollIntoViewOptions
@@ -56164,9 +56237,9 @@ name: ScrollIntoViewOptions
 base types:
 - ScrollOptions
 properties:
-UnionOfString block 
-UnionOfString inline 
-UnionOfString behavior 
+String block 
+String inline 
+String behavior 
 
 
 ts type 1567 32768 IDBArrayKey C:/Documents/Repos/typescript2java/node_modules/typescript/lib/lib.es6.d.ts:743793 : IDBArrayKey
@@ -56704,7 +56777,7 @@ NodeListOf<Element> querySelectorAll(String selectors)
 ts type 1602 32768 ShadowRootInit C:/Documents/Repos/typescript2java/node_modules/typescript/lib/lib.es6.d.ts:747698 : ShadowRootInit
 name: ShadowRootInit
 properties:
-UnionOfString mode 
+String mode 
 Boolean delegatesFocus 
 
 
@@ -58580,8 +58653,7 @@ Array<String> __@split(String string,Number limit)
 
 
 ts type 2031 65536   : StringOrStringOrStringOrString
-UnionType UnionOfString
-- String
+Builtin type String
 
 
 ts type 2041 32768 Intl.NumberFormatOptions C:/Documents/Repos/typescript2java/node_modules/typescript/lib/lib.es6.d.ts:193039 : NumberFormatOptions
@@ -61194,8 +61266,7 @@ name: AnonymousType_276
 
 
 ts type 4255 65536   : StringOrString
-UnionType UnionOfString
-- String
+Builtin type String
 
 
 ts type 4248 65536   : CanvasRenderingContext2DOrWebGLRenderingContext
@@ -61485,8 +61556,7 @@ name: AnonymousType_341
 
 
 ts type 4548 65536   : StringOrString
-UnionType UnionOfString
-- String
+Builtin type String
 
 
 ts type 4555 65536   : StringOrNumberOrDateOrIDBKeyRangeOrIDBArrayKey
@@ -61955,8 +62025,7 @@ UnionType UnionOfStringAndAesDerivedKeyParamsAndHmacImportParamsAndConcatParamsA
 
 
 ts type 5476 65536   : StringOrStringOrString
-UnionType UnionOfString
-- String
+Builtin type String
 
 
 ts type 5466 65536   : ArrayBufferOrJsonWebKey
@@ -62127,13 +62196,11 @@ name: AnonymousType_456
 
 
 ts type 5918 65536   : StringOrStringOrString
-UnionType UnionOfString
-- String
+Builtin type String
 
 
 ts type 5927 65536   : StringOrStringOrStringOrString
-UnionType UnionOfString
-- String
+Builtin type String
 
 
 ts type 4554 65536   : StringOrNumberOrDateOrIDBArrayKey
@@ -62145,8 +62212,7 @@ UnionType UnionOfStringAndNumberAndDateAndIDBArrayKey
 
 
 ts type 5935 65536   : StringOrString
-UnionType UnionOfString
-- String
+Builtin type String
 
 
 ts type 6079 32768 __type C:/Documents/Repos/typescript2java/node_modules/typescript/lib/lib.es6.d.ts:783527 : __type
