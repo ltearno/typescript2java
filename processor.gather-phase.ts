@@ -524,9 +524,9 @@ export class GatherPhase {
         // Array => JsArray and so on for similar custom native types replacement\\freebox
         // remove unreferenced types ?
 
-        console.log(this.variables.map(v => `variable : ${TypeMap.ClassOrInterfacePreJavaType.getTypeName(v.type)} ${v.name}`).join(`\n`))
+        console.log(this.variables.map(v => `variable : ${v.type.getName()} ${v.name}`).join(`\n`))
 
-        console.log(this.globalMethods.map(m => `global method : ${TypeMap.ClassOrInterfacePreJavaType.serializeSignature(m)}`).join('\n'))
+        console.log(this.globalMethods.map(m => `global method : ${TypeMap.PreJavaTypeClassOrInterface.serializeSignature(m)}`).join('\n'))
 
         this.typeMap.typeMap.forEach((type, k) => {
             let files = (k.getSymbol() && k.getSymbol().declarations) ? k.getSymbol().declarations.map(d => d.getSourceFile().fileName + ':' + d.getFullStart()).join() : ''
@@ -538,7 +538,7 @@ export class GatherPhase {
 
             switch (type.kind) {
                 case TypeMap.PreJavaTypeKind.CLASS_OR_INTERFACE: {
-                    (type as TypeMap.ClassOrInterfacePreJavaType).dump()
+                    (type as TypeMap.PreJavaTypeClassOrInterface).dump()
                     break
                 }
             }
@@ -555,9 +555,9 @@ export class GatherPhase {
                     if (constructorSignature.getReturnType()) {
                         let preJava = this.typeMap.getOrCreatePreJavaTypeForTsType(constructorSignature.getReturnType())
                         if (preJava.kind == TypeMap.PreJavaTypeKind.CLASS_OR_INTERFACE) {
-                            (preJava as TypeMap.ClassOrInterfacePreJavaType).addPrototypeName(null, guessName(declaration.name));
-                            (preJava as TypeMap.ClassOrInterfacePreJavaType).maybeSetTypeName(guessName(declaration.name));
-                            (preJava as TypeMap.ClassOrInterfacePreJavaType).addConstructorSignature(this.convertSignature(null, constructorSignature))
+                            (preJava as TypeMap.PreJavaTypeClassOrInterface).addPrototypeName(null, guessName(declaration.name));
+                            (preJava as TypeMap.PreJavaTypeClassOrInterface).maybeSetTypeName(guessName(declaration.name));
+                            (preJava as TypeMap.PreJavaTypeClassOrInterface).addConstructorSignature(this.convertSignature(null, constructorSignature))
                         }
                     }
                 })
@@ -589,8 +589,8 @@ export class GatherPhase {
 
     private currentIdAnonymousTypes = 1
 
-    private processClassOrInterfaceDeclaration(preJava: TypeMap.ClassOrInterfacePreJavaType) {
-        let realPreJavaType = preJava as TypeMap.ClassOrInterfacePreJavaType
+    private processClassOrInterfaceDeclaration(preJava: TypeMap.PreJavaTypeClassOrInterface) {
+        let realPreJavaType = preJava as TypeMap.PreJavaTypeClassOrInterface
 
         if (realPreJavaType.processed)
             return
@@ -663,7 +663,7 @@ export class GatherPhase {
 
                     let propertyPreJavaType = this.typeMap.getOrCreatePreJavaTypeForTsType(propertyType)
                     if (propertyPreJavaType.kind == TypeMap.PreJavaTypeKind.CLASS_OR_INTERFACE) {
-                        (propertyPreJavaType as TypeMap.ClassOrInterfacePreJavaType).maybeSetTypeName(`${propertyName.slice(0, 1).toUpperCase() + propertyName.slice(1)}Caller`)
+                        (propertyPreJavaType as TypeMap.PreJavaTypeClassOrInterface).maybeSetTypeName(`${propertyName.slice(0, 1).toUpperCase() + propertyName.slice(1)}Caller`)
                     }
 
                     realPreJavaType.addProperty({

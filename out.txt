@@ -4,26 +4,21 @@ Compiling diagnostics...
 Adding exportable nodes...
 source C:/Documents/Repos/typescript2java/node_modules/typescript/lib/lib.es6.d.ts
 source tests/test.d.ts
-enum member name Un
-enum member name Deux
-enum member name Cinq
-enum member name Sept
-enum member name Yo
-enum member name Yi
-enum member name Ya
 Ignored SyntaxKind: TypeAliasDeclaration
 Ignored SyntaxKind: EndOfFileToken
 processing types...
-enum member name Un
-enum member name Deux
-enum member name Cinq
-enum member name Sept
 variable : AnonymousType_1 Rock
 variable : PartialClass toto
 
 
 
-ts type 53 32768 "tests/test".Rock tests/test.d.ts:192,tests/test.d.ts:298 : Rock
+ts type 51 16 "tests/test".MonEnum1 tests/test.d.ts:0 : MonEnum1
+
+
+ts type 52 16 "tests/test".MonEnum2 tests/test.d.ts:155 : MonEnum2
+
+
+ts type 53 32768 "tests/test".Rock tests/test.d.ts:210,tests/test.d.ts:316 : Rock
 name: Rock
 prototypes
 Rock
@@ -31,19 +26,19 @@ constructors
 Rock(java.lang.String a,java.lang.Number b)
 Rock(java.lang.String a,java.lang.Number b)
 properties
-java.lang.Number tototo 
+MonEnum1 tototo 
 MoimoiCaller moimoi 
 methods
 java.lang.String moimoi(java.lang.String a)
 
 
-ts type 54 32768 __type tests/test.d.ts:304 : __type
+ts type 54 32768 __type tests/test.d.ts:322 : __type
 name: AnonymousType_1
 properties
 java.lang.Number SAVE_ME 
 
 
-ts type 56 32768 __type tests/test.d.ts:438 : __type
+ts type 56 32768 __type tests/test.d.ts:456 : __type
 name: SpaceShip
 prototypes
 SpaceShip
@@ -55,11 +50,11 @@ methods
 Array<java.lang.Number> mimi(java.lang.Number mati)
 
 
-ts type 57 32768 "tests/test".JeSuisInterface tests/test.d.ts:488 : JeSuisInterface
+ts type 57 32768 "tests/test".JeSuisInterface tests/test.d.ts:506 : JeSuisInterface
 name: JeSuisInterface
 
 
-ts type 58 32768 "tests/test".JeSuisClasse tests/test.d.ts:528 : JeSuisClasse
+ts type 58 32768 "tests/test".JeSuisClasse tests/test.d.ts:546 : JeSuisClasse
 name: JeSuisClasse
 prototypes
 JeSuisClasse
@@ -67,7 +62,7 @@ constructors
 JeSuisClasse()
 
 
-ts type 60 32768 "tests/test".PartialClass tests/test.d.ts:561,tests/test.d.ts:661,tests/test.d.ts:1168 : PartialClass
+ts type 60 32768 "tests/test".PartialClass tests/test.d.ts:579,tests/test.d.ts:679,tests/test.d.ts:1186 : PartialClass
 name: PartialClass
 prototypes
 PartialClass
@@ -84,7 +79,7 @@ java.lang.Number aFunction(java.lang.Number n,java.lang.String s)
 java.lang.Number execute(java.lang.String n)
 
 
-ts type 62 32768 "tests/test".CompileAnimationStateDeclarationMetadata tests/test.d.ts:951 : CompileAnimationStateDeclarationMetadata
+ts type 62 32768 "tests/test".CompileAnimationStateDeclarationMetadata tests/test.d.ts:969 : CompileAnimationStateDeclarationMetadata
 name: CompileAnimationStateDeclarationMetadata
 prototypes
 CompileAnimationStateDeclarationMetadata
@@ -96,7 +91,7 @@ methods
 java.lang.Number stateNameExpr(java.lang.String n)
 
 
-ts type 64 32768 "tests/test".TestI tests/test.d.ts:1110,tests/test.d.ts:1256 : TestI
+ts type 64 32768 "tests/test".TestI tests/test.d.ts:1128,tests/test.d.ts:1274 : TestI
 name: TestI
 type parameters : TTT
 properties
@@ -108,7 +103,7 @@ java.lang.Number a(java.lang.String n)
 java.lang.Number cc(java.lang.String n)
 
 
-ts type 67 32768 "tests/test".ConcreteAbstractPartialClass tests/test.d.ts:1343 : ConcreteAbstractPartialClass
+ts type 67 32768 "tests/test".ConcreteAbstractPartialClass tests/test.d.ts:1361 : ConcreteAbstractPartialClass
 name: ConcreteAbstractPartialClass
 type parameters : U
 properties
@@ -129,7 +124,7 @@ java.lang.Number aFunction(java.lang.Number n,java.lang.String s)
 java.lang.Number execute(java.lang.String n)
 
 
-ts type 70 32768 "tests/test".Rock.moimoi tests/test.d.ts:242 : moimoi
+ts type 70 32768 "tests/test".Rock.moimoi tests/test.d.ts:260 : moimoi
 name: MoimoiCaller
 methods
 java.lang.String execute(java.lang.String a)
@@ -216,25 +211,25 @@ IterableIterator<T> values()
 AnonymousType_19 __@unscopables()
 
 
-ts type 71 32768 __type.mimi tests/test.d.ts:440 : mimi
+ts type 71 32768 __type.mimi tests/test.d.ts:458 : mimi
 name: MimiCaller
 methods
 Array<java.lang.Number> execute(java.lang.Number mati)
 
 
-ts type 75 32768 "tests/test".PartialClass.aFunction tests/test.d.ts:859 : aFunction
+ts type 75 32768 "tests/test".PartialClass.aFunction tests/test.d.ts:877 : aFunction
 name: AFunctionCaller
 methods
 java.lang.Number execute(java.lang.Number n,java.lang.String s)
 
 
-ts type 79 32768 "tests/test".ConcreteAbstractPartialClass.faireSomethink tests/test.d.ts:1418 : faireSomethink
+ts type 79 32768 "tests/test".ConcreteAbstractPartialClass.faireSomethink tests/test.d.ts:1436 : faireSomethink
 name: FaireSomethinkCaller
 methods
 java.lang.Object execute()
 
 
-ts type 80 32768 "tests/test".ConcreteAbstractPartialClass.faireSomethins tests/test.d.ts:1441 : faireSomethins
+ts type 80 32768 "tests/test".ConcreteAbstractPartialClass.faireSomethins tests/test.d.ts:1459 : faireSomethins
 name: FaireSomethinsCaller
 methods
 java.lang.Object execute(java.lang.Number i,ConcreteAbstractPartialClass toto)
