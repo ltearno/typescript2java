@@ -34,7 +34,9 @@ export declare var SpaceShip: {
     }
 }
 
-export interface JeSuisInterface { }
+export interface JeSuisInterface {
+    avecUneMethode(t: number): number
+}
 
 export class JeSuisClasse { }
 

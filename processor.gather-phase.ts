@@ -20,6 +20,7 @@ function guessName(identifier: ts.Identifier | ts.BindingPattern): string {
  * and Java types.
  */
 export class GatherPhase {
+    private currentIdAnonymousTypes = 1
     private BY_INDEX_SETTER = `JsTools.setItem`
     private BY_INDEX_GETTER = `JsTools.getItem`
 
@@ -336,145 +337,6 @@ export class GatherPhase {
         }
     }
 
-    analyzeType(type: ts.Type, deep: number = 0) {
-        let prefix = ''
-        for (let i = 0; i < deep; i++)
-            prefix += '\t'
-
-        if (type == null) {
-            console.log(`${prefix}NO TYPE`)
-            return
-        }
-        let typeName = type.getSymbol() ? type.getSymbol().getName() : "(anonymous type)"
-        console.log(`${prefix}TYPE : ${typeName}`);
-
-        let flags = type.getFlags() as number
-        let keys = Object.keys(ts.TypeFlags)
-        console.log(`${prefix}RAW FLAG: ${flags}`)
-        keys.filter(k => parseInt(k)).forEach(flag => {
-            let f = parseInt(flag);
-            if ((f & flags) === f)
-                console.log(`${prefix}FLAG : ${ts.TypeFlags[flag]}`)
-        })
-
-        if ((flags & ts.TypeFlags.TypeParameter) === ts.TypeFlags.TypeParameter) {
-            console.log(`${prefix}TYPE PARAMETER TYPE`)
-            let typeParameter = type as ts.TypeParameter
-            if (typeParameter.constraint) {
-                console.log(`${prefix} CONSTRAINT`)
-                this.analyzeType(typeParameter.constraint, deep + 2)
-            }
-        }
-
-        if ((flags & ts.TypeFlags.Object) === ts.TypeFlags.Object) {
-            console.log(`${prefix}OBJECT TYPE`)
-            let objectType = type as ts.ObjectType
-            if (objectType.objectFlags & ts.ObjectFlags.ClassOrInterface) {
-                let interfaceType = objectType as ts.InterfaceType
-                console.log(`${prefix}OBJECTTYPE ${interfaceType.localTypeParameters} ${interfaceType.outerTypeParameters} ${interfaceType.typeParameters} ${interfaceType.aliasTypeArguments}`)
-
-                if (interfaceType.typeParameters && interfaceType.typeParameters.length) {
-                    console.log(`${prefix}TYPE PARAMETERS`)
-                    for (let typeParameter of interfaceType.typeParameters) {
-                        console.log(`${prefix} TYPE PARAMETER :`)
-                        this.analyzeType(typeParameter, deep + 2)
-                    }
-                }
-            }
-        }
-
-        if (deep > 2)
-            return
-
-        let baseTypes = type.getBaseTypes()
-        if (baseTypes && baseTypes.length > 0) {
-            console.log(`${prefix}BASE TYPES:`)
-            baseTypes.forEach((baseType => this.analyzeType(baseType, deep + 1)))
-        }
-
-        if (type.aliasTypeArguments && type.aliasTypeArguments.length) {
-            console.log(`ALIAS TYPE ARGUMENTS`)
-        }
-
-        let properties = type.getProperties()
-        if (properties) {
-            console.log(`${prefix}PROPERTIES`)
-            for (let property of properties) {
-                if ("baobab" == property.getName())
-                    console.log(`yop`)
-                let propertyType = this.program.getTypeChecker().getTypeAtLocation(property.valueDeclaration)
-
-                //this.program.getTypeChecker().getDeclaredTypeOfSymbol(property)
-                console.log(`${prefix} PROPERTY ${property.getName()}`)
-                this.analyzeType(propertyType, deep + 2)
-                console.log(`${prefix} END PROPERTY ${property.getName()}`)
-            }
-        }
-
-        let callSignatures = type.getCallSignatures()
-        if (callSignatures) {
-            console.log(`${prefix}CALL SIGNATURE`)
-            for (let callSignature of callSignatures) {
-                let parameters = callSignature.getParameters()
-                if (parameters && parameters.length) {
-                    console.log(`${prefix}PARAMETERS`)
-                    for (let parameter of parameters) {
-                        let parameteryType = this.program.getTypeChecker().getTypeAtLocation(parameter.valueDeclaration)
-                        console.log(`${prefix}${parameter.getName()}`)
-                        this.analyzeType(parameteryType, deep + 1)
-                    }
-                }
-
-                let returnType = callSignature.getReturnType()
-                if (returnType) {
-                    console.log(`${prefix}RETURN TYPE`)
-                    this.analyzeType(returnType, deep + 1)
-                }
-
-                let typeParameters = callSignature.getTypeParameters()
-                if (typeParameters && typeParameters.length) {
-                    console.log(`${prefix}TYPE PARAMETERS`)
-                    for (let typeParameter of typeParameters) {
-                        console.log(`${prefix}TYPE PARAMETER`)
-                        this.analyzeType(typeParameter, deep + 1)
-                    }
-                }
-            }
-        }
-
-        let constructSignatures = type.getConstructSignatures()
-        if (constructSignatures) {
-            console.log(`${prefix}CONSTRUCT SIGNATURE`)
-            for (let constructSignature of constructSignatures) {
-                let parameters = constructSignature.getParameters()
-                if (parameters && parameters.length) {
-                    console.log(`${prefix}PARAMETERS`)
-                    for (let parameter of parameters) {
-                        let parameteryType = this.program.getTypeChecker().getTypeAtLocation(parameter.valueDeclaration)
-                        console.log(`${prefix}${parameter.getName()}`)
-                        this.analyzeType(parameteryType, deep + 1)
-                    }
-                }
-
-                let returnType = constructSignature.getReturnType()
-                if (returnType) {
-                    console.log(`${prefix}RETURN TYPE`)
-                    this.analyzeType(returnType, deep + 1)
-                }
-
-                let typeParameters = constructSignature.getTypeParameters()
-                if (typeParameters && typeParameters.length) {
-                    console.log(`${prefix}TYPE PARAMETERS`)
-                    for (let typeParameter of typeParameters) {
-                        console.log(`${prefix}TYPE PARAMETER`)
-                        this.analyzeType(typeParameter, deep + 1)
-                    }
-                }
-            }
-        }
-
-        console.log(`${prefix}END TYPE ${typeName}`)
-    }
 
     addTypesFromSourceFile(sourceFile: ts.SourceFile, onlyExportedSymbols: boolean) {
         ts.forEachChild(sourceFile, (node) => {
@@ -526,7 +388,7 @@ export class GatherPhase {
 
         console.log(this.variables.map(v => `variable : ${v.type.getName()} ${v.name}`).join(`\n`))
 
-        console.log(this.globalMethods.map(m => `global method : ${TypeMap.PreJavaTypeClassOrInterface.serializeSignature(m)}`).join('\n'))
+        console.log(this.globalMethods.map(m => `global method : ${m.serializeSignature()}`).join('\n'))
 
         this.typeMap.typeMap.forEach((type, k) => {
             let files = (k.getSymbol() && k.getSymbol().declarations) ? k.getSymbol().declarations.map(d => d.getSourceFile().fileName + ':' + d.getFullStart()).join() : ''
@@ -536,12 +398,7 @@ export class GatherPhase {
             console.log()
             console.log(`ts type ${k['id']} ${k.flags} ${fqn} ${files} : ${this.getTypeName(k)}`)
 
-            switch (type.kind) {
-                case TypeMap.PreJavaTypeKind.CLASS_OR_INTERFACE: {
-                    (type as TypeMap.PreJavaTypeClassOrInterface).dump()
-                    break
-                }
-            }
+            type.dump()
         })
     }
 
@@ -554,10 +411,10 @@ export class GatherPhase {
                 cs.forEach(constructorSignature => {
                     if (constructorSignature.getReturnType()) {
                         let preJava = this.typeMap.getOrCreatePreJavaTypeForTsType(constructorSignature.getReturnType())
-                        if (preJava.kind == TypeMap.PreJavaTypeKind.CLASS_OR_INTERFACE) {
-                            (preJava as TypeMap.PreJavaTypeClassOrInterface).addPrototypeName(null, guessName(declaration.name));
-                            (preJava as TypeMap.PreJavaTypeClassOrInterface).maybeSetTypeName(guessName(declaration.name));
-                            (preJava as TypeMap.PreJavaTypeClassOrInterface).addConstructorSignature(this.convertSignature(null, constructorSignature))
+                        if (preJava instanceof TypeMap.PreJavaTypeClassOrInterface) {
+                            preJava.addPrototypeName(null, guessName(declaration.name));
+                            preJava.setName(guessName(declaration.name));
+                            preJava.addConstructorSignature(this.convertSignature(null, constructorSignature))
                         }
                     }
                 })
@@ -587,8 +444,6 @@ export class GatherPhase {
         }
     }
 
-    private currentIdAnonymousTypes = 1
-
     private processClassOrInterfaceDeclaration(preJava: TypeMap.PreJavaTypeClassOrInterface) {
         let realPreJavaType = preJava as TypeMap.PreJavaTypeClassOrInterface
 
@@ -601,9 +456,9 @@ export class GatherPhase {
 
             if (symbol) {
                 if ((symbol.flags & ts.SymbolFlags.Class) || (symbol.flags & ts.SymbolFlags.Interface))
-                    realPreJavaType.maybeSetTypeName(symbol.getName())
+                    realPreJavaType.setName(symbol.getName())
                 else if (symbol.flags & ts.SymbolFlags.TypeLiteral)
-                    realPreJavaType.maybeSetTypeName(`AnonymousType_${this.currentIdAnonymousTypes++}`)
+                    realPreJavaType.setName(`AnonymousType_${this.currentIdAnonymousTypes++}`)
 
                 if (symbol.getDeclarations() && symbol.getDeclarations().some(d => d.kind == ts.SyntaxKind.ClassDeclaration)) {
                     realPreJavaType.addPrototypeName(null, this.getTypeName(type))
@@ -616,6 +471,9 @@ export class GatherPhase {
                         constructors.forEach(constructorSignature => realPreJavaType.addConstructorSignature(this.convertSignature(null, constructorSignature)))
                 }
 
+                let comments = this.getCommentFromSymbol(symbol)
+                if (comments && comments.length > 0)
+                    realPreJavaType.addComments(comments)
             }
 
             if (type.flags & ts.TypeFlags.Object) {
@@ -623,7 +481,7 @@ export class GatherPhase {
                 if (objectType.objectFlags & ts.ObjectFlags.Class || objectType.objectFlags & ts.ObjectFlags.Interface) {
                     let interfaceType = objectType as ts.InterfaceType
                     if (interfaceType.typeParameters && interfaceType.typeParameters.length) {
-                        realPreJavaType.setTypeParameters(interfaceType.typeParameters.map(tp => ({ kind: TypeMap.PreJavaTypeKind.TYPE_PARAMETER, name: tp.symbol.getName() } as TypeMap.PreJavaTypeParameter)))
+                        realPreJavaType.setTypeParameters(interfaceType.typeParameters.map(tp => (new TypeMap.PreJavaTypeParameter(tp.symbol.getName(), this.typeMap.getOrCreatePreJavaTypeForTsType(tp.constraint)))))
                     }
                 }
             }
@@ -652,25 +510,31 @@ export class GatherPhase {
 
                     if (!property.valueDeclaration)
                         return
+
+                    let comments = this.getCommentFromSymbol(property)
+
                     let propertyType = this.program.getTypeChecker().getTypeAtLocation(property.valueDeclaration)
 
+                    // TODO : generating property accessors for callable types should be configurable
                     let callSignatures = propertyType.getCallSignatures()
-                    if (callSignatures && callSignatures.length) {
+                    if (callSignatures && callSignatures.length == 1) {
                         for (let callSignature of callSignatures) {
-                            realPreJavaType.addMethod(this.convertSignature(propertyName, callSignature))
+                            let method = this.convertSignature(propertyName, callSignature)
+                            method.addComments(comments)
+                            realPreJavaType.addMethod(method)
                         }
                     }
+                    else {
+                        let propertyPreJavaType = this.typeMap.getOrCreatePreJavaTypeForTsType(propertyType)
+                        propertyPreJavaType.setName(`${propertyName.slice(0, 1).toUpperCase() + propertyName.slice(1)}Caller`)
 
-                    let propertyPreJavaType = this.typeMap.getOrCreatePreJavaTypeForTsType(propertyType)
-                    if (propertyPreJavaType.kind == TypeMap.PreJavaTypeKind.CLASS_OR_INTERFACE) {
-                        (propertyPreJavaType as TypeMap.PreJavaTypeClassOrInterface).maybeSetTypeName(`${propertyName.slice(0, 1).toUpperCase() + propertyName.slice(1)}Caller`)
+                        realPreJavaType.addProperty({
+                            name: propertyName,
+                            type: propertyPreJavaType,
+                            writable: true,
+                            comments
+                        })
                     }
-
-                    realPreJavaType.addProperty({
-                        name: propertyName,
-                        type: propertyPreJavaType,
-                        writable: true
-                    })
                 })
             }
 
@@ -685,21 +549,31 @@ export class GatherPhase {
     }
 
     private convertSignature(name: string, tsSignature: ts.Signature): TypeMap.PreJavaTypeCallSignature {
-        let methodSignature: TypeMap.PreJavaTypeCallSignature = {
-            typeParameters: tsSignature.getTypeParameters() ? tsSignature.getTypeParameters().map(t => {
+        return new TypeMap.PreJavaTypeCallSignature(
+            tsSignature.getTypeParameters() ? tsSignature.getTypeParameters().map(t => {
                 let res = this.typeMap.getOrCreatePreJavaTypeForTsType(t) as TypeMap.PreJavaTypeParameter
-                if (res.kind != TypeMap.PreJavaTypeKind.TYPE_PARAMETER)
+                if (!(res instanceof TypeMap.PreJavaTypeParameter))
                     console.error(`BLABLABLA`)
                 return res
             }) : null,
-            returnType: this.typeMap.getOrCreatePreJavaTypeForTsType(tsSignature.getReturnType()),
-            name: name,
-            parameters: tsSignature.getParameters() ? tsSignature.getParameters().map(p => {
+            this.typeMap.getOrCreatePreJavaTypeForTsType(tsSignature.getReturnType()),
+            name,
+            tsSignature.getParameters() ? tsSignature.getParameters().map(p => {
                 let parameteryType = this.program.getTypeChecker().getTypeAtLocation(p.valueDeclaration)
                 return { name: p.name, type: this.typeMap.getOrCreatePreJavaTypeForTsType(parameteryType) } as TypeMap.PreJavaTypeFormalParameter
             }) : null
+        )
+    }
+
+    private getCommentFromSymbol(symbol: ts.Symbol): string[] {
+        let comments = symbol && symbol.getDocumentationComment()
+        if (comments && comments.length > 0) {
+            let res = comments.map(c => c.text).filter(c => c != null && c.trim().length)
+            if (res.length == 0)
+                return null
+            return res
         }
 
-        return methodSignature
+        return null
     }
 }

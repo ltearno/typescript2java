@@ -5,38 +5,67 @@ export interface PreJavaTypeFormalParameter {
     type: PreJavaType
 }
 
-export interface PreJavaTypeCallSignature {
+export class PreJavaTypeCallSignature {
     typeParameters: PreJavaTypeParameter[]
     returnType: PreJavaType
     name: string
     parameters: PreJavaTypeFormalParameter[]
+    comments: string[]
+
+    constructor(typeParameters: PreJavaTypeParameter[], returnType: PreJavaType, name: string, parameters: PreJavaTypeFormalParameter[]) {
+        this.typeParameters = typeParameters
+        this.returnType = returnType
+        this.name = name,
+            this.parameters = parameters
+    }
+
+    addComments(comments: string[]) {
+        if (!this.comments)
+            this.comments = []
+        comments && comments.forEach(c => this.comments.push(c))
+    }
+
+    serializeSignature(defaultName: string = null) {
+        let res = ''
+
+        if (this.comments && this.comments.length)
+            res += this.comments.map(c => `/* ${c} */`).join('\n') + '\n'
+
+        if (this.typeParameters) {
+            res += '<'
+            res += this.typeParameters.map(tp => {
+                return tp.name + (tp.constraint ? ` extends ${tp.constraint.getName()}` : '')
+            }).join()
+            res += '> '
+        }
+
+        if (this.name)
+            res += `${this.returnType.getName()} ${this.name}`
+        else if (defaultName)
+            res += `${defaultName}`
+
+        if (this.parameters && this.parameters.length)
+            res += `(${this.parameters.map(p => p.type.getName() + ' ' + p.name).join()})`
+        else
+            res += '()'
+        return res
+    }
 }
 
 export interface PreJavaTypeProperty {
     name: string
     type: PreJavaType
     writable?: boolean
-}
-
-export enum PreJavaTypeKind {
-    BUILTIN,
-    CLASS_OR_INTERFACE,
-    TYPE_PARAMETER,
-    REFERENCE,
-    UNION,
-    ENUM
+    comments?: string[]
 }
 
 export abstract class PreJavaType {
-    kind: PreJavaTypeKind
-
     sourceTypes: Set<ts.Type>
 
     abstract getName(): string
+    abstract setName(name: string)
 
-    dump() {
-        console.log(`PreJavaType ${this.getName()} kind ${PreJavaTypeKind[this.kind]}`)
-    }
+    abstract dump()
 
     addSourceType(type: ts.Type) {
         if (!this.sourceTypes)
@@ -46,8 +75,6 @@ export abstract class PreJavaType {
 }
 
 export class PreJavaTypeReference extends PreJavaType {
-    kind = PreJavaTypeKind.REFERENCE
-
     type: PreJavaType
     typeParameters: PreJavaType[]
 
@@ -57,14 +84,19 @@ export class PreJavaTypeReference extends PreJavaType {
         this.typeParameters = typeParameters
     }
 
+    dump() { console.log(`TypeReference to ${this.type.getName()}`) }
+
     getName(): string {
-        return this.type.getName() + `<${this.typeParameters.map(tp => tp.getName()).join(', ')}>`
+        let referencedTypeName = this.type.getName()
+        if (!referencedTypeName)
+            return null
+        return `${referencedTypeName}<${this.typeParameters.map(tp => tp.getName()).join(', ')}>`
     }
+
+    setName(name: string) { }
 }
 
 export class PreJavaTypeEnum extends PreJavaType {
-    kind = PreJavaTypeKind.ENUM
-
     name: string
     members: {
         name: string
@@ -76,14 +108,21 @@ export class PreJavaTypeEnum extends PreJavaType {
         this.name = name
     }
 
-    getName(): string {
-        return this.name
+    dump() {
+        console.log(`enum ${this.getName()}`)
+        if (this.members && this.members.length)
+            this.members.forEach(m => console.log(`enum member ${m.name} = ${m.value}`))
+    }
+
+    getName(): string { return this.name }
+
+    setName(name: string) {
+        if (!this.name)
+            this.name = name
     }
 }
 
 export class PreJavaTypeParameter extends PreJavaType {
-    kind = PreJavaTypeKind.TYPE_PARAMETER
-
     name: string
     constraint: PreJavaType
 
@@ -93,14 +132,19 @@ export class PreJavaTypeParameter extends PreJavaType {
         this.constraint = constraint
     }
 
+    dump() { console.log(`TypeParameter ${this.name}`) }
+
     getName(): string {
         return this.name
+    }
+
+    setName(name: string) {
+        if (this.name != null)
+            this.name = name
     }
 }
 
 export class PreJavaTypeBuiltinJavaType extends PreJavaType {
-    kind = PreJavaTypeKind.BUILTIN
-
     fqn: string
 
     constructor(fqn: string) {
@@ -108,9 +152,13 @@ export class PreJavaTypeBuiltinJavaType extends PreJavaType {
         this.fqn = fqn
     }
 
+    dump() { console.log(`Builtin type ${this.fqn}`) }
+
     getName(): string {
         return this.fqn
     }
+
+    setName(name: string) { }
 }
 
 export class PreJavaTypeFakeType extends PreJavaTypeBuiltinJavaType {
@@ -120,8 +168,6 @@ export class PreJavaTypeFakeType extends PreJavaTypeBuiltinJavaType {
 }
 
 export class PreJavaTypeUnion extends PreJavaType {
-    kind = PreJavaTypeKind.UNION
-
     types: PreJavaType[]
 
     constructor(types: PreJavaType[]) {
@@ -129,14 +175,22 @@ export class PreJavaTypeUnion extends PreJavaType {
         this.types = types
     }
 
+    dump() {
+        console.log(`UnionType ${this.getName()}`)
+        if (this.types && this.types.length)
+            this.types.forEach(t => console.log(`- ${t.getName()}`))
+    }
+
     getName(): string {
+        if ((!this.types) || this.types.length == 0)
+            return null
         return `UnionOf${this.types.map(t => t.getName()).join('And')}`
     }
+
+    setName(name: string) { }
 }
 
 export class PreJavaTypeClassOrInterface extends PreJavaType {
-    kind = PreJavaTypeKind.CLASS_OR_INTERFACE
-
     processed: boolean = false
 
     name: string = null
@@ -153,8 +207,24 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
     numberIndexType: PreJavaType
     stringIndexType: PreJavaType
 
+    comments: string[]
+
     getName(): string {
         return this.name
+    }
+
+    setName(name: string) {
+        if (name == '__type')
+            return
+
+        if (!this.name)
+            this.name = name
+    }
+
+    addComments(lines: string[]) {
+        if (!this.comments)
+            this.comments = []
+        lines && lines.forEach(l => this.comments.push(l))
     }
 
     dump() {
@@ -162,6 +232,11 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
 
         if (this.typeParameters && this.typeParameters.length) {
             console.log(`type parameters : ${this.typeParameters.map(tp => tp.name).join(', ')}`)
+        }
+
+        if (this.comments && this.comments.length) {
+            console.log(`comments`)
+            this.comments.map(c => `/* ${c} */`).forEach(c => console.log(c))
         }
 
         if (this.prototypeNames && this.prototypeNames.size) {
@@ -172,14 +247,17 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
         if (this.constructorSignatures && this.constructorSignatures.length) {
             console.log(`constructors`)
             for (let constructorSignature of this.constructorSignatures) {
-                console.log(PreJavaTypeClassOrInterface.serializeSignature(constructorSignature, this.name))
+                console.log(constructorSignature.serializeSignature(this.name))
             }
         }
 
         if (this.properties && this.properties.length) {
             console.log(`properties`)
-            for (let property of this.properties)
+            for (let property of this.properties) {
+                if (property.comments && property.comments.length)
+                    console.log(property.comments.map(c => `/* ${c} */`).join('\n'))
                 console.log(`${property.type.getName()} ${property.name} ${property.writable ? '' : 'READ-ONLY'}`)
+            }
         }
 
         if (this.numberIndexType) {
@@ -192,37 +270,10 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
         if (this.methods && this.methods.length) {
             console.log(`methods`)
             for (let method of this.methods) {
-                console.log(PreJavaTypeClassOrInterface.serializeSignature(method))
+                console.log(method.serializeSignature())
             }
         }
     }
-
-    static serializeSignature(signature: PreJavaTypeCallSignature, defaultName: string = null) {
-        let res = ''
-
-        if (signature.typeParameters) {
-            res += '<'
-            res += signature.typeParameters.map(tp => {
-                return tp.name + (tp.constraint ? ` extends ${tp.constraint.getName()}` : '')
-            }).join()
-            res += '> '
-        }
-
-        if (signature.name)
-            res += `${signature.returnType.getName()} ${signature.name}`
-        else if (defaultName)
-            res += `${defaultName}`
-
-        if (signature.parameters && signature.parameters.length)
-            res += `(${signature.parameters.map(p => p.type.getName() + ' ' + p.name).join()})`
-        else
-            res += '()'
-        return res
-    }
-
-
-
-
 
     addPrototypeName(namespace: string, name: string) {
         name = namespace ? `${namespace}.${name}` : name
@@ -231,13 +282,6 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
             console.log(`MULTIPLE PROTOTYPES ${this.prototypeNames} + ${name}`)
 
         this.prototypeNames.add(name)
-    }
-
-    maybeSetTypeName(name: string) {
-        if (name == '__type')
-            return
-        if (this.name == null)
-            this.name = name
     }
 
     setTypeParameters(typeParameters: PreJavaTypeParameter[]) {
@@ -286,11 +330,8 @@ export class TsToPreJavaTypemap {
 
     ensureAllTypesHaveName(currentIdAnonymousTypes: number) {
         for (let type of this.typeMap.values())
-            if (type.kind == PreJavaTypeKind.CLASS_OR_INTERFACE) {
-                let t = type as PreJavaTypeClassOrInterface
-                if (t.name == null)
-                    t.name = `AnonymousType_${currentIdAnonymousTypes++}`
-            }
+            if (type.getName() == null)
+                type.setName(`AnonymousType_${currentIdAnonymousTypes++}`)
         return currentIdAnonymousTypes
     }
 
@@ -309,11 +350,10 @@ export class TsToPreJavaTypemap {
         }
 
         for (let type of this.typeMap.values()) {
-            if (type.kind == PreJavaTypeKind.CLASS_OR_INTERFACE)
-                pruneType(type as PreJavaTypeClassOrInterface)
-            else if (type.kind == PreJavaTypeKind.UNION) {
-                let union = type as PreJavaTypeUnion
-                union.types = union.types ? union.types.filter(t => t != typeToRemove) : null
+            if (type instanceof PreJavaTypeClassOrInterface)
+                pruneType(type)
+            else if (type instanceof PreJavaTypeUnion) {
+                type.types = type.types ? type.types.filter(t => t != typeToRemove) : null
             }
         }
     }
@@ -332,14 +372,14 @@ export class TsToPreJavaTypemap {
         }
 
         for (let type of this.typeMap.values())
-            if (type.kind == PreJavaTypeKind.CLASS_OR_INTERFACE)
-                developMethods(type as PreJavaTypeClassOrInterface)
+            if (type instanceof PreJavaTypeClassOrInterface)
+                developMethods(type)
     }
 
     getNotProcessedTypes(): PreJavaTypeClassOrInterface[] {
         let res: PreJavaTypeClassOrInterface[] = []
         this.typeMap.forEach(preJavaType => {
-            if (preJavaType.kind == PreJavaTypeKind.CLASS_OR_INTERFACE && !(preJavaType as PreJavaTypeClassOrInterface).processed)
+            if (preJavaType instanceof PreJavaTypeClassOrInterface && !preJavaType.processed)
                 res.push(preJavaType as PreJavaTypeClassOrInterface)
         })
         return res
