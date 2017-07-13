@@ -59,13 +59,23 @@ export interface PreJavaTypeProperty {
     comments?: string[]
 }
 
+export interface CompletablePreJavaType {
+    isProcessed(): boolean
+    setProcessed()
+}
+
 export abstract class PreJavaType {
     sourceTypes: Set<ts.Type>
 
     abstract getName(): string
     abstract setName(name: string)
 
+    abstract setPackageName(name: string)
+    abstract getPackageName(): string
+
     abstract dump()
+
+    abstract isCompletablePreJavaType(): CompletablePreJavaType
 
     addSourceType(type: ts.Type) {
         if (!this.sourceTypes)
@@ -74,9 +84,11 @@ export abstract class PreJavaType {
     }
 }
 
-export class PreJavaTypeReference extends PreJavaType {
+export class PreJavaTypeReference extends PreJavaType implements CompletablePreJavaType {
     type: PreJavaType
     typeParameters: PreJavaType[]
+
+    private processed = false
 
     constructor(type: PreJavaType, typeParameters: PreJavaType[]) {
         super()
@@ -94,14 +106,26 @@ export class PreJavaTypeReference extends PreJavaType {
     }
 
     setName(name: string) { }
+
+    getPackageName(): string { return this.type.getPackageName() }
+
+    setPackageName(name: string) { }
+
+    isCompletablePreJavaType() { return this }
+
+    isProcessed() { return this.processed }
+    setProcessed() { this.processed = true }
 }
 
-export class PreJavaTypeEnum extends PreJavaType {
+export class PreJavaTypeEnum extends PreJavaType implements CompletablePreJavaType {
+    packageName: string
     name: string
     members: {
         name: string
         value: number
     }[] = []
+
+    private processed = false
 
     constructor(name: string) {
         super()
@@ -120,6 +144,18 @@ export class PreJavaTypeEnum extends PreJavaType {
         if (!this.name)
             this.name = name
     }
+
+    getPackageName(): string { return this.packageName }
+
+    setPackageName(name: string) {
+        if (!this.packageName)
+            this.packageName = name
+    }
+
+    isCompletablePreJavaType() { return this }
+
+    isProcessed() { return this.processed }
+    setProcessed() { this.processed = true }
 }
 
 export class PreJavaTypeParameter extends PreJavaType {
@@ -142,13 +178,21 @@ export class PreJavaTypeParameter extends PreJavaType {
         if (this.name != null)
             this.name = name
     }
+
+    getPackageName(): string { return null }
+
+    setPackageName(name: string) { }
+
+    isCompletablePreJavaType() { return null }
 }
 
 export class PreJavaTypeBuiltinJavaType extends PreJavaType {
+    packageName: string
     name: string
 
-    constructor(name: string) {
+    constructor(packageName: string, name: string) {
         super()
+        this.packageName = packageName
         this.name = name
     }
 
@@ -159,16 +203,25 @@ export class PreJavaTypeBuiltinJavaType extends PreJavaType {
     }
 
     setName(name: string) { }
+
+    getPackageName(): string { return this.packageName }
+
+    setPackageName(name: string) { }
+
+    isCompletablePreJavaType() { return null }
 }
 
 export class PreJavaTypeFakeType extends PreJavaTypeBuiltinJavaType {
-    constructor(fqn: string) {
-        super(fqn)
+    constructor(packageName: string, name: string) {
+        super(packageName, name)
     }
 }
 
-export class PreJavaTypeUnion extends PreJavaType {
+export class PreJavaTypeUnion extends PreJavaType implements CompletablePreJavaType {
+    packageName: string
     types: PreJavaType[]
+
+    private processed = false
 
     constructor(types: PreJavaType[]) {
         super()
@@ -192,11 +245,23 @@ export class PreJavaTypeUnion extends PreJavaType {
         return this.transformTypeName(this)
     }
 
+    setName(name: string) { }
+
+    getPackageName(): string { return this.packageName }
+
+    setPackageName(name: string) {
+        if (!this.packageName)
+            this.packageName = name
+    }
+
+    isCompletablePreJavaType() { return this }
+
+    isProcessed() { return this.processed }
+    setProcessed() { this.processed = true }
+
     private transformTypeName(type: PreJavaType) {
         if (type instanceof PreJavaTypeClassOrInterface) {
             let res = type.name
-            //if (type.typeParameters && type.typeParameters.length)
-            //    res += `Of${type.typeParameters.map(t => this.transformTypeName(t)).join('And')}`
             return res
         }
 
@@ -214,14 +279,13 @@ export class PreJavaTypeUnion extends PreJavaType {
         return type.getName()
     }
 
-    setName(name: string) { }
 }
 
-export class PreJavaTypeClassOrInterface extends PreJavaType {
+export class PreJavaTypeClassOrInterface extends PreJavaType implements CompletablePreJavaType {
     processed: boolean = false
 
     name: string = null
-    javaPackageName: string
+    packageName: string
 
     typeParameters: PreJavaTypeParameter[] = null
 
@@ -237,9 +301,13 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
 
     comments: string[]
 
-    setPackage(javaPackageName: string) {
-        if (!this.javaPackageName)
-            this.javaPackageName = javaPackageName
+    getPackageName() {
+        return this.packageName
+    }
+
+    setPackageName(packageName: string) {
+        if (!this.packageName)
+            this.packageName = packageName
     }
 
     getName(): string {
@@ -254,6 +322,11 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
             this.name = name
     }
 
+    isCompletablePreJavaType() { return this }
+
+    isProcessed() { return this.processed }
+    setProcessed() { this.processed = true }
+
     addComments(lines: string[]) {
         if (!this.comments)
             this.comments = []
@@ -263,8 +336,8 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
     dump() {
         console.log(`name: ${this.name}`)
 
-        if (this.javaPackageName)
-            console.log(`package: ${this.javaPackageName}`)
+        if (this.packageName)
+            console.log(`package: ${this.packageName}`)
 
         if (this.typeParameters && this.typeParameters.length) {
             console.log(`type parameters: ${this.typeParameters.map(tp => tp.name).join(', ')}`)
@@ -357,16 +430,16 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
     }
 }
 
-const BUILTIN_TYPE_OBJECT = new PreJavaTypeBuiltinJavaType('JavaObject')
-const BUILTIN_TYPE_STRING = new PreJavaTypeBuiltinJavaType('JavaString')
-const BUILTIN_TYPE_NUMBER = new PreJavaTypeBuiltinJavaType('JavaNumber')
-const BUILTIN_TYPE_BOOLEAN = new PreJavaTypeBuiltinJavaType('JavaBoolean')
-const BUILTIN_TYPE_UNIT = new PreJavaTypeBuiltinJavaType('void')
-const BUILTIN_TYPE_VOID = new PreJavaTypeBuiltinJavaType('JavaVoid')
+const BUILTIN_TYPE_OBJECT = new PreJavaTypeBuiltinJavaType('java.lang', 'Object')
+const BUILTIN_TYPE_STRING = new PreJavaTypeBuiltinJavaType('java.lang', 'String')
+const BUILTIN_TYPE_NUMBER = new PreJavaTypeBuiltinJavaType('java.lang', 'Number')
+const BUILTIN_TYPE_BOOLEAN = new PreJavaTypeBuiltinJavaType('java.lang', 'Boolean')
+const BUILTIN_TYPE_UNIT = new PreJavaTypeBuiltinJavaType(null, 'void')
+const BUILTIN_TYPE_VOID = new PreJavaTypeBuiltinJavaType('java.lang', 'Void')
 
-const FAKE_TYPE_INTERSECTION = new PreJavaTypeFakeType('FakeIntersection')
-const FAKE_TYPE_ESSYMBOL = new PreJavaTypeFakeType('FakeEsSymbol')
-const FAKE_TYPE_INDEXEDACCESS = new PreJavaTypeFakeType('FakeIndexedAccess')
+const FAKE_TYPE_INTERSECTION = new PreJavaTypeFakeType('gwt.ext', 'FakeIntersection')
+const FAKE_TYPE_ESSYMBOL = new PreJavaTypeFakeType('gwt.ext', 'FakeEsSymbol')
+const FAKE_TYPE_INDEXEDACCESS = new PreJavaTypeFakeType('gwt.ext', 'FakeIndexedAccess')
 
 export class TsToPreJavaTypemap {
     typeMap = new Map<ts.Type, PreJavaType>()
@@ -378,18 +451,42 @@ export class TsToPreJavaTypemap {
         return currentIdAnonymousTypes
     }
 
+    private doesTypeUsesType(type: PreJavaType, usedType: PreJavaType) {
+        if (type === usedType)
+            return true
+
+        if (type instanceof PreJavaTypeReference) {
+            if (this.doesTypeUsesType(type.type, usedType))
+                return true
+            if (type.typeParameters && type.typeParameters.some(t => this.doesTypeUsesType(t, usedType)))
+                return true
+            return false
+        }
+
+        if (type instanceof PreJavaTypeUnion) {
+            return type.types && type.types.some(t => this.doesTypeUsesType(t, usedType))
+        }
+
+        if (type instanceof PreJavaTypeClassOrInterface) {
+            if (type.baseTypes && type.baseTypes.has(usedType))
+                return true
+        }
+
+        return false
+    }
+
     private removeTypeInTypes(typeToRemove: PreJavaType) {
-        function signatureHasIndexedType(sig: PreJavaTypeCallSignature) {
-            return (sig.returnType === typeToRemove)
-                || (sig.typeParameters && sig.typeParameters.some(tp => tp.constraint === typeToRemove))
-                || (sig.parameters && sig.parameters.some(p => p.type === typeToRemove))
+        let signatureHasIndexedType = (sig: PreJavaTypeCallSignature) => {
+            return (this.doesTypeUsesType(sig.returnType, typeToRemove))
+                || (sig.typeParameters && sig.typeParameters.some(tp => this.doesTypeUsesType(tp.constraint, typeToRemove)))
+                || (sig.parameters && sig.parameters.some(p => this.doesTypeUsesType(p.type, typeToRemove)))
         }
 
         let pruneType = (type: PreJavaTypeClassOrInterface) => {
             type.baseTypes.delete(typeToRemove)
             type.constructorSignatures = type.constructorSignatures.filter(s => !signatureHasIndexedType(s))
             type.methods = type.methods.filter(s => !signatureHasIndexedType(s))
-            type.properties = type.properties.filter(p => p.type != typeToRemove)
+            type.properties = type.properties.filter(p => !this.doesTypeUsesType(p.type, typeToRemove))
         }
 
         for (let type of this.typeMap.values()) {
@@ -419,11 +516,12 @@ export class TsToPreJavaTypemap {
                 developMethods(type)
     }
 
-    getNotProcessedTypes(): PreJavaTypeClassOrInterface[] {
-        let res: PreJavaTypeClassOrInterface[] = []
+    getNotProcessedTypes(): (PreJavaType & CompletablePreJavaType)[] {
+        let res: (PreJavaType & CompletablePreJavaType)[] = []
         this.typeMap.forEach(preJavaType => {
-            if (preJavaType instanceof PreJavaTypeClassOrInterface && !preJavaType.processed)
-                res.push(preJavaType as PreJavaTypeClassOrInterface)
+            let completablePreJavaType = preJavaType.isCompletablePreJavaType()
+            if (completablePreJavaType && !completablePreJavaType.isProcessed())
+                res.push(completablePreJavaType as (PreJavaType & CompletablePreJavaType))
         })
         return res
     }

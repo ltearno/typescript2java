@@ -341,12 +341,12 @@ export class GatherPhase {
     addTypesFromSourceFile(sourceFile: ts.SourceFile, onlyExportedSymbols: boolean) {
         ts.forEachChild(sourceFile, (node) => {
             if (node.kind == ts.SyntaxKind.VariableStatement) {
-                this.processVariableStatement(node as ts.VariableStatement)
+                this.registerVariableStatement(node as ts.VariableStatement)
                 return
             }
 
             if (node.kind == ts.SyntaxKind.FunctionDeclaration) {
-                this.processFunctionDeclaration(node as ts.FunctionDeclaration)
+                this.registerFunctionDeclaration(node as ts.FunctionDeclaration)
                 return
             }
 
@@ -402,7 +402,7 @@ export class GatherPhase {
         })
     }
 
-    private processVariableStatement(statement: ts.VariableStatement) {
+    private registerVariableStatement(statement: ts.VariableStatement) {
         statement.declarationList.declarations.forEach((declaration) => {
             let t = this.program.getTypeChecker().getTypeFromTypeNode(declaration.type)
 
@@ -431,7 +431,7 @@ export class GatherPhase {
         })
     }
 
-    private processFunctionDeclaration(declaration: ts.FunctionDeclaration) {
+    private registerFunctionDeclaration(declaration: ts.FunctionDeclaration) {
         let t = this.program.getTypeChecker().getTypeAtLocation(declaration)
 
         let name = declaration && declaration.name && declaration.name.text
@@ -448,21 +448,25 @@ export class GatherPhase {
         return identifier.text
     }
 
-    private processClassOrInterfaceDeclaration(preJava: TypeMap.PreJavaTypeClassOrInterface) {
-        let realPreJavaType = preJava as TypeMap.PreJavaTypeClassOrInterface
-
-        if (realPreJavaType.processed)
+    private processClassOrInterfaceDeclaration(preJavaType: TypeMap.PreJavaType & TypeMap.CompletablePreJavaType) {
+        if (preJavaType.isProcessed())
             return
-        realPreJavaType.processed = true
 
-        for (let type of realPreJavaType.sourceTypes) {
+        preJavaType.setProcessed()
+
+        let classOrInterface = preJavaType instanceof TypeMap.PreJavaTypeClassOrInterface ? preJavaType : null
+
+        if (!preJavaType.sourceTypes)
+            return
+
+        for (let type of preJavaType.sourceTypes) {
             let symbol = type.getSymbol()
 
             if (symbol) {
                 if ((symbol.flags & ts.SymbolFlags.Class) || (symbol.flags & ts.SymbolFlags.Interface))
-                    realPreJavaType.setName(symbol.getName())
+                    preJavaType.setName(symbol.getName())
                 else if (symbol.flags & ts.SymbolFlags.TypeLiteral)
-                    realPreJavaType.setName(`AnonymousType_${this.currentIdAnonymousTypes++}`)
+                    preJavaType.setName(`AnonymousType_${this.currentIdAnonymousTypes++}`)
 
                 if (symbol.getDeclarations()) {
                     symbol.getDeclarations()
@@ -483,55 +487,56 @@ export class GatherPhase {
                                     }
                                 }
 
-                                realPreJavaType.addPrototypeName(jsNamespace, jsName)
+                                if (classOrInterface)
+                                    classOrInterface.addPrototypeName(jsNamespace, jsName)
                             }
 
                             if (jsNamespace)
-                                realPreJavaType.setPackage(this.baseJavaPackage + '.' + jsNamespace)
+                                preJavaType.setPackageName('.' + jsNamespace)
                         })
                 }
 
                 if (symbol.valueDeclaration) {
                     let constructorType = this.program.getTypeChecker().getTypeOfSymbolAtLocation(symbol, symbol.valueDeclaration)
                     let constructors = constructorType.getConstructSignatures()
-                    if (constructors)
-                        constructors.forEach(constructorSignature => realPreJavaType.addConstructorSignature(this.convertSignature(null, constructorSignature)))
+                    if (classOrInterface && constructors)
+                        constructors.forEach(constructorSignature => classOrInterface.addConstructorSignature(this.convertSignature(null, constructorSignature)))
                 }
 
                 let comments = this.getCommentFromSymbol(symbol)
-                if (comments && comments.length > 0)
-                    realPreJavaType.addComments(comments)
+                if (classOrInterface && comments && comments.length > 0)
+                    classOrInterface.addComments(comments)
             }
 
             if (type.flags & ts.TypeFlags.Object) {
                 let objectType = type as ts.ObjectType
                 if (objectType.objectFlags & ts.ObjectFlags.Class || objectType.objectFlags & ts.ObjectFlags.Interface) {
                     let interfaceType = objectType as ts.InterfaceType
-                    if (interfaceType.typeParameters && interfaceType.typeParameters.length) {
-                        realPreJavaType.setTypeParameters(interfaceType.typeParameters.map(tp => (new TypeMap.PreJavaTypeParameter(tp.symbol.getName(), this.typeMap.getOrCreatePreJavaTypeForTsType(tp.constraint)))))
+                    if (classOrInterface && interfaceType.typeParameters && interfaceType.typeParameters.length) {
+                        classOrInterface.setTypeParameters(interfaceType.typeParameters.map(tp => (new TypeMap.PreJavaTypeParameter(tp.symbol.getName(), this.typeMap.getOrCreatePreJavaTypeForTsType(tp.constraint)))))
                     }
                 }
             }
 
             let nit = type.getNumberIndexType()
-            if (nit) {
-                realPreJavaType.setNumberIndexType(this.typeMap.getOrCreatePreJavaTypeForTsType(nit))
+            if (classOrInterface && nit) {
+                classOrInterface.setNumberIndexType(this.typeMap.getOrCreatePreJavaTypeForTsType(nit))
             }
 
             let sit = type.getStringIndexType()
-            if (sit) {
-                realPreJavaType.setStringIndexType(this.typeMap.getOrCreatePreJavaTypeForTsType(sit))
+            if (classOrInterface && sit) {
+                classOrInterface.setStringIndexType(this.typeMap.getOrCreatePreJavaTypeForTsType(sit))
             }
 
             let baseTypes = type.getBaseTypes()
-            if (baseTypes) {
+            if (classOrInterface && baseTypes) {
                 baseTypes.forEach(baseType => {
-                    realPreJavaType.addBaseType(this.typeMap.getOrCreatePreJavaTypeForTsType(baseType))
+                    classOrInterface.addBaseType(this.typeMap.getOrCreatePreJavaTypeForTsType(baseType))
                 })
             }
 
             let properties = type.getProperties()
-            if (properties) {
+            if (classOrInterface && properties) {
                 properties.forEach(property => {
                     let propertyName = property.getName()
 
@@ -548,14 +553,14 @@ export class GatherPhase {
                         for (let callSignature of callSignatures) {
                             let method = this.convertSignature(propertyName, callSignature)
                             method.addComments(comments)
-                            realPreJavaType.addMethod(method)
+                            classOrInterface.addMethod(method)
                         }
                     }
                     else {
                         let propertyPreJavaType = this.typeMap.getOrCreatePreJavaTypeForTsType(propertyType)
                         propertyPreJavaType.setName(`${propertyName.slice(0, 1).toUpperCase() + propertyName.slice(1)}Caller`)
 
-                        realPreJavaType.addProperty({
+                        classOrInterface.addProperty({
                             name: propertyName,
                             type: propertyPreJavaType,
                             writable: true,
@@ -566,11 +571,11 @@ export class GatherPhase {
             }
 
             let callSignatures = type.getCallSignatures()
-            if (callSignatures && callSignatures.length) {
+            if (classOrInterface && callSignatures && callSignatures.length) {
                 // TODO : Check that the method is alone so that it is a correct functional type
                 // TODO : check if it can be melted down with other similar types
                 // TODO : try to get a name for it from where it has been created (callback of a function, ...)
-                callSignatures.forEach(callSignature => realPreJavaType.addMethod(this.convertSignature('execute', callSignature)))
+                callSignatures.forEach(callSignature => classOrInterface.addMethod(this.convertSignature('execute', callSignature)))
             }
         }
     }

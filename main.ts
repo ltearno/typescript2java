@@ -89,7 +89,8 @@ let javaPackages = {
     "tests/@angular/platform-browser/": "ng.platformBrowser",
     "tests/@angular/platform-browser-dynamic/": "ng.platformBrowserDynamic",
     "tests/@angular/router/": "ng.router",
-    "tests/rxjs": "rxjs"
+    "tests/rxjs": "rxjs",
+    "tests": "lteconsulting"
 }
 
 let syncPhase = new GatherPhase(baseJavaPackage, javaPackages, program);// new SyncPhase(baseJavaPackage, javaPackages);
@@ -99,7 +100,7 @@ program.getSourceFiles().forEach(sourceFile => {
 
     let isInternalFile = !files.find(file => path.normalize(file) === path.normalize(sourceFile.fileName));
     //if (!isInternalFile)
-        syncPhase.addTypesFromSourceFile(sourceFile, !isInternalFile);
+    syncPhase.addTypesFromSourceFile(sourceFile, !isInternalFile);
 });
 
 syncPhase.sumup()
