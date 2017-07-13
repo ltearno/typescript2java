@@ -5,8 +5,8 @@
 }*/
 
 export enum MonEnum1 {
-    Un,
-    Deux,
+    Un = 0 << 1,
+    Deux = 1 << 2,
     Cinq = 5,
     Sept
 }

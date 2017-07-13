@@ -23,7 +23,8 @@ export enum PreJavaTypeKind {
     CLASS_OR_INTERFACE,
     TYPE_PARAMETER,
     REFERENCE,
-    UNION
+    UNION,
+    ENUM
 }
 
 export interface PreJavaType {
@@ -35,6 +36,16 @@ export interface PreJavaTypeReference extends PreJavaType {
 
     type: PreJavaType
     typeParameters: PreJavaType[]
+}
+
+export interface PreJavaTypeEnum extends PreJavaType {
+    kind: PreJavaTypeKind.ENUM
+
+    name: string
+    members: {
+        name: string
+        value: number
+    }[]
 }
 
 export interface PreJavaTypeParameter extends PreJavaType {
@@ -395,22 +406,43 @@ export class TsToPreJavaTypemap {
         }
 
         if (tsType.flags & ts.TypeFlags.Enum) {
-            let enumType = tsType as ts.EnumType
-            let enumDeclaration = tsType.getSymbol().valueDeclaration as ts.EnumDeclaration
-            if (enumDeclaration.members && enumDeclaration.members.length) {
-                for (let enumMember of enumDeclaration.members) {
-                    let propertyName = enumMember.name
-                    if (propertyName.kind == ts.SyntaxKind.Identifier) {
-                        console.log('enum member name ' + (propertyName as ts.Identifier).text)
-                    }
-                    else {
-                        // WARNING NOT SUPPORTED YET !
+            if (tsType.getSymbol()) {
+                let preJavaEnum: PreJavaTypeEnum = {
+                    kind: PreJavaTypeKind.ENUM,
+                    name: tsType.getSymbol().getName(),
+                    members: []
+                }
+
+                let enumType = tsType as ts.EnumType
+                let enumDeclaration = tsType.getSymbol().valueDeclaration as ts.EnumDeclaration
+                if (enumDeclaration.members && enumDeclaration.members.length) {
+                    let memberValue = 0
+                    for (let enumMember of enumDeclaration.members) {
+                        let propertyName = enumMember.name
+                        if (propertyName.kind == ts.SyntaxKind.Identifier) {
+                            let memberName = (propertyName as ts.Identifier).text
+                            if (enumMember.initializer) {
+                                if (enumMember.initializer['text']) {
+                                    let initializer = parseInt(enumMember.initializer['text'])
+                                    if (initializer)
+                                        memberValue = initializer
+                                }
+                            }
+
+                            preJavaEnum.members.push({
+                                name: memberName,
+                                value: memberValue
+                            })
+                        }
+                        else {
+                            console.warn(`unsupported enum member`)
+                        }
+
+                        memberValue++
                     }
                 }
-            }
 
-            if (enumType.memberTypes && enumType.memberTypes.length) {
-                console.log('yo')
+                this.typeMap.set(tsType, preJavaEnum)
             }
         }
 
