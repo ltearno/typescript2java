@@ -444,6 +444,10 @@ export class GatherPhase {
         }
     }
 
+    private nameOfIdentifier(identifier: ts.Identifier): string {
+        return identifier.text
+    }
+
     private processClassOrInterfaceDeclaration(preJava: TypeMap.PreJavaTypeClassOrInterface) {
         let realPreJavaType = preJava as TypeMap.PreJavaTypeClassOrInterface
 
@@ -460,8 +464,31 @@ export class GatherPhase {
                 else if (symbol.flags & ts.SymbolFlags.TypeLiteral)
                     realPreJavaType.setName(`AnonymousType_${this.currentIdAnonymousTypes++}`)
 
-                if (symbol.getDeclarations() && symbol.getDeclarations().some(d => d.kind == ts.SyntaxKind.ClassDeclaration)) {
-                    realPreJavaType.addPrototypeName(null, this.getTypeName(type))
+                if (symbol.getDeclarations()) {
+                    symbol.getDeclarations()
+                        .filter(d => d.kind == ts.SyntaxKind.ClassDeclaration)
+                        .forEach(declaration => {
+                            let classDeclaration = declaration as ts.ClassDeclaration
+
+                            let sourceFile = classDeclaration.getSourceFile()
+                            let relative = path.relative(this.program.getCurrentDirectory(), sourceFile.fileName);
+
+                            let jsNamespace = null
+                            let jsName = this.nameOfIdentifier(classDeclaration.name)
+                            if (jsName) {
+                                for (let pathPrefix in this.javaPackages) {
+                                    if (!path.relative(pathPrefix, relative).startsWith('..')) {
+                                        jsNamespace = this.javaPackages[pathPrefix]
+                                        break
+                                    }
+                                }
+
+                                realPreJavaType.addPrototypeName(jsNamespace, jsName)
+                            }
+
+                            if (jsNamespace)
+                                realPreJavaType.setPackage(this.baseJavaPackage + '.' + jsNamespace)
+                        })
                 }
 
                 if (symbol.valueDeclaration) {
@@ -517,7 +544,7 @@ export class GatherPhase {
 
                     // TODO : generating property accessors for callable types should be configurable
                     let callSignatures = propertyType.getCallSignatures()
-                    if (callSignatures && callSignatures.length == 1) {
+                    if (callSignatures && callSignatures.length) {
                         for (let callSignature of callSignatures) {
                             let method = this.convertSignature(propertyName, callSignature)
                             method.addComments(comments)
@@ -539,11 +566,11 @@ export class GatherPhase {
             }
 
             let callSignatures = type.getCallSignatures()
-            if (callSignatures && callSignatures.length == 1) {
+            if (callSignatures && callSignatures.length) {
                 // TODO : Check that the method is alone so that it is a correct functional type
                 // TODO : check if it can be melted down with other similar types
                 // TODO : try to get a name for it from where it has been created (callback of a function, ...)
-                realPreJavaType.addMethod(this.convertSignature('execute', callSignatures[0]))
+                callSignatures.forEach(callSignature => realPreJavaType.addMethod(this.convertSignature('execute', callSignature)))
             }
         }
     }
