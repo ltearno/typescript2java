@@ -1,9 +1,8 @@
-import * as fs from "fs";
-import * as path from "path";
-import * as ts from "typescript";
-import { ExportPhase } from './processor.export-phase';
-import { SyncPhase } from "./processor.sync-phase";
-import { GatherPhase } from "./processor.gather-phase";
+import * as fs from "fs"
+import * as path from "path"
+import * as ts from "typescript"
+import { GatherPhase } from "./processor.gather-phase"
+import * as ExportPhase from './processor.export-phase'
 
 /**
  * TODO
@@ -105,8 +104,8 @@ program.getSourceFiles().forEach(sourceFile => {
 
 syncPhase.sumup()
 
-/*console.log(`Exporting nodes...`);
- let exportPhase = new ExportPhase(syncPhase);
- exportPhase.exportNodes(program);*/
+console.log(`Exporting nodes...`);
+let exportPhase = new ExportPhase.ExportPhase(syncPhase)
+exportPhase.exportNodes(program)
 
 console.log(`Finished.`);

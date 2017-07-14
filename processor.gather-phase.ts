@@ -21,11 +21,8 @@ function guessName(identifier: ts.Identifier | ts.BindingPattern): string {
  */
 export class GatherPhase {
     private currentIdAnonymousTypes = 1
-    private BY_INDEX_SETTER = `JsTools.setItem`
-    private BY_INDEX_GETTER = `JsTools.getItem`
 
-    types: Set<ts.Type> = new Set()
-    private typeMap = new TypeMap.TsToPreJavaTypemap()
+    typeMap = new TypeMap.TsToPreJavaTypemap()
 
     variables: {
         type: TypeMap.PreJavaType;
@@ -37,11 +34,6 @@ export class GatherPhase {
     constructor(private baseJavaPackage: string,
         private javaPackages: { [key: string]: string },
         private program: ts.Program) {
-    }
-
-    private registerType(type: ts.Type) {
-        if (type)
-            this.types.add(type)
     }
 
     private getTypeName(type: ts.Type) {
@@ -117,226 +109,6 @@ export class GatherPhase {
         return "(type without symbol)"
     }
 
-    private toJava(type: ts.Type) {
-        let tab = '    '
-
-        if (type.getSymbol()) {
-            console.log(`// FQN : ${this.program.getTypeChecker().getFullyQualifiedName(type.getSymbol())}`)
-            console.log(`type flags : ${type.flags}`)
-
-            let comments = type.getSymbol().getDocumentationComment()
-            if (comments && comments.length) {
-                console.log(`/**`)
-                for (let comment of comments) {
-                    let text = comment.text
-                    console.log(` * ${text.split('\n').join('\n * ')}`)
-                }
-                console.log(` */`)
-            }
-        }
-
-        console.log(`@JsType( isNative=true )`)
-        console.log(`public class ${this.getTypeName(type)}`)
-        console.log(`{`)
-
-
-        let symbol = type.getSymbol()
-        if (symbol && symbol.valueDeclaration) {
-            let constructorType = this.program.getTypeChecker().getTypeOfSymbolAtLocation(symbol, symbol.valueDeclaration)
-            let constructors = constructorType.getConstructSignatures()
-            if (constructors && constructors.length) {
-                for (let constructorSignature of constructors) {
-                    let paramsDump = this.serializeSignatureParameters(constructorSignature)
-                    console.log(`${tab}${this.getTypeName(type)}(${paramsDump}) {`)
-                    console.log(`${tab}}`)
-                }
-            }
-        }
-
-        let nit = type.getNumberIndexType()
-        if (nit) {
-            console.log(`${tab}@JsOverlay`)
-            console.log(`${tab}public void setByIndex(int index, ${this.getTypeName(nit)} value) {`)
-            console.log(`${tab}${tab}${this.BY_INDEX_SETTER}(index, value);`)
-            console.log(`${tab}}`)
-            console.log(``)
-
-            console.log(`${tab}@JsOverlay`)
-            console.log(`${tab}public ${this.getTypeName(nit)} getByIndex(int index) {`)
-            console.log(`${tab}${tab}return ${this.getTypeName(nit)}(Object) ${this.BY_INDEX_GETTER}(index);`)
-            console.log(`${tab}}`)
-            console.log(``)
-        }
-
-        let sit = type.getStringIndexType()
-        if (sit) {
-            console.log(`${tab}@JsOverlay`)
-            console.log(`${tab}public void setByIndex(String index, ${this.getTypeName(sit)} value) {`)
-            console.log(`${tab}${tab}${this.BY_INDEX_SETTER}(index, value);`)
-            console.log(`${tab}}`)
-            console.log(``)
-
-            console.log(`${tab}@JsOverlay`)
-            console.log(`${tab}public ${this.getTypeName(sit)} getByIndex(String index) {`)
-            console.log(`${tab}${tab}return ${this.getTypeName(sit)}(Object) ${this.BY_INDEX_GETTER}(index);`)
-            console.log(`${tab}}`)
-            console.log(``)
-        }
-
-        let baseTypes = type.getBaseTypes()
-        let constructors = type.getConstructSignatures()
-
-        let properties = type.getProperties()
-        if (properties && properties.length) {
-            for (let property of properties) {
-                this.generatePropertiesOrMethods(property)
-            }
-        }
-        console.log(`}`)
-    }
-
-    private serializeSignatureParameters(signature: ts.Signature) {
-        return signature.getParameters().map(p => {
-            let parameteryType = this.program.getTypeChecker().getTypeAtLocation(p.valueDeclaration)
-            return this.getTypeName(parameteryType) + ' ' + p.getName()
-        }).join()
-    }
-
-    private generatePropertiesOrMethods(property: ts.Symbol) {
-        if (!property || !property.valueDeclaration)
-            return
-
-        let tab = '    '
-
-        let propertyType = this.program.getTypeChecker().getTypeAtLocation(property.valueDeclaration)
-
-        let name = property.getName()
-        let upcaseName = name.slice(0, 1).toLocaleUpperCase() + name.slice(1)
-
-        // type of property =>
-        // for each callable signature, generate a method
-
-        let callSignatures = propertyType.getCallSignatures()
-        if (callSignatures && callSignatures.length) {
-            for (let callSignature of callSignatures) {
-                console.log(`${tab}/* Call signature */`)
-                let paramsDump = this.serializeSignatureParameters(callSignature)
-                console.log(`${tab}public final native ${this.getTypeName(callSignature.getReturnType())} ${name}(${paramsDump});`)
-                console.log()
-            }
-        }
-
-        console.log(`${tab}public ${this.getTypeName(propertyType)} ${name};`)
-        console.log()
-
-        console.log(`${tab}@JsProperty( name = "${name}")`)
-        console.log(`${tab}public final native ${this.getTypeName(propertyType)} get${upcaseName}();`)
-        console.log()
-
-        console.log(`${tab}@JsProperty( name = "${name}")`)
-        console.log(`${tab}public final native void set${upcaseName}( ${this.getTypeName(propertyType)} value );`)
-        console.log()
-    }
-
-    private addDeeperTypes(type: ts.Type, typeSet: Set<ts.Type>) {
-        if (typeSet.has(type))
-            return
-
-        typeSet.add(type)
-
-        if ((type.flags & ts.TypeFlags.TypeParameter) === ts.TypeFlags.TypeParameter) {
-            let typeParameter = type as ts.TypeParameter
-            if (typeParameter.constraint)
-                this.addDeeperTypes(typeParameter.constraint, typeSet)
-        }
-
-        if ((type.flags & ts.TypeFlags.Object) === ts.TypeFlags.Object) {
-            let objectType = type as ts.ObjectType
-            if (objectType.objectFlags & ts.ObjectFlags.ClassOrInterface) {
-                let interfaceType = objectType as ts.InterfaceType
-                if (interfaceType.typeParameters && interfaceType.typeParameters.length) {
-                    for (let typeParameter of interfaceType.typeParameters)
-                        this.addDeeperTypes(typeParameter, typeSet)
-                }
-            }
-        }
-
-        let baseTypes = type.getBaseTypes()
-        if (baseTypes && baseTypes.length > 0)
-            baseTypes.forEach((baseType => this.addDeeperTypes(baseType, typeSet)))
-
-        let properties = type.getProperties()
-        if (properties) {
-            for (let property of properties) {
-                if (!property.valueDeclaration)
-                    continue
-
-                /**
-                 * TODO
-                 * 
-                 * One TS property is projected in the java as one or many
-                 * - attribute of primitive type (int, char, ...)
-                 * - attribute of reference type (Object...)
-                 * - method
-                 */
-                let propertyType = this.program.getTypeChecker().getTypeAtLocation(property.valueDeclaration)
-                this.addDeeperTypes(propertyType, typeSet)
-            }
-        }
-
-        /**
-         * TODO
-         * 
-         * Call and Construct signatures are methods and constructors in the containing type
-         */
-
-        let callSignatures = type.getCallSignatures()
-        if (callSignatures) {
-            for (let callSignature of callSignatures) {
-                let parameters = callSignature.getParameters()
-                if (parameters && parameters.length) {
-                    for (let parameter of parameters) {
-                        let parameteryType = this.program.getTypeChecker().getTypeAtLocation(parameter.valueDeclaration)
-                        this.addDeeperTypes(parameteryType, typeSet)
-                    }
-                }
-
-                let returnType = callSignature.getReturnType()
-                if (returnType)
-                    this.addDeeperTypes(returnType, typeSet)
-
-                let typeParameters = callSignature.getTypeParameters()
-                if (typeParameters && typeParameters.length) {
-                    for (let typeParameter of typeParameters)
-                        this.addDeeperTypes(typeParameter, typeSet)
-                }
-            }
-        }
-
-        let constructSignatures = type.getConstructSignatures()
-        if (constructSignatures) {
-            for (let constructSignature of constructSignatures) {
-                let parameters = constructSignature.getParameters()
-                if (parameters && parameters.length) {
-                    for (let parameter of parameters) {
-                        let parameteryType = this.program.getTypeChecker().getTypeAtLocation(parameter.valueDeclaration)
-                        this.addDeeperTypes(parameteryType, typeSet)
-                    }
-                }
-
-                let returnType = constructSignature.getReturnType()
-                if (returnType)
-                    this.addDeeperTypes(returnType, typeSet)
-
-                let typeParameters = constructSignature.getTypeParameters()
-                if (typeParameters && typeParameters.length) {
-                    for (let typeParameter of typeParameters)
-                        this.addDeeperTypes(typeParameter, typeSet)
-                }
-            }
-        }
-    }
-
 
     addTypesFromSourceFile(sourceFile: ts.SourceFile, onlyExportedSymbols: boolean) {
         ts.forEachChild(sourceFile, (node) => {
@@ -377,17 +149,20 @@ export class GatherPhase {
             }
         }
 
-        this.currentIdAnonymousTypes = this.typeMap.ensureAllTypesHaveName(this.currentIdAnonymousTypes)
-        this.typeMap.removeIndexedAccessTypes()
-        this.typeMap.removeSymbolType()
-        this.typeMap.developMethodOverridesForUnionParameters()
+        console.log(`removing unsupported types`)
+        this.typeMap.removeNotSupportedTypes()
+        console.log(`unanonymising types`)
+        this.currentIdAnonymousTypes = this.typeMap.ensureAllTypesHaveName(this.currentIdAnonymousTypes, this.baseJavaPackage)
+        console.log(`simplify unions`)
         this.typeMap.simplifyUnions()
+        console.log(`develop unions for methods`)
+        this.typeMap.developMethodOverridesForUnionParameters()
         // simplify : merge types with same name and same structure
         // by default for properties : do not generate Caller
         // Array => JsArray and so on for similar custom native types replacement\\freebox
         // remove unreferenced types ?
 
-        console.log(this.variables.map(v => `variable : ${v.type.getName()} ${v.name}`).join(`\n`))
+        console.log(this.variables.map(v => `variable : ${v.type.getParametrizedSimpleName()} ${v.name}`).join(`\n`))
 
         console.log(this.globalMethods.map(m => `global method : ${m.serializeSignature()}`).join('\n'))
 
@@ -414,7 +189,7 @@ export class GatherPhase {
                         let preJava = this.typeMap.getOrCreatePreJavaTypeForTsType(constructorSignature.getReturnType())
                         if (preJava instanceof TypeMap.PreJavaTypeClassOrInterface) {
                             preJava.addPrototypeName(null, guessName(declaration.name));
-                            preJava.setName(guessName(declaration.name));
+                            preJava.setSimpleName(guessName(declaration.name));
                             preJava.addConstructorSignature(this.convertSignature(null, constructorSignature))
                         }
                     }
@@ -465,9 +240,9 @@ export class GatherPhase {
 
             if (symbol) {
                 if ((symbol.flags & ts.SymbolFlags.Class) || (symbol.flags & ts.SymbolFlags.Interface))
-                    preJavaType.setName(symbol.getName())
+                    preJavaType.setSimpleName(symbol.getName())
                 else if (symbol.flags & ts.SymbolFlags.TypeLiteral)
-                    preJavaType.setName(`AnonymousType_${this.currentIdAnonymousTypes++}`)
+                    preJavaType.setSimpleName(`AnonymousType_${this.currentIdAnonymousTypes++}`)
 
                 if (symbol.getDeclarations()) {
                     symbol.getDeclarations()
@@ -559,7 +334,7 @@ export class GatherPhase {
                     }
                     else {
                         let propertyPreJavaType = this.typeMap.getOrCreatePreJavaTypeForTsType(propertyType)
-                        propertyPreJavaType.setName(`${propertyName.slice(0, 1).toUpperCase() + propertyName.slice(1)}Caller`)
+                        propertyPreJavaType.setSimpleName(`${propertyName.slice(0, 1).toUpperCase() + propertyName.slice(1)}Caller`)
 
                         classOrInterface.addProperty({
                             name: propertyName,

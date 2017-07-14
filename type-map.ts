@@ -34,18 +34,18 @@ export class PreJavaTypeCallSignature {
         if (this.typeParameters) {
             res += '<'
             res += this.typeParameters.map(tp => {
-                return tp.name + (tp.constraint ? ` extends ${tp.constraint.getName()}` : '')
+                return tp.name + (tp.constraint ? ` extends ${tp.constraint.getParametrizedSimpleName()}` : '')
             }).join()
             res += '> '
         }
 
         if (this.name)
-            res += `${this.returnType.getName()} ${this.name}`
+            res += `${this.returnType.getParametrizedSimpleName()} ${this.name}`
         else if (defaultName)
             res += `${defaultName}`
 
         if (this.parameters && this.parameters.length)
-            res += `(${this.parameters.map(p => p.type.getName() + ' ' + p.name).join()})`
+            res += `(${this.parameters.map(p => p.type.getParametrizedSimpleName() + ' ' + p.name).join()})`
         else
             res += '()'
         return res
@@ -104,11 +104,31 @@ export type TypeReplacer = { (type: PreJavaType): PreJavaType }
 export abstract class PreJavaType {
     sourceTypes: Set<ts.Type>
 
-    abstract getName(): string
-    abstract setName(name: string)
+    abstract getSimpleName(): string
+    abstract setSimpleName(name: string)
 
     abstract setPackageName(name: string)
     abstract getPackageName(): string
+
+    abstract getParametrization(): string
+
+    getParametrizedSimpleName(): string {
+        let simpleName = this.getSimpleName()
+        if (!simpleName)
+            return null
+        let parametrization = this.getParametrization()
+        return simpleName + (parametrization ? parametrization : '')
+    }
+
+    getFullyQualifiedName(): string {
+        return `${this.getPackageName()}.${this.getSimpleName()}`
+    }
+
+    getParametrizedFullyQualifiedName(): string {
+        return `${this.getPackageName()}.${this.getParametrizedSimpleName()}`
+    }
+
+    abstract isClassLike(): boolean
 
     abstract dump()
 
@@ -150,20 +170,21 @@ export class PreJavaTypeReference extends PreJavaType implements CompletablePreJ
         this.typeParameters = typeParameters
     }
 
-    dump() { console.log(`TypeReference to ${this.type.getName()}`) }
+    dump() { console.log(`TypeReference to ${this.type.getParametrizedSimpleName()}`) }
 
-    getName(): string {
-        let referencedTypeName = this.type.getName()
-        if (!referencedTypeName)
-            return null
-        return `${referencedTypeName}<${this.typeParameters.map(tp => tp.getName()).join(', ')}>`
+    getParametrization(): string {
+        return `<${this.typeParameters.map(tp => tp.getParametrizedSimpleName()).join(', ')}>`
     }
 
-    setName(name: string) { }
+    setSimpleName(name: string) { }
+
+    getSimpleName(): string { return this.type.getSimpleName() }
 
     getPackageName(): string { return this.type.getPackageName() }
 
     setPackageName(name: string) { }
+
+    isClassLike() { return this.type.isClassLike() }
 
     isCompletablePreJavaType() { return this }
 
@@ -202,17 +223,19 @@ export class PreJavaTypeEnum extends PreJavaType implements CompletablePreJavaTy
     }
 
     dump() {
-        console.log(`enum ${this.getName()}`)
+        console.log(`enum ${this.getParametrizedSimpleName()}`)
         if (this.members && this.members.length)
             this.members.forEach(m => console.log(`enum member ${m.name} = ${m.value}`))
     }
 
-    getName(): string { return this.name }
+    getParametrization(): string { return '' }
 
-    setName(name: string) {
+    setSimpleName(name: string) {
         if (!this.name)
             this.name = name
     }
+
+    getSimpleName(): string { return this.name }
 
     getPackageName(): string { return this.packageName }
 
@@ -220,6 +243,8 @@ export class PreJavaTypeEnum extends PreJavaType implements CompletablePreJavaTy
         if (!this.packageName)
             this.packageName = name
     }
+
+    isClassLike() { return true }
 
     isCompletablePreJavaType() { return this }
 
@@ -241,18 +266,20 @@ export class PreJavaTypeParameter extends PreJavaType {
 
     dump() { console.log(`TypeParameter ${this.name}`) }
 
-    getName(): string {
-        return this.name
-    }
+    getParametrization(): string { return '' }
 
-    setName(name: string) {
+    setSimpleName(name: string) {
         if (this.name != null)
             this.name = name
     }
 
+    getSimpleName(): string { return this.name }
+
     getPackageName(): string { return null }
 
     setPackageName(name: string) { }
+
+    isClassLike() { return false }
 
     isCompletablePreJavaType() { return null }
 
@@ -280,15 +307,17 @@ export class PreJavaTypeBuiltinJavaType extends PreJavaType {
 
     dump() { console.log(`Builtin type ${this.name}`) }
 
-    getName(): string {
-        return this.name
-    }
+    getParametrization(): string { return '' }
 
-    setName(name: string) { }
+    setSimpleName(name: string) { }
+
+    getSimpleName(): string { return this.name }
 
     getPackageName(): string { return this.packageName }
 
     setPackageName(name: string) { }
+
+    isClassLike() { return true }
 
     isCompletablePreJavaType() { return null }
 
@@ -317,19 +346,23 @@ export class PreJavaTypeUnion extends PreJavaType implements CompletablePreJavaT
     }
 
     dump() {
-        console.log(`UnionType ${this.getName()}`)
+        console.log(`UnionType ${this.getParametrizedSimpleName()}`)
         if (this.types && this.types.length)
-            this.types.forEach(t => console.log(`- ${t.getName()}`))
+            this.types.forEach(t => console.log(`- ${t.getParametrizedSimpleName()}`))
     }
 
-    getName(): string {
+
+    // TODO : ADD TYPE PARAMETERS IF ANY, BUT FOR NOW THE DATA DOES NOT EXISTS IN THE UNION PJT STRUCTURE
+    getParametrization(): string { return '' }
+
+    setSimpleName(name: string) { }
+
+    getSimpleName(): string {
         if ((!this.types) || this.types.length == 0)
             return 'EmptyUnion'
 
         return this.transformTypeName(this)
     }
-
-    setName(name: string) { }
 
     getPackageName(): string { return this.packageName }
 
@@ -337,6 +370,8 @@ export class PreJavaTypeUnion extends PreJavaType implements CompletablePreJavaT
         if (!this.packageName)
             this.packageName = name
     }
+
+    isClassLike() { return false }
 
     isCompletablePreJavaType() { return this }
 
@@ -371,7 +406,7 @@ export class PreJavaTypeUnion extends PreJavaType implements CompletablePreJavaT
             return `UnionOf${type.types.map(t => this.transformTypeName(t)).join('And')}`
         }
 
-        return type.getName()
+        return type.getSimpleName()
     }
 }
 
@@ -394,6 +429,8 @@ export class PreJavaTypeClassOrInterface extends PreJavaType implements Completa
     stringIndexType: PreJavaType
 
     comments: string[]
+
+    isClassLike() { return this.prototypeNames && this.prototypeNames.size > 0 }
 
     substituteTypeReal(replacer: TypeReplacer, cache: Map<PreJavaType, PreJavaType>, passThroughTypes: Set<PreJavaType>): PreJavaType {
         let stay = replacer(this)
@@ -446,17 +483,22 @@ export class PreJavaTypeClassOrInterface extends PreJavaType implements Completa
             this.packageName = packageName
     }
 
-    getName(): string {
-        return this.name
+    getParametrization(): string {
+        if (this.typeParameters && this.typeParameters.length)
+            return `<${this.typeParameters.map(tp => tp.name).join(', ')}>`
+        else
+            return ''
     }
 
-    setName(name: string) {
+    setSimpleName(name: string) {
         if (name == '__type')
             return
 
         if (!this.name)
             this.name = name
     }
+
+    getSimpleName(): string { return this.name }
 
     isCompletablePreJavaType() { return this }
 
@@ -481,7 +523,7 @@ export class PreJavaTypeClassOrInterface extends PreJavaType implements Completa
 
         if (this.baseTypes && this.baseTypes.size) {
             console.log('base types:')
-            this.baseTypes.forEach(type => console.log(`- ${type.getName()}`))
+            this.baseTypes.forEach(type => console.log(`- ${type.getParametrizedSimpleName()}`))
         }
 
         if (this.comments && this.comments.length) {
@@ -506,15 +548,15 @@ export class PreJavaTypeClassOrInterface extends PreJavaType implements Completa
             for (let property of this.properties) {
                 if (property.comments && property.comments.length)
                     console.log(property.comments.map(c => `/* ${c} */`).join('\n'))
-                console.log(`${property.type.getName()} ${property.name} ${property.writable ? '' : 'READ-ONLY'}`)
+                console.log(`${property.type.getParametrizedSimpleName()} ${property.name} ${property.writable ? '' : 'READ-ONLY'}`)
             }
         }
 
         if (this.numberIndexType) {
-            console.log(`index by number: ${this.numberIndexType.getName()}`)
+            console.log(`index by number: ${this.numberIndexType.getParametrizedSimpleName()}`)
         }
         if (this.stringIndexType) {
-            console.log(`index by string: ${this.stringIndexType.getName()}`)
+            console.log(`index by string: ${this.stringIndexType.getParametrizedSimpleName()}`)
         }
 
         if (this.methods && this.methods.length) {
@@ -580,10 +622,13 @@ const FAKE_TYPE_INDEXEDACCESS = new PreJavaTypeFakeType('gwt.ext', 'FakeIndexedA
 export class TsToPreJavaTypemap {
     typeMap = new Map<ts.Type, PreJavaType>()
 
-    ensureAllTypesHaveName(currentIdAnonymousTypes: number) {
-        for (let type of this.typeMap.values())
-            if (type.getName() == null)
-                type.setName(`AnonymousType_${currentIdAnonymousTypes++} `)
+    ensureAllTypesHaveName(currentIdAnonymousTypes: number, defaultPackageName: string) {
+        for (let type of this.typeMap.values()) {
+            if (type.getParametrizedSimpleName() == null)
+                type.setSimpleName(`AnonymousType_${currentIdAnonymousTypes++} `)
+            if (defaultPackageName && !type.getPackageName())
+                type.setPackageName(defaultPackageName)
+        }
         return currentIdAnonymousTypes
     }
 
@@ -609,10 +654,6 @@ export class TsToPreJavaTypemap {
         }
 
         return false
-    }
-
-    private removeTypeInTypes(typeToRemove: PreJavaType) {
-        this.substituteType((type) => type != typeToRemove ? type : null)
     }
 
     private substituteType(replacer: TypeReplacer) {
@@ -649,12 +690,8 @@ export class TsToPreJavaTypemap {
         }))
     }
 
-    removeIndexedAccessTypes() {
-        this.removeTypeInTypes(FAKE_TYPE_INDEXEDACCESS)
-    }
-
-    removeSymbolType() {
-        this.removeTypeInTypes(FAKE_TYPE_ESSYMBOL)
+    removeNotSupportedTypes() {
+        this.substituteType((type) => type instanceof PreJavaTypeFakeType ? null : type)
     }
 
     developMethodOverridesForUnionParameters() {
