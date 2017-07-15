@@ -1,4 +1,3 @@
-import * as Model from "./model";
 import * as ts from "typescript";
 import * as path from "path";
 import { Identifier } from "typescript";

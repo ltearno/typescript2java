@@ -2,28 +2,6 @@ import * as ts from "typescript";
 import * as path from "path";
 import * as fs from "fs";
 
-export interface ChildrenOf extends Array<ts.Node> {
-    byKind(kind: ts.SyntaxKind): ts.Node[];
-}
-
-export function childrenOf(node: ts.Node): ChildrenOf {
-    let res: ChildrenOf = [] as ChildrenOf;
-
-    ts.forEachChild(node, child => {
-        res.push(child);
-    });
-
-    res.byKind = (kind: ts.SyntaxKind) => {
-        return res.filter(child => child.kind == kind);
-    };
-
-    return res;
-}
-
-export function firstChildOf(node: ts.Node) {
-    return childrenOf(node)[0];
-}
-
 export function mkdirRec(p, opts = undefined, made = null) {
     if (!opts || typeof opts !== 'object') {
         opts = {mode: opts};
