@@ -43,6 +43,9 @@ export class ExportPhase {
 
     private reservedWords: { [key: string]: string } = {
         '_': '_underscore_',
+        'public': '_public_',
+        'protected': 'protected_',
+        'private': 'private_',
         'do': 'do_',
         'switch': 'switch_',
         'char': 'char_',

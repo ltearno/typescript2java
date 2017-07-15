@@ -437,7 +437,7 @@ export class PreJavaTypeClassOrInterface extends PreJavaType implements Completa
 
     isClassLike() { return this.shouldOutputClass || (this.prototypeNames && this.prototypeNames.size > 0) }
 
-    hasOnlyProperties = () => {
+    hasOnlyProperties() {
         if (this.baseTypes && this.baseTypes.size)
             return false
 
@@ -732,6 +732,51 @@ export class TsToPreJavaTypemap {
             }
         }
         console.log(`${nb} DTO types converted to classes`)
+    }
+
+    arrangeMultipleImplementationInheritance() {
+        for (let type of this.typeMap.values()) {
+            if (type instanceof PreJavaTypeClassOrInterface && type.baseTypes && type.baseTypes.size > 1) {
+                let implementationSuperTypes: PreJavaTypeClassOrInterface[] = []
+                for (let superType of type.baseTypes.values()) {
+                    if (superType instanceof PreJavaTypeClassOrInterface && superType.isClassLike()) {
+                        implementationSuperTypes.push(superType)
+                    }
+                }
+                if (implementationSuperTypes.length < 2)
+                    continue
+
+                let nbConstructors = type.constructorSignatures && type.constructorSignatures.length
+
+                console.log(`MULTIPLE TYPE ${type.getParametrizedFullyQualifiedName()} with ${nbConstructors} constructors`)
+
+                for (let superType of implementationSuperTypes) {
+                    // super_type doit maintenant être une interface => on le transforme comme ca tout le monde pointe vers l'interface
+                    let newType = new PreJavaTypeClassOrInterface()
+                    newType.baseTypes = new Set()
+                    newType.baseTypes.add(superType)
+                    newType.comments = superType.comments && superType.comments.slice()
+                    newType.constructorSignatures = superType.constructorSignatures
+                    newType.methods = superType.methods && superType.methods.slice()
+                    newType.name = superType.name + '_'
+                    newType.numberIndexType = superType.numberIndexType
+                    newType.stringIndexType = superType.stringIndexType
+                    newType.packageName = superType.packageName
+                    newType.processed = false
+                    newType.properties = superType.properties && superType.properties.slice()
+                    newType.prototypeNames = superType.prototypeNames
+                    newType.shouldOutputClass = true
+                    newType.typeParameters = superType.typeParameters && superType.typeParameters.slice()
+                    newType.sourceTypes = superType.sourceTypes
+
+                    superType.shouldOutputClass = false
+                    superType.constructorSignatures = null
+                    superType.prototypeNames = null
+
+                    this.typeMap.set({} as ts.Type, newType)
+                }
+            }
+        }
     }
 
     developMethodOverridesForUnionParameters() {

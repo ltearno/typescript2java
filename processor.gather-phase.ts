@@ -157,8 +157,11 @@ export class GatherPhase {
         this.typeMap.simplifyUnions()
         console.log(`change DTO interfaces into classes`)
         this.typeMap.changeDtoInterfacesIntoClasses()
-        console.log(`develop unions for methods`)
+        console.log(`transforming types inheriting multiple implementations`)
+        this.typeMap.arrangeMultipleImplementationInheritance()
+        console.log(`develop union types in methods parameters into overrides`)
         this.typeMap.developMethodOverridesForUnionParameters()
+        console.log(`removing invalid method duplicates (same type erasure overrides and so on...)`)
 
         console.log(`statistics:`)
         console.log(`${this.variables.length} global variables`)
