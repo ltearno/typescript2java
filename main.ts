@@ -89,10 +89,10 @@ let javaPackages = {
     "tests/@angular/platform-browser-dynamic/": "ng.platformBrowserDynamic",
     "tests/@angular/router/": "ng.router",
     "tests/rxjs": "rxjs",
-    "tests": "lteconsulting"
+    "tests": "fr.lteconsulting.test"
 }
 
-let syncPhase = new GatherPhase(baseJavaPackage, javaPackages, program);// new SyncPhase(baseJavaPackage, javaPackages);
+let syncPhase = new GatherPhase(baseJavaPackage, javaPackages, program)
 
 program.getSourceFiles().forEach(sourceFile => {
     console.log(`source ${sourceFile.fileName}`);
@@ -106,6 +106,6 @@ syncPhase.sumup()
 
 console.log(`Exporting nodes...`);
 let exportPhase = new ExportPhase.ExportPhase(syncPhase)
-exportPhase.exportNodes(program)
+exportPhase.exportNodes(program, './out/src/main/java')
 
 console.log(`Finished.`);

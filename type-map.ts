@@ -173,7 +173,9 @@ export class PreJavaTypeReference extends PreJavaType implements CompletablePreJ
     dump() { console.log(`TypeReference to ${this.type.getParametrizedSimpleName()}`) }
 
     getParametrization(): string {
-        return `<${this.typeParameters.map(tp => tp.getParametrizedSimpleName()).join(', ')}>`
+        if (this.typeParameters && this.typeParameters.length)
+            return `<${this.typeParameters.map(tp => tp.getParametrizedSimpleName()).join(', ')}>`
+        return ''
     }
 
     setSimpleName(name: string) { }
@@ -361,7 +363,7 @@ export class PreJavaTypeUnion extends PreJavaType implements CompletablePreJavaT
         if ((!this.types) || this.types.length == 0)
             return 'EmptyUnion'
 
-        return this.transformTypeName(this)
+        return this.transformTypeName(this).replace(new RegExp('\\?', 'g'), 'UNKOWNTYPE')
     }
 
     getPackageName(): string { return this.packageName }
@@ -389,7 +391,7 @@ export class PreJavaTypeUnion extends PreJavaType implements CompletablePreJavaT
         return this
     }
 
-    private transformTypeName(type: PreJavaType) {
+    private transformTypeName(type: PreJavaType): string {
         if (type instanceof PreJavaTypeClassOrInterface) {
             let res = type.name
             return res
@@ -430,7 +432,23 @@ export class PreJavaTypeClassOrInterface extends PreJavaType implements Completa
 
     comments: string[]
 
-    isClassLike() { return this.prototypeNames && this.prototypeNames.size > 0 }
+    /** sometimes interfaces are better presented as classes so that DTO instantiation is easier in Java */
+    shouldOutputClass: boolean
+
+    isClassLike() { return this.shouldOutputClass || (this.prototypeNames && this.prototypeNames.size > 0) }
+
+    hasOnlyProperties = () => {
+        if (this.baseTypes && this.baseTypes.size)
+            return false
+
+        if (this.constructorSignatures && this.constructorSignatures.length)
+            return false
+
+        if (this.methods && this.methods.length)
+            return false
+
+        return true
+    }
 
     substituteTypeReal(replacer: TypeReplacer, cache: Map<PreJavaType, PreJavaType>, passThroughTypes: Set<PreJavaType>): PreJavaType {
         let stay = replacer(this)
@@ -625,7 +643,7 @@ export class TsToPreJavaTypemap {
     ensureAllTypesHaveName(currentIdAnonymousTypes: number, defaultPackageName: string) {
         for (let type of this.typeMap.values()) {
             if (type.getParametrizedSimpleName() == null)
-                type.setSimpleName(`AnonymousType_${currentIdAnonymousTypes++} `)
+                type.setSimpleName(`AnonymousType_${currentIdAnonymousTypes++}`)
             if (defaultPackageName && !type.getPackageName())
                 type.setPackageName(defaultPackageName)
         }
@@ -668,6 +686,15 @@ export class TsToPreJavaTypemap {
         }
     }
 
+    hasSubType(type: PreJavaType) {
+        for (let type of this.typeMap.values()) {
+            if (type instanceof PreJavaTypeClassOrInterface && type.baseTypes && type.baseTypes.has(type))
+                return true
+        }
+
+        return false
+    }
+
     simplifyUnions() {
         let typesToSimplifyToObject: PreJavaType[] = []
         let typesToSimplifyToOnlyType: PreJavaType[] = []
@@ -692,6 +719,19 @@ export class TsToPreJavaTypemap {
 
     removeNotSupportedTypes() {
         this.substituteType((type) => type instanceof PreJavaTypeFakeType ? null : type)
+        this.substituteType((type) => type.getSimpleName() == '?' ? BUILTIN_TYPE_OBJECT : type)
+        this.substituteType((type) => type.getSimpleName() == '' ? null : type)
+    }
+
+    changeDtoInterfacesIntoClasses() {
+        let nb = 0
+        for (let type of this.typeMap.values()) {
+            if (type instanceof PreJavaTypeClassOrInterface && type.hasOnlyProperties() && !this.hasSubType(type)) {
+                type.shouldOutputClass = true
+                nb++
+            }
+        }
+        console.log(`${nb} DTO types converted to classes`)
     }
 
     developMethodOverridesForUnionParameters() {

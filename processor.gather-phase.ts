@@ -133,9 +133,14 @@ export class GatherPhase {
                 return;
             }
 
-            console.log(`Ignored SyntaxKind: ${ts.SyntaxKind[node.kind]}`);
+            if (!this.ignoredSyntaxKinds.has(node.kind)) {
+                this.ignoredSyntaxKinds.add(node.kind)
+                console.log(`Ignored SyntaxKind: ${ts.SyntaxKind[node.kind]}`)
+            }
         });
     }
+
+    private ignoredSyntaxKinds: Set<ts.SyntaxKind> = new Set()
 
     sumup() {
         console.log(`processing types...`)
@@ -155,18 +160,27 @@ export class GatherPhase {
         this.currentIdAnonymousTypes = this.typeMap.ensureAllTypesHaveName(this.currentIdAnonymousTypes, this.baseJavaPackage)
         console.log(`simplify unions`)
         this.typeMap.simplifyUnions()
+        console.log(`change DTO interfaces into classes`)
+        this.typeMap.changeDtoInterfacesIntoClasses()
         console.log(`develop unions for methods`)
         this.typeMap.developMethodOverridesForUnionParameters()
+
+        console.log(`statistics:`)
+        console.log(`${this.variables.length} global variables`)
+        console.log(`${this.globalMethods.length} global methods`)
+        console.log(`${this.typeMap.typeMap.size} jsinterop types`)
+
         // simplify : merge types with same name and same structure
         // by default for properties : do not generate Caller
         // Array => JsArray and so on for similar custom native types replacement\\freebox
         // remove unreferenced types ?
+        // todo rendre les DTO interface en classe : plus facile à instancier ! critère : pas de prototype et interface non utilisée comme interface mère. les classes qui en héritent utilisent maintenant 'extends' => probleme si déjà un extends, et dans ce cas, ce n'est pas possible !
 
-        console.log(this.variables.map(v => `variable : ${v.type.getParametrizedSimpleName()} ${v.name}`).join(`\n`))
+        //console.log(this.variables.map(v => `variable : ${v.type.getParametrizedSimpleName()} ${v.name}`).join(`\n`))
 
-        console.log(this.globalMethods.map(m => `global method : ${m.serializeSignature()}`).join('\n'))
+        //console.log(this.globalMethods.map(m => `global method : ${m.serializeSignature()}`).join('\n'))
 
-        this.typeMap.typeMap.forEach((type, k) => {
+        /*this.typeMap.typeMap.forEach((type, k) => {
             let files = (k.getSymbol() && k.getSymbol().declarations) ? k.getSymbol().declarations.map(d => d.getSourceFile().fileName + ':' + d.getFullStart()).join() : ''
             let fqn = k.getSymbol() ? this.program.getTypeChecker().getFullyQualifiedName(k.getSymbol()) : ''
 
@@ -175,7 +189,7 @@ export class GatherPhase {
             console.log(`ts type ${k['id']} ${k.flags} ${fqn} ${files} : ${this.getTypeName(k)}`)
 
             type.dump()
-        })
+        })*/
     }
 
     private registerVariableStatement(statement: ts.VariableStatement) {
@@ -190,7 +204,7 @@ export class GatherPhase {
                         if (preJava instanceof TypeMap.PreJavaTypeClassOrInterface) {
                             preJava.addPrototypeName(null, guessName(declaration.name));
                             preJava.setSimpleName(guessName(declaration.name));
-                            preJava.addConstructorSignature(this.convertSignature(null, constructorSignature))
+                            //preJava.addConstructorSignature(this.convertSignature(null, constructorSignature))
                         }
                     }
                 })
@@ -268,7 +282,7 @@ export class GatherPhase {
                             }
 
                             if (jsNamespace)
-                                preJavaType.setPackageName('.' + jsNamespace)
+                                preJavaType.setPackageName(jsNamespace)
                         })
                 }
 
@@ -325,7 +339,7 @@ export class GatherPhase {
 
                     // TODO : generating property accessors for callable types should be configurable
                     let callSignatures = propertyType.getCallSignatures()
-                    if (callSignatures && callSignatures.length) {
+                    if (callSignatures && callSignatures.length && !(propertyName.startsWith('on'))) {
                         for (let callSignature of callSignatures) {
                             let method = this.convertSignature(propertyName, callSignature)
                             method.addComments(comments)
