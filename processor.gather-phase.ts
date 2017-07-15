@@ -118,13 +118,13 @@ export class GatherPhase {
             }
 
             if (node.kind == ts.SyntaxKind.InterfaceDeclaration || node.kind == ts.SyntaxKind.ClassDeclaration) {
-                this.typeMap.getOrCreatePreJavaTypeForTsType(this.program.getTypeChecker().getTypeAtLocation(node))
+                this.typeMap.getOrCreatePreJavaTypeForTsType(this.program.getTypeChecker().getTypeAtLocation(node), null)
                 return;
             }
 
             if (node.kind == ts.SyntaxKind.EnumDeclaration) {
                 let t = this.program.getTypeChecker().getTypeAtLocation(node)
-                this.typeMap.getOrCreatePreJavaTypeForTsType(t)
+                this.typeMap.getOrCreatePreJavaTypeForTsType(t, null)
                 return;
             }
 
@@ -200,7 +200,7 @@ export class GatherPhase {
             if (cs && cs.length) {
                 cs.forEach(constructorSignature => {
                     if (constructorSignature.getReturnType()) {
-                        let preJava = this.typeMap.getOrCreatePreJavaTypeForTsType(constructorSignature.getReturnType())
+                        let preJava = this.typeMap.getOrCreatePreJavaTypeForTsType(constructorSignature.getReturnType(), null)
                         if (preJava instanceof TypeMap.PreJavaTypeClassOrInterface) {
                             preJava.addPrototypeName(null, guessName(declaration.name));
                             preJava.setSimpleName(guessName(declaration.name));
@@ -214,7 +214,7 @@ export class GatherPhase {
                 || t.getStringIndexType()
                 || (t.getCallSignatures() && t.getCallSignatures().some(s => s.declaration && s.declaration.name && s.declaration.name.getText() != '__call'))
                 || (t.getProperties() && t.getProperties().some(p => p.name != 'prototype'))) {
-                let variableType = this.typeMap.getOrCreatePreJavaTypeForTsType(t)
+                let variableType = this.typeMap.getOrCreatePreJavaTypeForTsType(t, null)
 
                 this.variables.push({ type: variableType, name: guessName(declaration.name) });
             }
@@ -293,7 +293,7 @@ export class GatherPhase {
                     let constructors = constructorType.getConstructSignatures()
                     if (classOrInterface && constructors)
                         constructors.forEach(constructorSignature => {
-                            let signature = this.convertSignature(null, constructorSignature, classOrInterface)
+                            let signature = this.convertSignature(null, constructorSignature, classOrInterface.typeParameters)
                             classOrInterface.addConstructorSignature(signature)
                         })
                 }
@@ -309,25 +309,25 @@ export class GatherPhase {
                 if (objectType.objectFlags & ts.ObjectFlags.Class || objectType.objectFlags & ts.ObjectFlags.Interface) {
                     let interfaceType = objectType as ts.InterfaceType
                     if (classOrInterface && interfaceType.typeParameters && interfaceType.typeParameters.length) {
-                        classOrInterface.setTypeParameters(interfaceType.typeParameters.map(tp => (new TypeMap.PreJavaTypeParameter(tp.symbol.getName(), this.typeMap.getOrCreatePreJavaTypeForTsType(tp.constraint)))))
+                        classOrInterface.setTypeParameters(interfaceType.typeParameters.map(tp => (new TypeMap.PreJavaTypeParameter(tp.symbol.getName(), this.typeMap.getOrCreatePreJavaTypeForTsType(tp.constraint, null)))))
                     }
                 }
             }
 
             let nit = type.getNumberIndexType()
             if (classOrInterface && nit) {
-                classOrInterface.setNumberIndexType(this.typeMap.getOrCreatePreJavaTypeForTsType(nit))
+                classOrInterface.setNumberIndexType(this.typeMap.getOrCreatePreJavaTypeForTsType(nit, classOrInterface.typeParameters))
             }
 
             let sit = type.getStringIndexType()
             if (classOrInterface && sit) {
-                classOrInterface.setStringIndexType(this.typeMap.getOrCreatePreJavaTypeForTsType(sit))
+                classOrInterface.setStringIndexType(this.typeMap.getOrCreatePreJavaTypeForTsType(sit, classOrInterface.typeParameters))
             }
 
             let baseTypes = type.getBaseTypes()
             if (classOrInterface && baseTypes) {
                 baseTypes.forEach(baseType => {
-                    classOrInterface.addBaseType(this.typeMap.getOrCreatePreJavaTypeForTsType(baseType))
+                    classOrInterface.addBaseType(this.typeMap.getOrCreatePreJavaTypeForTsType(baseType, null /*no need*/))
                 })
             }
 
@@ -347,7 +347,7 @@ export class GatherPhase {
                     let callSignatures = propertyType.getCallSignatures()
                     if (callSignatures && callSignatures.length && !(propertyName.startsWith('on'))) {
                         for (let callSignature of callSignatures) {
-                            let method = this.convertSignature(propertyName, callSignature, classOrInterface)
+                            let method = this.convertSignature(propertyName, callSignature, classOrInterface.typeParameters)
                             if (method) {
                                 method.addComments(comments)
                                 classOrInterface.addMethod(method)
@@ -355,7 +355,7 @@ export class GatherPhase {
                         }
                     }
                     else {
-                        let propertyPreJavaType = this.typeMap.getOrCreatePreJavaTypeForTsType(propertyType)
+                        let propertyPreJavaType = this.typeMap.getOrCreatePreJavaTypeForTsType(propertyType, classOrInterface.typeParameters)
                         propertyPreJavaType.setSimpleName(`${propertyName.slice(0, 1).toUpperCase() + propertyName.slice(1)}Caller`)
 
                         classOrInterface.addProperty({
@@ -374,7 +374,7 @@ export class GatherPhase {
                 // TODO : check if it can be melted down with other similar types
                 // TODO : try to get a name for it from where it has been created (callback of a function, ...)
                 callSignatures.forEach(callSignature => {
-                    let signature = this.convertSignature('execute', callSignature, classOrInterface)
+                    let signature = this.convertSignature('execute', callSignature, classOrInterface.typeParameters)
                     if (signature)
                         classOrInterface.addMethod(signature)
                 })
@@ -382,27 +382,25 @@ export class GatherPhase {
         }
     }
 
-    private convertSignature(name: string, tsSignature: ts.Signature, containingType: TypeMap.PreJavaTypeClassOrInterface): TypeMap.PreJavaTypeCallSignature {
+    private convertSignature(name: string, tsSignature: ts.Signature, typeParametersToApplyToAnonymousTypes: TypeMap.PreJavaTypeParameter[]): TypeMap.PreJavaTypeCallSignature {
         if (('thisParameter' in tsSignature) && tsSignature['thisParameter'])
             return null
 
         let signatureTypeParameters = tsSignature.getTypeParameters() ? tsSignature.getTypeParameters().map(t => {
-            let res = this.typeMap.getOrCreatePreJavaTypeForTsType(t) as TypeMap.PreJavaTypeParameter
+            let res = this.typeMap.getOrCreatePreJavaTypeForTsType(t, typeParametersToApplyToAnonymousTypes) as TypeMap.PreJavaTypeParameter
             if (!(res instanceof TypeMap.PreJavaTypeParameter))
                 console.error(`BLABLABLA`)
             return res
         }) : null
 
-        if (name == 'mapMyTTT')
+        if (name == 'sort')
             console.log()
 
-        let typeParametersToApplyOnAnonymousTypes = []
-        if (containingType && containingType.typeParameters)
-            typeParametersToApplyOnAnonymousTypes = typeParametersToApplyOnAnonymousTypes.concat(containingType.typeParameters)
+        typeParametersToApplyToAnonymousTypes = (typeParametersToApplyToAnonymousTypes && typeParametersToApplyToAnonymousTypes.slice()) || []
         if (signatureTypeParameters)
-            typeParametersToApplyOnAnonymousTypes = typeParametersToApplyOnAnonymousTypes.concat(signatureTypeParameters)
+            typeParametersToApplyToAnonymousTypes = typeParametersToApplyToAnonymousTypes.concat(signatureTypeParameters)
 
-        let returnType = this.typeMap.getOrCreatePreJavaTypeForTsType(tsSignature.getReturnType())
+        let returnType = this.typeMap.getOrCreatePreJavaTypeForTsType(tsSignature.getReturnType(), typeParametersToApplyToAnonymousTypes)
 
         return new TypeMap.PreJavaTypeCallSignature(
             signatureTypeParameters,
@@ -425,7 +423,7 @@ export class GatherPhase {
                     }
                 }
 
-                let preJavaParameterType = this.typeMap.getOrCreatePreJavaTypeForTsType(parameteryType)
+                let preJavaParameterType = this.typeMap.getOrCreatePreJavaTypeForTsType(parameteryType, typeParametersToApplyToAnonymousTypes)
 
                 let result: TypeMap.PreJavaTypeFormalParameter = {
                     name: p.name,

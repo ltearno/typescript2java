@@ -599,7 +599,7 @@ export class PreJavaTypeClassOrInterface extends PreJavaType implements Completa
     }
 
     setTypeParameters(typeParameters: PreJavaTypeParameter[]) {
-        if (typeParameters)
+        if (!this.typeParameters)
             this.typeParameters = typeParameters
     }
 
@@ -801,7 +801,7 @@ export class TsToPreJavaTypemap {
         return res
     }
 
-    getOrCreatePreJavaTypeForTsType(tsType: ts.Type): PreJavaType {
+    getOrCreatePreJavaTypeForTsType(tsType: ts.Type, typeParametersToApplyToAnonymousTypes: PreJavaTypeParameter[]): PreJavaType {
         if (!tsType)
             return null
 
@@ -839,13 +839,13 @@ export class TsToPreJavaTypemap {
 
         if (tsType.flags & ts.TypeFlags.TypeParameter) {
             let symbol = (tsType as ts.TypeParameter).getSymbol()
-            return new PreJavaTypeParameter(symbol ? symbol.getName() : '?', this.getOrCreatePreJavaTypeForTsType((tsType as ts.TypeParameter).constraint))
+            return new PreJavaTypeParameter(symbol ? symbol.getName() : '?', this.getOrCreatePreJavaTypeForTsType((tsType as ts.TypeParameter).constraint, typeParametersToApplyToAnonymousTypes))
         }
 
         if ((tsType.flags & ts.TypeFlags.Object) && ((tsType as ts.ObjectType).objectFlags & ts.ObjectFlags.Reference)) {
             let reference = tsType as ts.TypeReference
             if (reference.target != tsType) {
-                return new PreJavaTypeReference(this.getOrCreatePreJavaTypeForTsType(reference.target), reference.typeArguments ? reference.typeArguments.map(typeArgument => this.getOrCreatePreJavaTypeForTsType(typeArgument)) : null)
+                return new PreJavaTypeReference(this.getOrCreatePreJavaTypeForTsType(reference.target, typeParametersToApplyToAnonymousTypes), reference.typeArguments ? reference.typeArguments.map(typeArgument => this.getOrCreatePreJavaTypeForTsType(typeArgument, typeParametersToApplyToAnonymousTypes)) : null)
             }
         }
 
@@ -855,7 +855,8 @@ export class TsToPreJavaTypemap {
         if (tsType.flags & ts.TypeFlags.Union) {
             let unionType = tsType as ts.UnionType
 
-            let res = new PreJavaTypeUnion(unionType.types.map(t => this.getOrCreatePreJavaTypeForTsType(t)))
+            let res = new PreJavaTypeUnion(unionType.types.map(t => this.getOrCreatePreJavaTypeForTsType(t, typeParametersToApplyToAnonymousTypes)))
+            // TODO res.typeParameters = typeParametersToApplyToAnonymousTypes.slice()
 
             this.typeMap.set(tsType, res)
 
@@ -870,6 +871,11 @@ export class TsToPreJavaTypemap {
         if (tsType.flags & ts.TypeFlags.Object) {
             let preJavaType = new PreJavaTypeClassOrInterface()
             preJavaType.addSourceType(tsType)
+
+            let objectType = tsType as ts.ObjectType
+            if (typeParametersToApplyToAnonymousTypes && typeParametersToApplyToAnonymousTypes.length && objectType.objectFlags & ts.ObjectFlags.Anonymous && (preJavaType.typeParameters == null)) {
+                preJavaType.typeParameters = typeParametersToApplyToAnonymousTypes ? typeParametersToApplyToAnonymousTypes.slice() : null
+            }
 
             this.typeMap.set(tsType, preJavaType)
 
