@@ -23,13 +23,13 @@ export interface Rock {
 }
 
 export declare var Rock: {
-    new (a: string, b: number): Rock
+    new(a: string, b: number): Rock
 
     SAVE_ME: number
 }
 
 export declare var SpaceShip: {
-    new (a: string, b: number): {
+    new(a: string, b: number): {
         mimi(mati: number): number[]
     }
 }
@@ -192,3 +192,7 @@ export interface ConcreteAbstractPartialClass<U> extends PartialClass {
 
  export function aa(a: A);
  */
+
+export interface TTTTT<T> {
+    mapMyTTT<U>(callbackfn: (value: T, index: number, array: T[]) => U, thisArg?: any): [U, U];
+}

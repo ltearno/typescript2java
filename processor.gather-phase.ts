@@ -151,6 +151,8 @@ export class GatherPhase {
 
         console.log(`removing unsupported types`)
         this.typeMap.removeNotSupportedTypes()
+        // TODO TODO TODO TODO TODO TODO TODO TODO
+        console.log(`removing methods with THIS ARGS`)
         console.log(`unanonymising types`)
         this.currentIdAnonymousTypes = this.typeMap.ensureAllTypesHaveName(this.currentIdAnonymousTypes, this.baseJavaPackage)
         console.log(`simplify unions`)
@@ -228,7 +230,9 @@ export class GatherPhase {
 
         let callSignatures = t.getCallSignatures()
         if (callSignatures && callSignatures.length == 1) {
-            this.globalMethods.push(this.convertSignature(name, callSignatures[0]))
+            let signature = this.convertSignature(name, callSignatures[0], null)
+            if (signature)
+                this.globalMethods.push(signature)
         }
     }
 
@@ -288,7 +292,10 @@ export class GatherPhase {
                     let constructorType = this.program.getTypeChecker().getTypeOfSymbolAtLocation(symbol, symbol.valueDeclaration)
                     let constructors = constructorType.getConstructSignatures()
                     if (classOrInterface && constructors)
-                        constructors.forEach(constructorSignature => classOrInterface.addConstructorSignature(this.convertSignature(null, constructorSignature)))
+                        constructors.forEach(constructorSignature => {
+                            let signature = this.convertSignature(null, constructorSignature, classOrInterface)
+                            classOrInterface.addConstructorSignature(signature)
+                        })
                 }
 
                 let comments = this.getCommentFromSymbol(symbol)
@@ -298,6 +305,7 @@ export class GatherPhase {
 
             if (type.flags & ts.TypeFlags.Object) {
                 let objectType = type as ts.ObjectType
+
                 if (objectType.objectFlags & ts.ObjectFlags.Class || objectType.objectFlags & ts.ObjectFlags.Interface) {
                     let interfaceType = objectType as ts.InterfaceType
                     if (classOrInterface && interfaceType.typeParameters && interfaceType.typeParameters.length) {
@@ -339,9 +347,11 @@ export class GatherPhase {
                     let callSignatures = propertyType.getCallSignatures()
                     if (callSignatures && callSignatures.length && !(propertyName.startsWith('on'))) {
                         for (let callSignature of callSignatures) {
-                            let method = this.convertSignature(propertyName, callSignature)
-                            method.addComments(comments)
-                            classOrInterface.addMethod(method)
+                            let method = this.convertSignature(propertyName, callSignature, classOrInterface)
+                            if (method) {
+                                method.addComments(comments)
+                                classOrInterface.addMethod(method)
+                            }
                         }
                     }
                     else {
@@ -363,24 +373,68 @@ export class GatherPhase {
                 // TODO : Check that the method is alone so that it is a correct functional type
                 // TODO : check if it can be melted down with other similar types
                 // TODO : try to get a name for it from where it has been created (callback of a function, ...)
-                callSignatures.forEach(callSignature => classOrInterface.addMethod(this.convertSignature('execute', callSignature)))
+                callSignatures.forEach(callSignature => {
+                    let signature = this.convertSignature('execute', callSignature, classOrInterface)
+                    if (signature)
+                        classOrInterface.addMethod(signature)
+                })
             }
         }
     }
 
-    private convertSignature(name: string, tsSignature: ts.Signature): TypeMap.PreJavaTypeCallSignature {
+    private convertSignature(name: string, tsSignature: ts.Signature, containingType: TypeMap.PreJavaTypeClassOrInterface): TypeMap.PreJavaTypeCallSignature {
+        if (('thisParameter' in tsSignature) && tsSignature['thisParameter'])
+            return null
+
+        let signatureTypeParameters = tsSignature.getTypeParameters() ? tsSignature.getTypeParameters().map(t => {
+            let res = this.typeMap.getOrCreatePreJavaTypeForTsType(t) as TypeMap.PreJavaTypeParameter
+            if (!(res instanceof TypeMap.PreJavaTypeParameter))
+                console.error(`BLABLABLA`)
+            return res
+        }) : null
+
+        if (name == 'mapMyTTT')
+            console.log()
+
+        let typeParametersToApplyOnAnonymousTypes = []
+        if (containingType && containingType.typeParameters)
+            typeParametersToApplyOnAnonymousTypes = typeParametersToApplyOnAnonymousTypes.concat(containingType.typeParameters)
+        if (signatureTypeParameters)
+            typeParametersToApplyOnAnonymousTypes = typeParametersToApplyOnAnonymousTypes.concat(signatureTypeParameters)
+
+        let returnType = this.typeMap.getOrCreatePreJavaTypeForTsType(tsSignature.getReturnType())
+
         return new TypeMap.PreJavaTypeCallSignature(
-            tsSignature.getTypeParameters() ? tsSignature.getTypeParameters().map(t => {
-                let res = this.typeMap.getOrCreatePreJavaTypeForTsType(t) as TypeMap.PreJavaTypeParameter
-                if (!(res instanceof TypeMap.PreJavaTypeParameter))
-                    console.error(`BLABLABLA`)
-                return res
-            }) : null,
-            this.typeMap.getOrCreatePreJavaTypeForTsType(tsSignature.getReturnType()),
+            signatureTypeParameters,
+            returnType,
             name,
             tsSignature.getParameters() ? tsSignature.getParameters().map(p => {
                 let parameteryType = this.program.getTypeChecker().getTypeAtLocation(p.valueDeclaration)
-                return { name: p.name, type: this.typeMap.getOrCreatePreJavaTypeForTsType(parameteryType) } as TypeMap.PreJavaTypeFormalParameter
+                let objectType = (parameteryType.flags & ts.TypeFlags.Object) && parameteryType as ts.ObjectType
+                let referenceType = objectType && (objectType.objectFlags & ts.ObjectFlags.Reference) && parameteryType as ts.TypeReference
+                let dotdotdot = false
+
+                let de = p.valueDeclaration as ts.ParameterDeclaration
+                if (de.dotDotDotToken) {
+                    if (referenceType && referenceType.typeArguments && referenceType.typeArguments.length == 1) {
+                        parameteryType = referenceType.typeArguments[0]
+                        dotdotdot = true
+                    }
+                    else {
+                        console.error(`... token in parameters but expected type is not good`)
+                    }
+                }
+
+                let preJavaParameterType = this.typeMap.getOrCreatePreJavaTypeForTsType(parameteryType)
+
+                let result: TypeMap.PreJavaTypeFormalParameter = {
+                    name: p.name,
+                    type: preJavaParameterType,
+                    optional: (de.questionToken) != null || (de.initializer != null),
+                    dotdotdot
+                }
+
+                return result
             }) : null
         )
     }

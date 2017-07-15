@@ -333,7 +333,7 @@ export class ExportPhase {
                             flow.push(`<${method.typeParameters.map(tp => tp.name).join(', ')}> `)
                         flow.push(`${javaWriter.importTypeParametrized(method.returnType)} ${escapedMethodName}(`)
                         if (method.parameters)
-                            flow.push(method.parameters.map(p => `${javaWriter.importTypeParametrized(p.type)} ${this.escapePropertyName(p.name)}`).join(', '))
+                            flow.push(method.parameters.map(p => `${javaWriter.importTypeParametrized(p.type)} ${this.escapePropertyName(p.name)}${p.dotdotdot ? ' /* ... */' : ''}${p.optional ? ' /* optional */' : ''}`).join(', '))
                         flow.push(`);`).finishLine()
                     })
                 }

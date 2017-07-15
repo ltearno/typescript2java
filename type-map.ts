@@ -3,6 +3,8 @@ import * as ts from "typescript";
 export interface PreJavaTypeFormalParameter {
     name: string
     type: PreJavaType
+    optional: boolean
+    dotdotdot: boolean
 }
 
 export class PreJavaTypeCallSignature {
@@ -826,6 +828,9 @@ export class TsToPreJavaTypemap {
         if (tsType.flags & ts.TypeFlags.Never)
             return BUILTIN_TYPE_VOID
 
+        if (tsType.flags & ts.TypeFlags.StringLike)
+            return BUILTIN_TYPE_STRING
+
         if (tsType.flags & ts.TypeFlags.ESSymbol)
             return FAKE_TYPE_ESSYMBOL
 
@@ -908,8 +913,6 @@ export class TsToPreJavaTypemap {
             }
         }
 
-        if (tsType.flags & ts.TypeFlags.StringLike)
-            return BUILTIN_TYPE_STRING
         if (tsType.flags & ts.TypeFlags.NumberLike)
             return BUILTIN_TYPE_NUMBER
         if (tsType.flags & ts.TypeFlags.BooleanLike)
