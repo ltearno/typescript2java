@@ -4,10 +4,6 @@ import { Identifier } from "typescript";
 import { type } from "os";
 import * as TypeMap from './type-map'
 
-function hasExportModifier(node: ts.Node) {
-    return !node.modifiers || !node.modifiers.find(e => e.kind == ts.SyntaxKind.ExportKeyword);
-}
-
 function guessName(identifier: ts.Identifier | ts.BindingPattern): string {
     if (identifier.kind == ts.SyntaxKind.Identifier)
         return identifier.text;
