@@ -10,100 +10,24 @@ function guessName(identifier: ts.Identifier | ts.BindingPattern): string {
     return "[UNKNOWN]";
 }
 
-/**
- * Constructs the correspondance between Typescript types
- * and Java types.
- */
 export class GatherPhase {
-    private currentIdAnonymousTypes = 1
-
     typeMap = new TypeMap.TsToPreJavaTypemap()
 
-    variables: {
+    globalVariables: {
         type: TypeMap.PreJavaType;
         name: string;
     }[] = [];
 
     globalMethods: TypeMap.PreJavaTypeCallSignature[] = []
 
+    private currentIdAnonymousTypes = 1
+
+    private ignoredSyntaxKinds: Set<ts.SyntaxKind> = new Set()
+
     constructor(private baseJavaPackage: string,
         private javaPackages: { [key: string]: string },
         private program: ts.Program) {
     }
-
-    private getTypeName(type: ts.Type) {
-        if (type.getSymbol())
-            return type.getSymbol().getName()
-
-        if (type.flags & ts.TypeFlags.Any)
-            return "Object"
-        if (type.flags & ts.TypeFlags.StringLike)
-            return "String"
-        if (type.flags & ts.TypeFlags.StringLiteral)
-            return "String"
-        if (type.flags & ts.TypeFlags.Number)
-            return "Number"
-        if (type.flags & ts.TypeFlags.NumberLiteral)
-            return "Number"
-        if (type.flags & ts.TypeFlags.NumberLike)
-            return "Number"
-        if (type.flags & ts.TypeFlags.Boolean)
-            return "Boolean"
-        if (type.flags & ts.TypeFlags.BooleanLiteral)
-            return "Boolean"
-        if (type.flags & ts.TypeFlags.BooleanLike)
-            return "Boolean"
-        if (type.flags & ts.TypeFlags.Void)
-            return "void"
-        if (type.flags & ts.TypeFlags.Undefined)
-            return "void"
-        if (type.flags & ts.TypeFlags.Null)
-            return "Void"
-        if (type.flags & ts.TypeFlags.Never)
-            return "Void"
-
-        if (type.flags & ts.TypeFlags.ESSymbol)
-            return "ESSymbol"
-
-        if (type.flags & ts.TypeFlags.Union) {
-            let unionType = type as ts.UnionType
-            return unionType.types.map(t => this.getTypeName(t)).join('Or')
-        }
-
-        if (type.flags & ts.TypeFlags.Intersection) {
-            let unionType = type as ts.IntersectionType
-            return unionType.types.map(t => this.getTypeName(t)).join('And')
-        }
-
-        if (type.flags & ts.TypeFlags.NonPrimitive)
-            return "Object"
-
-        if (type.flags & ts.TypeFlags.Object)
-            return "Object/*StructuredUnnamed*/"
-
-        if (type.flags & ts.TypeFlags.IndexedAccess) {
-            let indexedAccess = type as ts.IndexedAccessType
-            return "INDEXEDACCESS"
-        }
-
-        //Enum
-        //EnumLiteral
-        //EnumLike
-        //TypeParameter
-        //UnionOrIntersection
-        //Index
-        //Literal
-        //StringOrNumberLiteral
-        //PossiblyFalsy
-        //StructuredType
-        //StructuredOrTypeVariable
-        //TypeVariable
-        //Narrowable
-        //NotUnionOrUnit
-
-        return "(type without symbol)"
-    }
-
 
     addTypesFromSourceFile(sourceFile: ts.SourceFile, onlyExportedSymbols: boolean) {
         ts.forEachChild(sourceFile, (node) => {
@@ -135,8 +59,6 @@ export class GatherPhase {
         });
     }
 
-    private ignoredSyntaxKinds: Set<ts.SyntaxKind> = new Set()
-
     sumup() {
         console.log(`processing types...`)
         while (true) {
@@ -151,48 +73,33 @@ export class GatherPhase {
 
         console.log(`removing unsupported types`)
         this.typeMap.removeNotSupportedTypes()
-        // TODO TODO TODO TODO TODO TODO TODO TODO
-        console.log(`removing methods with THIS ARGS`)
+
         console.log(`unanonymising types`)
         this.currentIdAnonymousTypes = this.typeMap.ensureAllTypesHaveName(this.currentIdAnonymousTypes, this.baseJavaPackage)
+
         console.log(`simplify unions`)
         this.typeMap.simplifyUnions()
+
         console.log(`change DTO interfaces into classes`)
         this.typeMap.changeDtoInterfacesIntoClasses()
+
         while (true) {
             console.log(`transforming types inheriting multiple implementations`)
             if (!this.typeMap.arrangeMultipleImplementationInheritance())
                 break
         }
+
         console.log(`develop union types in methods parameters into overrides`)
         this.typeMap.developMethodOverridesForUnionParameters()
-        console.log(`removing invalid method duplicates (same type erasure overrides and so on...)`)
+
+        console.log(`(todo) removing invalid method duplicates (same type erasure overrides and so on...)`)
+        console.log(`(todo) merge types with same name and same structure`)
+        console.log(`(todo) Array should be replaced by an externally provided type`)
 
         console.log(`statistics:`)
-        console.log(`${this.variables.length} global variables`)
+        console.log(`${this.globalVariables.length} global variables`)
         console.log(`${this.globalMethods.length} global methods`)
         console.log(`${this.typeMap.typeMap.size} jsinterop types`)
-
-        // simplify : merge types with same name and same structure
-        // by default for properties : do not generate Caller
-        // Array => JsArray and so on for similar custom native types replacement\\freebox
-        // remove unreferenced types ?
-        // todo rendre les DTO interface en classe : plus facile à instancier ! critère : pas de prototype et interface non utilisée comme interface mère. les classes qui en héritent utilisent maintenant 'extends' => probleme si déjà un extends, et dans ce cas, ce n'est pas possible !
-
-        //console.log(this.variables.map(v => `variable : ${v.type.getParametrizedSimpleName()} ${v.name}`).join(`\n`))
-
-        //console.log(this.globalMethods.map(m => `global method : ${m.serializeSignature()}`).join('\n'))
-
-        /*this.typeMap.typeMap.forEach((type, k) => {
-            let files = (k.getSymbol() && k.getSymbol().declarations) ? k.getSymbol().declarations.map(d => d.getSourceFile().fileName + ':' + d.getFullStart()).join() : ''
-            let fqn = k.getSymbol() ? this.program.getTypeChecker().getFullyQualifiedName(k.getSymbol()) : ''
-
-            console.log()
-            console.log()
-            console.log(`ts type ${k['id']} ${k.flags} ${fqn} ${files} : ${this.getTypeName(k)}`)
-
-            type.dump()
-        })*/
     }
 
     private registerVariableStatement(statement: ts.VariableStatement) {
@@ -205,9 +112,8 @@ export class GatherPhase {
                     if (constructorSignature.getReturnType()) {
                         let preJava = this.typeMap.getOrCreatePreJavaTypeForTsType(constructorSignature.getReturnType(), null)
                         if (preJava instanceof TypeMap.PreJavaTypeClassOrInterface) {
-                            preJava.addPrototypeName(null, guessName(declaration.name));
-                            preJava.setSimpleName(guessName(declaration.name));
-                            //preJava.addConstructorSignature(this.convertSignature(null, constructorSignature))
+                            preJava.addPrototypeName(null, guessName(declaration.name))
+                            preJava.setSimpleName(guessName(declaration.name))
                         }
                     }
                 })
@@ -219,7 +125,7 @@ export class GatherPhase {
                 || (t.getProperties() && t.getProperties().some(p => p.name != 'prototype'))) {
                 let variableType = this.typeMap.getOrCreatePreJavaTypeForTsType(t, null)
 
-                this.variables.push({ type: variableType, name: guessName(declaration.name) });
+                this.globalVariables.push({ type: variableType, name: guessName(declaration.name) });
             }
         })
     }
@@ -237,10 +143,6 @@ export class GatherPhase {
             if (signature)
                 this.globalMethods.push(signature)
         }
-    }
-
-    private nameOfIdentifier(identifier: ts.Identifier): string {
-        return identifier.text
     }
 
     private processClassOrInterfaceDeclaration(preJavaType: TypeMap.PreJavaType & TypeMap.CompletablePreJavaType) {
@@ -273,7 +175,7 @@ export class GatherPhase {
                             let relative = path.relative(this.program.getCurrentDirectory(), sourceFile.fileName);
 
                             let jsNamespace = null
-                            let jsName = this.nameOfIdentifier(classDeclaration.name)
+                            let jsName = guessName(classDeclaration.name)
                             if (jsName) {
                                 for (let pathPrefix in this.javaPackages) {
                                     if (!path.relative(pathPrefix, relative).startsWith('..')) {
