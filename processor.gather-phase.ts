@@ -159,8 +159,11 @@ export class GatherPhase {
         this.typeMap.simplifyUnions()
         console.log(`change DTO interfaces into classes`)
         this.typeMap.changeDtoInterfacesIntoClasses()
-        console.log(`transforming types inheriting multiple implementations`)
-        this.typeMap.arrangeMultipleImplementationInheritance()
+        while (true) {
+            console.log(`transforming types inheriting multiple implementations`)
+            if (!this.typeMap.arrangeMultipleImplementationInheritance())
+                break
+        }
         console.log(`develop union types in methods parameters into overrides`)
         this.typeMap.developMethodOverridesForUnionParameters()
         console.log(`removing invalid method duplicates (same type erasure overrides and so on...)`)
@@ -331,10 +334,13 @@ export class GatherPhase {
                 })
             }
 
-            let properties = type.getProperties()
-            if (classOrInterface && properties) {
+            let properties = (type as ts.InterfaceTypeWithDeclaredMembers).declaredProperties// type.getProperties()
+            if (classOrInterface && properties && properties.length) {
                 properties.forEach(property => {
                     let propertyName = property.getName()
+
+                    if (propertyName == 'mygod')
+                        console.log()
 
                     if (!property.valueDeclaration)
                         return

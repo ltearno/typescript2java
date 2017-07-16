@@ -334,6 +334,47 @@ export class PreJavaTypeFakeType extends PreJavaTypeBuiltinJavaType {
     }
 }
 
+export class PreJavaTypeTuple extends PreJavaType {
+    packageName: string
+    name: string
+
+    private processed = false
+
+    constructor(name: string) {
+        super()
+        this.name = name
+    }
+
+    dump() {
+        console.log(`tuple ${this.getParametrizedSimpleName()}`)
+    }
+
+    getParametrization(): string { return '' }
+
+    setSimpleName(name: string) {
+        if (!this.name)
+            this.name = name
+    }
+
+    getSimpleName(): string { return this.name }
+
+    getPackageName(): string { return this.packageName }
+
+    setPackageName(name: string) {
+        if (!this.packageName)
+            this.packageName = name
+    }
+
+    isClassLike() { return true }
+
+    isCompletablePreJavaType() { return this }
+
+    isProcessed() { return this.processed }
+    setProcessed() { this.processed = true }
+
+    substituteTypeReal(replacer: TypeReplacer, cache: Map<PreJavaType, PreJavaType>): PreJavaType { return replacer(this) }
+}
+
 export class PreJavaTypeUnion extends PreJavaType implements CompletablePreJavaType {
     packageName: string
     types: PreJavaType[]
@@ -640,7 +681,7 @@ const FAKE_TYPE_ESSYMBOL = new PreJavaTypeFakeType('gwt.ext', 'FakeEsSymbol')
 const FAKE_TYPE_INDEXEDACCESS = new PreJavaTypeFakeType('gwt.ext', 'FakeIndexedAccess')
 
 export class TsToPreJavaTypemap {
-    typeMap = new Map<ts.Type, PreJavaType>()
+    typeMap = new Map<any, PreJavaType>()
 
     ensureAllTypesHaveName(currentIdAnonymousTypes: number, defaultPackageName: string) {
         for (let type of this.typeMap.values()) {
@@ -736,7 +777,8 @@ export class TsToPreJavaTypemap {
         console.log(`${nb} DTO types converted to classes`)
     }
 
-    arrangeMultipleImplementationInheritance() {
+    arrangeMultipleImplementationInheritance(): boolean {
+        let somethingDone = false
         for (let type of this.typeMap.values()) {
             if (type instanceof PreJavaTypeClassOrInterface && type.baseTypes && type.baseTypes.size > 1) {
                 let implementationSuperTypes: PreJavaTypeClassOrInterface[] = []
@@ -745,12 +787,14 @@ export class TsToPreJavaTypemap {
                         implementationSuperTypes.push(superType)
                     }
                 }
-                if (implementationSuperTypes.length < 2)
+                if ((type.isClassLike() && implementationSuperTypes.length <= 1) || (!type.isClassLike() && implementationSuperTypes.length == 0))
                     continue
 
-                let nbConstructors = type.constructorSignatures && type.constructorSignatures.length
+                somethingDone = true
 
-                console.log(`MULTIPLE TYPE ${type.getParametrizedFullyQualifiedName()} with ${nbConstructors} constructors`)
+                console.log(`arrange from ${type.getSimpleName()} with ${implementationSuperTypes.length} super implementations`)
+
+                let nbConstructors = type.constructorSignatures && type.constructorSignatures.length
 
                 for (let superType of implementationSuperTypes) {
                     // super_type doit maintenant être une interface => on le transforme comme ca tout le monde pointe vers l'interface
@@ -779,6 +823,8 @@ export class TsToPreJavaTypemap {
                 }
             }
         }
+
+        return somethingDone
     }
 
     developMethodOverridesForUnionParameters() {
@@ -828,29 +874,40 @@ export class TsToPreJavaTypemap {
         if (tsType.flags & ts.TypeFlags.Never)
             return BUILTIN_TYPE_VOID
 
-        if (tsType.flags & ts.TypeFlags.StringLike)
-            return BUILTIN_TYPE_STRING
-
         if (tsType.flags & ts.TypeFlags.ESSymbol)
             return FAKE_TYPE_ESSYMBOL
 
         if (tsType.flags & ts.TypeFlags.IndexedAccess)
             return FAKE_TYPE_INDEXEDACCESS
 
+        if (tsType.flags & ts.TypeFlags.Intersection)
+            return FAKE_TYPE_INTERSECTION
+
         if (tsType.flags & ts.TypeFlags.TypeParameter) {
             let symbol = (tsType as ts.TypeParameter).getSymbol()
             return new PreJavaTypeParameter(symbol ? symbol.getName() : '?', this.getOrCreatePreJavaTypeForTsType((tsType as ts.TypeParameter).constraint, typeParametersToApplyToAnonymousTypes))
         }
 
-        if ((tsType.flags & ts.TypeFlags.Object) && ((tsType as ts.ObjectType).objectFlags & ts.ObjectFlags.Reference)) {
+        let objectType = (tsType.flags & ts.TypeFlags.Object) && tsType as ts.ObjectType
+
+        if (objectType && objectType.objectFlags & ts.ObjectFlags.Reference) {
             let reference = tsType as ts.TypeReference
             if (reference.target != tsType) {
                 return new PreJavaTypeReference(this.getOrCreatePreJavaTypeForTsType(reference.target, typeParametersToApplyToAnonymousTypes), reference.typeArguments ? reference.typeArguments.map(typeArgument => this.getOrCreatePreJavaTypeForTsType(typeArgument, typeParametersToApplyToAnonymousTypes)) : null)
             }
         }
 
-        if (this.typeMap.has(tsType))
-            return this.typeMap.get(tsType)
+        if (tsType.flags & ts.TypeFlags.StringLike)
+            return BUILTIN_TYPE_STRING
+
+        let typeKey: any = tsType
+        if (objectType && objectType.objectFlags & ts.ObjectFlags.Tuple)
+            typeKey = 'tuple-' + tsType['id']
+        else if (objectType && objectType.objectFlags & ts.ObjectFlags.Anonymous)
+            typeKey = tsType['id'] + ((typeParametersToApplyToAnonymousTypes && typeParametersToApplyToAnonymousTypes.length) ? (typeParametersToApplyToAnonymousTypes.map(tp => '-' + tp.name)) : (''))
+
+        if (this.typeMap.has(typeKey))
+            return this.typeMap.get(typeKey)
 
         if (tsType.flags & ts.TypeFlags.Union) {
             let unionType = tsType as ts.UnionType
@@ -858,28 +915,32 @@ export class TsToPreJavaTypemap {
             let res = new PreJavaTypeUnion(unionType.types.map(t => this.getOrCreatePreJavaTypeForTsType(t, typeParametersToApplyToAnonymousTypes)))
             // TODO res.typeParameters = typeParametersToApplyToAnonymousTypes.slice()
 
-            this.typeMap.set(tsType, res)
+            this.typeMap.set(typeKey, res)
 
             return res
         }
 
-        if (tsType.flags & ts.TypeFlags.Intersection) {
-            // TODO : implement that
-            return FAKE_TYPE_INTERSECTION
-        }
+        if (objectType) {
+            if (objectType.objectFlags & ts.ObjectFlags.Tuple) {
+                let preJavaType = new PreJavaTypeTuple()
+                preJavaType.addSourceType(tsType)
 
-        if (tsType.flags & ts.TypeFlags.Object) {
-            let preJavaType = new PreJavaTypeClassOrInterface()
-            preJavaType.addSourceType(tsType)
+                this.typeMap.set(typeKey, preJavaType)
 
-            let objectType = tsType as ts.ObjectType
-            if (typeParametersToApplyToAnonymousTypes && typeParametersToApplyToAnonymousTypes.length && objectType.objectFlags & ts.ObjectFlags.Anonymous && (preJavaType.typeParameters == null)) {
-                preJavaType.typeParameters = typeParametersToApplyToAnonymousTypes ? typeParametersToApplyToAnonymousTypes.slice() : null
+                return preJavaType
             }
+            else {
+                let preJavaType = new PreJavaTypeClassOrInterface()
+                preJavaType.addSourceType(tsType)
 
-            this.typeMap.set(tsType, preJavaType)
+                if (typeParametersToApplyToAnonymousTypes && typeParametersToApplyToAnonymousTypes.length && objectType.objectFlags & ts.ObjectFlags.Anonymous && (preJavaType.typeParameters == null)) {
+                    preJavaType.typeParameters = typeParametersToApplyToAnonymousTypes ? typeParametersToApplyToAnonymousTypes.slice() : null
+                }
 
-            return preJavaType
+                this.typeMap.set(typeKey, preJavaType)
+
+                return preJavaType
+            }
         }
 
         if (tsType.flags & ts.TypeFlags.Enum) {
@@ -915,7 +976,7 @@ export class TsToPreJavaTypemap {
                     }
                 }
 
-                this.typeMap.set(tsType, preJavaEnum)
+                this.typeMap.set(typeKey, preJavaEnum)
             }
         }
 

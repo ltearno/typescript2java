@@ -1,7 +1,7 @@
-export interface Test {
-    toto: TTTTT<string>
+export interface A<T> {
+    value: T
 }
 
 export interface TTTTT<T> {
-    mapMyTTT<U>(callbackfn: (value: T, index: number, array: T[]) => U, thisArg?: any): { (value: T, index: number, array: T[]): U };
+    mygod(): A<[number, T]>;
 }
