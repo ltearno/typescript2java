@@ -5,8 +5,15 @@ import * as TypeMap from './type-map'
 import * as GatherPhase from './processor.gather-phase'
 import { mkdirRec } from './tools';
 
-function hasImplementationInHierarchy(type: TypeMap.PreJavaType) {
-    if (type instanceof TypeMap.PreJavaTypeClassOrInterface) {
+import { PreJavaType } from './prejavatypes/PreJavaType'
+import { PreJavaTypeClassOrInterface } from './prejavatypes/PreJavaTypeClassOrInterface'
+import { PreJavaTypeBuiltinJavaType } from './prejavatypes/PreJavaTypeBuiltinJavaType'
+import { PreJavaTypeEnum } from './prejavatypes/PreJavaTypeEnum'
+import { PreJavaTypeUnion } from './prejavatypes/PreJavaTypeUnion'
+import { PreJavaTypeParameter } from './prejavatypes/PreJavaTypeParameter'
+
+function hasImplementationInHierarchy(type: PreJavaType) {
+    if (type instanceof PreJavaTypeClassOrInterface) {
         if (type.prototypeNames && type.prototypeNames.size)
             return true
         if (type.baseTypes) {
@@ -25,7 +32,7 @@ export class ExportPhase {
 
     constructor(public gatherPhase: GatherPhase.GatherPhase) { }
 
-    exportJavaUnit(type: TypeMap.PreJavaType, javaWriter: JavaWriter, flow: TextFlow, baseDirectory: string) {
+    exportJavaUnit(type: PreJavaType, javaWriter: JavaWriter, flow: TextFlow, baseDirectory: string) {
         let content = ''
         content += `package ${type.getPackageName()};\n`
         content += '\n'
@@ -81,15 +88,15 @@ export class ExportPhase {
         return this.escapePropertyName(symbolName)
     }
 
-    JS_TYPE = new TypeMap.PreJavaTypeBuiltinJavaType('jsinterop.annotations', 'JsType')
-    JS_OVERLAY = new TypeMap.PreJavaTypeBuiltinJavaType('jsinterop.annotations', 'JsOverlay')
-    JS_PROPERTY = new TypeMap.PreJavaTypeBuiltinJavaType('jsinterop.annotations', 'JsProperty')
-    JS_PACKAGE = new TypeMap.PreJavaTypeBuiltinJavaType('jsinterop.annotations', 'JsPackage')
-    JS_METHOD = new TypeMap.PreJavaTypeBuiltinJavaType('jsinterop.annotations', 'JsMethod')
+    JS_TYPE = new PreJavaTypeBuiltinJavaType('jsinterop.annotations', 'JsType')
+    JS_OVERLAY = new PreJavaTypeBuiltinJavaType('jsinterop.annotations', 'JsOverlay')
+    JS_PROPERTY = new PreJavaTypeBuiltinJavaType('jsinterop.annotations', 'JsProperty')
+    JS_PACKAGE = new PreJavaTypeBuiltinJavaType('jsinterop.annotations', 'JsPackage')
+    JS_METHOD = new PreJavaTypeBuiltinJavaType('jsinterop.annotations', 'JsMethod')
 
     exportNodes(program: ts.Program, baseDirectory: string) {
         for (let type of this.gatherPhase.typeMap.typeMap.values()) {
-            if (type instanceof TypeMap.PreJavaTypeUnion) {
+            if (type instanceof PreJavaTypeUnion) {
                 let javaWriter = new JavaWriter(type.getPackageName())
                 let flow = new TextFlow()
 
@@ -123,7 +130,7 @@ export class ExportPhase {
 
                 this.exportJavaUnit(type, javaWriter, flow, baseDirectory)
             }
-            else if (type instanceof TypeMap.PreJavaTypeEnum) {
+            else if (type instanceof PreJavaTypeEnum) {
                 let javaWriter = new JavaWriter(type.getPackageName())
                 let flow = new TextFlow()
 
@@ -139,7 +146,7 @@ export class ExportPhase {
 
                 this.exportJavaUnit(type, javaWriter, flow, baseDirectory)
             }
-            else if (type instanceof TypeMap.PreJavaTypeClassOrInterface) {
+            else if (type instanceof PreJavaTypeClassOrInterface) {
                 let javaWriter = new JavaWriter(type.getPackageName())
                 let flow = new TextFlow()
 
@@ -187,8 +194,8 @@ export class ExportPhase {
                 if (type.typeParameters && type.typeParameters.length)
                     flow.push(`<${type.typeParameters.map(tp => javaWriter.importType(tp)).join(', ')}>`)
                 if (type.baseTypes) {
-                    let extendsTypes: TypeMap.PreJavaType[] = []
-                    let implementsTypes: TypeMap.PreJavaType[] = []
+                    let extendsTypes: PreJavaType[] = []
+                    let implementsTypes: PreJavaType[] = []
 
                     for (let baseType of type.baseTypes.values()) {
                         if ((isClass && baseType.isClassLike() || !isClass))
@@ -448,15 +455,15 @@ class TextFlow {
 }
 
 class JavaWriter {
-    imports: Map<TypeMap.PreJavaType, string> = new Map()
+    imports: Map<PreJavaType, string> = new Map()
 
     constructor(public unitPackageName: string) { }
 
-    importType(type: TypeMap.PreJavaType): string {
+    importType(type: PreJavaType): string {
         if (type.getPackageName() == null || type.getPackageName() == this.unitPackageName || type.getPackageName() == 'java.lang')
             return type.getSimpleName()
 
-        if (type instanceof TypeMap.PreJavaTypeParameter)
+        if (type instanceof PreJavaTypeParameter)
             return type.getSimpleName()
 
         if (this.imports.has(type))
@@ -475,7 +482,7 @@ class JavaWriter {
         return name
     }
 
-    importTypeParametrized(type: TypeMap.PreJavaType): string {
+    importTypeParametrized(type: PreJavaType): string {
         let res = this.importType(type)
         return res + type.getParametrization()
     }

@@ -3,6 +3,11 @@ import * as path from "path";
 import { Identifier } from "typescript";
 import { type } from "os";
 import * as TypeMap from './type-map'
+import { TsToPreJavaTypemap } from './type-map'
+
+import { PreJavaType, CompletablePreJavaType, ProcessContext } from './prejavatypes/PreJavaType'
+import { PreJavaTypeClassOrInterface } from './prejavatypes/PreJavaTypeClassOrInterface'
+import { PreJavaTypeCallSignature } from './prejavatypes/PreJavaTypeCallSignature'
 
 function guessName(identifier: ts.Identifier | ts.BindingPattern): string {
     if (identifier.kind == ts.SyntaxKind.Identifier)
@@ -11,14 +16,14 @@ function guessName(identifier: ts.Identifier | ts.BindingPattern): string {
 }
 
 export class GatherPhase {
-    typeMap: TypeMap.TsToPreJavaTypemap
+    typeMap: TsToPreJavaTypemap
 
     globalVariables: {
-        type: TypeMap.PreJavaType;
+        type: PreJavaType;
         name: string;
     }[] = [];
 
-    globalMethods: TypeMap.PreJavaTypeCallSignature[] = []
+    globalMethods: PreJavaTypeCallSignature[] = []
 
     private currentIdAnonymousTypes = 1
 
@@ -27,7 +32,7 @@ export class GatherPhase {
     constructor(private baseJavaPackage: string,
         private javaPackages: { [key: string]: string },
         private program: ts.Program) {
-        this.typeMap = new TypeMap.TsToPreJavaTypemap(program)
+        this.typeMap = new TsToPreJavaTypemap(program)
     }
 
     addTypesFromSourceFile(sourceFile: ts.SourceFile, onlyExportedSymbols: boolean) {
@@ -112,7 +117,7 @@ export class GatherPhase {
                 cs.forEach(constructorSignature => {
                     if (constructorSignature.getReturnType()) {
                         let preJava = this.typeMap.getOrCreatePreJavaTypeForTsType(constructorSignature.getReturnType())
-                        if (preJava instanceof TypeMap.PreJavaTypeClassOrInterface) {
+                        if (preJava instanceof PreJavaTypeClassOrInterface) {
                             preJava.addPrototypeName(null, guessName(declaration.name))
                             preJava.setSimpleName(guessName(declaration.name))
                         }
@@ -146,7 +151,7 @@ export class GatherPhase {
         }
     }
 
-    processContext: TypeMap.ProcessContext = {
+    processContext: ProcessContext = {
         createAnonymousTypeName: () => `AnonymousType${this.currentIdAnonymousTypes++}`,
 
         getJavaPackage: (sourceFile: ts.SourceFile) => {
@@ -164,7 +169,7 @@ export class GatherPhase {
         getTypeMap: () => this.typeMap
     }
 
-    private processClassOrInterfaceDeclaration(preJavaType: TypeMap.PreJavaType & TypeMap.CompletablePreJavaType) {
+    private processClassOrInterfaceDeclaration(preJavaType: PreJavaType & CompletablePreJavaType) {
         if (preJavaType.isProcessed())
             return
 

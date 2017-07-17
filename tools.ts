@@ -4,7 +4,7 @@ import * as fs from "fs";
 
 export function mkdirRec(p, opts = undefined, made = null) {
     if (!opts || typeof opts !== 'object') {
-        opts = {mode: opts};
+        opts = { mode: opts };
     }
 
     var mode = opts.mode;
@@ -23,7 +23,7 @@ export function mkdirRec(p, opts = undefined, made = null) {
     }
     catch (err0) {
         switch (err0.code) {
-            case 'ENOENT' :
+            case 'ENOENT':
                 made = mkdirRec(path.dirname(p), opts, made);
                 mkdirRec(p, opts, made);
                 break;
@@ -45,8 +45,13 @@ export function mkdirRec(p, opts = undefined, made = null) {
     }
 
     return made;
-};
+}
 
+export function guessName(identifier: ts.Identifier | ts.BindingPattern): string {
+    if (identifier.kind == ts.SyntaxKind.Identifier)
+        return identifier.text
+    return "[UNKNOWN]"
+}
 
 export function debugNode(node: ts.Node, space: string, rec: boolean = true) {
     let text = '(unk name)'
