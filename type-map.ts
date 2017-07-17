@@ -1,5 +1,11 @@
 import * as ts from "typescript";
 
+function guessName(identifier: ts.Identifier | ts.BindingPattern): string {
+    if (identifier.kind == ts.SyntaxKind.Identifier)
+        return identifier.text;
+    return "[UNKNOWN]";
+}
+
 export interface PreJavaTypeFormalParameter {
     name: string
     type: PreJavaType
@@ -96,9 +102,17 @@ export interface PreJavaTypeProperty {
     comments?: string[]
 }
 
+export interface ProcessContext {
+    createAnonymousTypeName(): string
+    getJavaPackage(sourceFile: ts.SourceFile): string
+    getProgram: () => ts.Program
+    getTypeMap: () => TsToPreJavaTypemap
+}
+
 export interface CompletablePreJavaType {
     isProcessed(): boolean
-    setProcessed()
+
+    processSourceTypes(context: ProcessContext)
 }
 
 export type TypeReplacer = { (type: PreJavaType): PreJavaType }
@@ -160,11 +174,9 @@ export abstract class PreJavaType {
     }
 }
 
-export class PreJavaTypeReference extends PreJavaType implements CompletablePreJavaType {
+export class PreJavaTypeReference extends PreJavaType {
     type: PreJavaType
     typeParameters: PreJavaType[]
-
-    private processed = false
 
     constructor(type: PreJavaType, typeParameters: PreJavaType[]) {
         super()
@@ -190,10 +202,7 @@ export class PreJavaTypeReference extends PreJavaType implements CompletablePreJ
 
     isClassLike() { return this.type.isClassLike() }
 
-    isCompletablePreJavaType() { return this }
-
-    isProcessed() { return this.processed }
-    setProcessed() { this.processed = true }
+    isCompletablePreJavaType() { return null }
 
     substituteTypeReal(replacer: TypeReplacer, cache: Map<PreJavaType, PreJavaType>, passThroughTypes: Set<PreJavaType>): PreJavaType {
         let stay = replacer(this)
@@ -211,15 +220,13 @@ export class PreJavaTypeReference extends PreJavaType implements CompletablePreJ
     }
 }
 
-export class PreJavaTypeEnum extends PreJavaType implements CompletablePreJavaType {
+export class PreJavaTypeEnum extends PreJavaType {
     packageName: string
     name: string
     members: {
         name: string
         value: number
     }[] = []
-
-    private processed = false
 
     constructor(name: string) {
         super()
@@ -250,10 +257,7 @@ export class PreJavaTypeEnum extends PreJavaType implements CompletablePreJavaTy
 
     isClassLike() { return true }
 
-    isCompletablePreJavaType() { return this }
-
-    isProcessed() { return this.processed }
-    setProcessed() { this.processed = true }
+    isCompletablePreJavaType() { return null }
 
     substituteTypeReal(replacer: TypeReplacer, cache: Map<PreJavaType, PreJavaType>): PreJavaType { return replacer(this) }
 }
@@ -338,8 +342,6 @@ export class PreJavaTypeTuple extends PreJavaType {
     packageName: string
     name: string
 
-    private processed = false
-
     constructor(name: string) {
         super()
         this.name = name
@@ -367,19 +369,14 @@ export class PreJavaTypeTuple extends PreJavaType {
 
     isClassLike() { return true }
 
-    isCompletablePreJavaType() { return this }
-
-    isProcessed() { return this.processed }
-    setProcessed() { this.processed = true }
+    isCompletablePreJavaType() { return null }
 
     substituteTypeReal(replacer: TypeReplacer, cache: Map<PreJavaType, PreJavaType>): PreJavaType { return replacer(this) }
 }
 
-export class PreJavaTypeUnion extends PreJavaType implements CompletablePreJavaType {
+export class PreJavaTypeUnion extends PreJavaType {
     packageName: string
     types: PreJavaType[]
-
-    private processed = false
 
     constructor(types: PreJavaType[]) {
         super()
@@ -418,10 +415,7 @@ export class PreJavaTypeUnion extends PreJavaType implements CompletablePreJavaT
 
     isClassLike() { return false }
 
-    isCompletablePreJavaType() { return this }
-
-    isProcessed() { return this.processed }
-    setProcessed() { this.processed = true }
+    isCompletablePreJavaType() { return null }
 
     substituteTypeReal(replacer: TypeReplacer, cache: Map<PreJavaType, PreJavaType>, passThroughTypes: Set<PreJavaType>): PreJavaType {
         let stay = replacer(this)
@@ -479,6 +473,132 @@ export class PreJavaTypeClassOrInterface extends PreJavaType implements Completa
     shouldOutputClass: boolean
 
     isClassLike() { return this.shouldOutputClass || (this.prototypeNames && this.prototypeNames.size > 0) }
+
+    processSourceTypes(context: ProcessContext) {
+        // TODO
+        if (this.processed || !this.sourceTypes || !this.sourceTypes.size)
+            return
+
+        this.processed = true
+
+        for (let type of this.sourceTypes) {
+            let symbol = type.getSymbol()
+            if (symbol) {
+                if ((symbol.flags & ts.SymbolFlags.Class) || (symbol.flags & ts.SymbolFlags.Interface))
+                    this.setSimpleName(symbol.getName())
+                else if (symbol.flags & ts.SymbolFlags.TypeLiteral)
+                    this.setSimpleName(context.createAnonymousTypeName())
+
+                if (symbol.getDeclarations()) {
+                    symbol.getDeclarations()
+                        .filter(d => d.kind == ts.SyntaxKind.ClassDeclaration)
+                        .forEach((declaration: ts.ClassDeclaration) => {
+                            let jsNamespace = null
+                            let jsName = guessName(declaration.name)
+
+                            if (jsName) {
+                                jsNamespace = context.getJavaPackage(declaration.getSourceFile())
+                                this.addPrototypeName(jsNamespace, jsName)
+                            }
+
+                            if (jsNamespace)
+                                this.setPackageName(jsNamespace)
+                        })
+                }
+
+                if (symbol.valueDeclaration) {
+                    let constructorType = context.getProgram().getTypeChecker().getTypeOfSymbolAtLocation(symbol, symbol.valueDeclaration)
+                    let constructors = constructorType.getConstructSignatures()
+                    if (constructors) {
+                        constructors.forEach(constructorSignature => {
+                            let signature = context.getTypeMap().convertSignature(null, constructorSignature, this.typeParameters)
+                            this.addConstructorSignature(signature)
+                        })
+                    }
+                }
+
+                let comments = this.getCommentFromSymbol(symbol)
+                if (comments && comments.length > 0)
+                    this.addComments(comments)
+            }
+
+            if (type.flags & ts.TypeFlags.Object) {
+                let objectType = type as ts.ObjectType
+
+                if (objectType.objectFlags & ts.ObjectFlags.Class || objectType.objectFlags & ts.ObjectFlags.Interface) {
+                    let interfaceType = objectType as ts.InterfaceType
+                    if (interfaceType.typeParameters && interfaceType.typeParameters.length) {
+                        this.setTypeParameters(interfaceType.typeParameters.map(tp => (new PreJavaTypeParameter(tp.symbol.getName(), context.getTypeMap().getOrCreatePreJavaTypeForTsType(tp.constraint, null)))))
+                    }
+                }
+            }
+
+            let nit = type.getNumberIndexType()
+            if (nit) {
+                this.setNumberIndexType(context.getTypeMap().getOrCreatePreJavaTypeForTsType(nit, this.typeParameters))
+            }
+
+            let sit = type.getStringIndexType()
+            if (sit) {
+                this.setStringIndexType(context.getTypeMap().getOrCreatePreJavaTypeForTsType(sit, this.typeParameters))
+            }
+
+            let baseTypes = type.getBaseTypes()
+            if (baseTypes) {
+                baseTypes.forEach(baseType => {
+                    this.addBaseType(context.getTypeMap().getOrCreatePreJavaTypeForTsType(baseType, null /*no need*/))
+                })
+            }
+
+            let properties = (type as ts.InterfaceTypeWithDeclaredMembers).declaredProperties// type.getProperties()
+            if (properties && properties.length) {
+                properties.forEach(property => {
+                    let propertyName = property.getName()
+                    if (!property.valueDeclaration)
+                        return
+
+                    let comments = this.getCommentFromSymbol(property)
+
+                    let propertyType = context.getProgram().getTypeChecker().getTypeAtLocation(property.valueDeclaration)
+
+                    // TODO : generating property accessors for callable types should be configurable
+                    let callSignatures = propertyType.getCallSignatures()
+                    if (callSignatures && callSignatures.length && !(propertyName.startsWith('on'))) {
+                        for (let callSignature of callSignatures) {
+                            let method = context.getTypeMap().convertSignature(propertyName, callSignature, this.typeParameters)
+                            if (method) {
+                                method.addComments(comments)
+                                this.addMethod(method)
+                            }
+                        }
+                    }
+                    else {
+                        let propertyPreJavaType = context.getTypeMap().getOrCreatePreJavaTypeForTsType(propertyType, this.typeParameters)
+                        propertyPreJavaType.setSimpleName(`${propertyName.slice(0, 1).toUpperCase() + propertyName.slice(1)}Caller`)
+
+                        this.addProperty({
+                            name: propertyName,
+                            type: propertyPreJavaType,
+                            writable: true,
+                            comments
+                        })
+                    }
+                })
+            }
+
+            let callSignatures = type.getCallSignatures()
+            if (callSignatures && callSignatures.length) {
+                // TODO : Check that the method is alone so that it is a correct functional type
+                // TODO : check if it can be melted down with other similar types
+                // TODO : try to get a name for it from where it has been created (callback of a function, ...)
+                callSignatures.forEach(callSignature => {
+                    let signature = context.getTypeMap().convertSignature('execute', callSignature, this.typeParameters)
+                    if (signature)
+                        this.addMethod(signature)
+                })
+            }
+        }
+    }
 
     hasOnlyProperties() {
         if (this.baseTypes && this.baseTypes.size)
@@ -564,7 +684,6 @@ export class PreJavaTypeClassOrInterface extends PreJavaType implements Completa
     isCompletablePreJavaType() { return this }
 
     isProcessed() { return this.processed }
-    setProcessed() { this.processed = true }
 
     addComments(lines: string[]) {
         if (!this.comments)
@@ -667,6 +786,18 @@ export class PreJavaTypeClassOrInterface extends PreJavaType implements Completa
     setStringIndexType(type: PreJavaType) {
         this.stringIndexType = type
     }
+
+    private getCommentFromSymbol(symbol: ts.Symbol): string[] {
+        let comments = symbol && symbol.getDocumentationComment()
+        if (comments && comments.length > 0) {
+            let res = comments.map(c => c.text).filter(c => c != null && c.trim().length)
+            if (res.length == 0)
+                return null
+            return res
+        }
+
+        return null
+    }
 }
 
 const BUILTIN_TYPE_OBJECT = new PreJavaTypeBuiltinJavaType('java.lang', 'Object')
@@ -682,6 +813,8 @@ const FAKE_TYPE_INDEXEDACCESS = new PreJavaTypeFakeType('gwt.ext', 'FakeIndexedA
 
 export class TsToPreJavaTypemap {
     typeMap = new Map<any, PreJavaType>()
+
+    constructor(private program: ts.Program) { }
 
     ensureAllTypesHaveName(currentIdAnonymousTypes: number, defaultPackageName: string) {
         for (let type of this.typeMap.values()) {
@@ -847,7 +980,81 @@ export class TsToPreJavaTypemap {
         return res
     }
 
-    getOrCreatePreJavaTypeForTsType(tsType: ts.Type, typeParametersToApplyToAnonymousTypes: PreJavaTypeParameter[]): PreJavaType {
+    convertSignature(name: string, tsSignature: ts.Signature, typeParametersToApplyToAnonymousTypes: PreJavaTypeParameter[]): PreJavaTypeCallSignature {
+        if (('thisParameter' in tsSignature) && tsSignature['thisParameter'])
+            return null
+
+        let signatureTypeParameters = tsSignature.getTypeParameters() ? tsSignature.getTypeParameters().map(t => {
+            let res = this.getOrCreatePreJavaTypeForTsType(t, typeParametersToApplyToAnonymousTypes) as PreJavaTypeParameter
+            if (!(res instanceof PreJavaTypeParameter))
+                console.error(`BLABLABLA`)
+            return res
+        }) : null
+
+        if (name == 'sort')
+            console.log()
+
+        typeParametersToApplyToAnonymousTypes = (typeParametersToApplyToAnonymousTypes && typeParametersToApplyToAnonymousTypes.slice()) || []
+        if (signatureTypeParameters)
+            typeParametersToApplyToAnonymousTypes = typeParametersToApplyToAnonymousTypes.concat(signatureTypeParameters)
+
+        let returnType = this.getOrCreatePreJavaTypeForTsType(tsSignature.getReturnType(), typeParametersToApplyToAnonymousTypes)
+
+        return new PreJavaTypeCallSignature(
+            signatureTypeParameters,
+            returnType,
+            name,
+            tsSignature.getParameters() ? tsSignature.getParameters().map(p => {
+                let parameteryType = this.program.getTypeChecker().getTypeAtLocation(p.valueDeclaration)
+                let objectType = (parameteryType.flags & ts.TypeFlags.Object) && parameteryType as ts.ObjectType
+                let referenceType = objectType && (objectType.objectFlags & ts.ObjectFlags.Reference) && parameteryType as ts.TypeReference
+                let dotdotdot = false
+
+                let de = p.valueDeclaration as ts.ParameterDeclaration
+                if (de.dotDotDotToken) {
+                    if (referenceType && referenceType.typeArguments && referenceType.typeArguments.length == 1) {
+                        parameteryType = referenceType.typeArguments[0]
+                        dotdotdot = true
+                    }
+                    else {
+                        console.error(`... token in parameters but expected type is not good`)
+                    }
+                }
+
+                let preJavaParameterType = this.getOrCreatePreJavaTypeForTsType(parameteryType, typeParametersToApplyToAnonymousTypes)
+
+                let result: PreJavaTypeFormalParameter = {
+                    name: p.name,
+                    type: preJavaParameterType,
+                    optional: (de.questionToken) != null || (de.initializer != null),
+                    dotdotdot
+                }
+
+                return result
+            }) : null
+        )
+    }
+
+    getOrCreatePreJavaTypeForTsType(tsType: ts.Type, typeParametersToApplyToAnonymousTypes: PreJavaTypeParameter[] = null): PreJavaType {
+        if (!tsType)
+            return null
+
+        let objectType = (tsType.flags & ts.TypeFlags.Object) && tsType as ts.ObjectType
+
+        let typeKey: any = tsType
+        if (objectType && objectType.objectFlags & ts.ObjectFlags.Tuple)
+            typeKey = 'tuple-' + tsType['id']
+        else if (objectType && objectType.objectFlags & ts.ObjectFlags.Anonymous)
+            typeKey = tsType['id'] + ((typeParametersToApplyToAnonymousTypes && typeParametersToApplyToAnonymousTypes.length) ? (typeParametersToApplyToAnonymousTypes.map(tp => '-' + tp.name)) : (''))
+
+        if (this.typeMap.has(typeKey))
+            return this.typeMap.get(typeKey)
+
+        let preJavaType = this.createPreJavaType(tsType, typeParametersToApplyToAnonymousTypes)
+        this.typeMap.set(typeKey, preJavaType)
+    }
+
+    private createPreJavaType(tsType: ts.Type, typeParametersToApplyToAnonymousTypes: PreJavaTypeParameter[]) {
         if (!tsType)
             return null
 
@@ -888,6 +1095,9 @@ export class TsToPreJavaTypemap {
             return new PreJavaTypeParameter(symbol ? symbol.getName() : '?', this.getOrCreatePreJavaTypeForTsType((tsType as ts.TypeParameter).constraint, typeParametersToApplyToAnonymousTypes))
         }
 
+        if (tsType.flags & ts.TypeFlags.StringLike)
+            return BUILTIN_TYPE_STRING
+
         let objectType = (tsType.flags & ts.TypeFlags.Object) && tsType as ts.ObjectType
 
         if (objectType && objectType.objectFlags & ts.ObjectFlags.Reference) {
@@ -897,47 +1107,29 @@ export class TsToPreJavaTypemap {
             }
         }
 
-        if (tsType.flags & ts.TypeFlags.StringLike)
-            return BUILTIN_TYPE_STRING
-
-        let typeKey: any = tsType
-        if (objectType && objectType.objectFlags & ts.ObjectFlags.Tuple)
-            typeKey = 'tuple-' + tsType['id']
-        else if (objectType && objectType.objectFlags & ts.ObjectFlags.Anonymous)
-            typeKey = tsType['id'] + ((typeParametersToApplyToAnonymousTypes && typeParametersToApplyToAnonymousTypes.length) ? (typeParametersToApplyToAnonymousTypes.map(tp => '-' + tp.name)) : (''))
-
-        if (this.typeMap.has(typeKey))
-            return this.typeMap.get(typeKey)
-
         if (tsType.flags & ts.TypeFlags.Union) {
             let unionType = tsType as ts.UnionType
 
             let res = new PreJavaTypeUnion(unionType.types.map(t => this.getOrCreatePreJavaTypeForTsType(t, typeParametersToApplyToAnonymousTypes)))
             // TODO res.typeParameters = typeParametersToApplyToAnonymousTypes.slice()
 
-            this.typeMap.set(typeKey, res)
-
             return res
         }
 
         if (objectType) {
-            if (objectType.objectFlags & ts.ObjectFlags.Tuple) {
+            /*if (objectType.objectFlags & ts.ObjectFlags.Tuple) {
                 let preJavaType = new PreJavaTypeTuple()
                 preJavaType.addSourceType(tsType)
 
-                this.typeMap.set(typeKey, preJavaType)
-
                 return preJavaType
             }
-            else {
+            else*/ {
                 let preJavaType = new PreJavaTypeClassOrInterface()
                 preJavaType.addSourceType(tsType)
 
                 if (typeParametersToApplyToAnonymousTypes && typeParametersToApplyToAnonymousTypes.length && objectType.objectFlags & ts.ObjectFlags.Anonymous && (preJavaType.typeParameters == null)) {
                     preJavaType.typeParameters = typeParametersToApplyToAnonymousTypes ? typeParametersToApplyToAnonymousTypes.slice() : null
                 }
-
-                this.typeMap.set(typeKey, preJavaType)
 
                 return preJavaType
             }
@@ -976,7 +1168,7 @@ export class TsToPreJavaTypemap {
                     }
                 }
 
-                this.typeMap.set(typeKey, preJavaEnum)
+                return preJavaEnum
             }
         }
 
