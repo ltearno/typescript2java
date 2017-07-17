@@ -13,20 +13,6 @@ import { PreJavaTypeUnion } from './prejavatypes/PreJavaTypeUnion'
 import { PreJavaTypeParameter } from './prejavatypes/PreJavaTypeParameter'
 import { PreJavaTypeTuple, TUPLE_TYPE_VARIABLE_NAMES } from './prejavatypes/PreJavaTypeTuple'
 
-function hasImplementationInHierarchy(type: PreJavaType) {
-    if (type instanceof PreJavaTypeClassOrInterface) {
-        if (type.prototypeNames && type.prototypeNames.size)
-            return true
-        if (type.baseTypes) {
-            for (let baseType of type.baseTypes.values())
-                if (hasImplementationInHierarchy(baseType))
-                    return true
-        }
-    }
-
-    return type.isClassLike()
-}
-
 export class ExportPhase {
     constructor(public gatherPhase: GatherPhase.GatherPhase) { }
 
@@ -120,7 +106,7 @@ export class ExportPhase {
                     flow.pullLineStart()
                     flow.push(`}`).finishLine()
 
-                    flow.push(`public static ${type.getParametrizedSimpleName()} of(${unionedType.getSimpleName()} value) {`).finishLine()
+                    flow.push(`public static ${type.getParametrization()} ${type.getParametrizedSimpleName()} of(${unionedType.getSimpleName()} value) {`).finishLine()
                     flow.pushLineStart('    ')
                     flow.push(`return Js.uncheckedCast( value );`).finishLine()
                     flow.pullLineStart()
@@ -217,7 +203,7 @@ export class ExportPhase {
                 }
                 flow.endJavaDocComments()
 
-                let isClass = hasImplementationInHierarchy(type)
+                let isClass = type.isClassLike()
 
                 let prototypeName = null
                 let prototypeNamespace = null
@@ -247,7 +233,7 @@ export class ExportPhase {
                     let implementsTypes: PreJavaType[] = []
 
                     for (let baseType of type.baseTypes.values()) {
-                        if ((isClass && baseType.isClassLike() || !isClass))
+                        if (!isClass || baseType.isClassLike())
                             extendsTypes.push(baseType)
                         else
                             implementsTypes.push(baseType)
@@ -304,7 +290,7 @@ export class ExportPhase {
                     flow.push(`@JsOverlay`).finishLine()
                     flow.push(`${isClass ? 'public' : 'default'} ${javaWriter.importTypeParametrized(nit)} getByIndex(int index) {`).finishLine()
                     flow.pushLineStart('    ')
-                    flow.push(`return Js.asArrayLike(this).getAt(index);`).finishLine()
+                    flow.push(`return (${javaWriter.importTypeParametrized(nit)}) Js.asArrayLike(this).getAt(index);`).finishLine()
                     flow.pullLineStart()
                     flow.push(`}`).finishLine()
                 }
@@ -326,7 +312,7 @@ export class ExportPhase {
                     flow.push(`@JsOverlay`).finishLine()
                     flow.push(`public ${javaWriter.importTypeParametrized(sit)} getByIndex(String index) {`).finishLine()
                     flow.pushLineStart('    ')
-                    flow.push(`return Js.asPropertyMap(this).get(index);`).finishLine()
+                    flow.push(`return (${javaWriter.importTypeParametrized(sit)}) Js.asPropertyMap(this).get(index);`).finishLine()
                     flow.pullLineStart()
                     flow.push(`}`).finishLine()
                 }

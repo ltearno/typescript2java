@@ -38,6 +38,10 @@ export class PreJavaTypeTuple extends PreJavaType {
 
     isClassLike() { return true }
 
+    getHierachyDepth() {
+        return 1
+    }
+
     isCompletablePreJavaType() { return null }
 
     substituteTypeReal(replacer: TypeReplacer, cache: Map<PreJavaType, PreJavaType>): PreJavaType { return replacer(this) }

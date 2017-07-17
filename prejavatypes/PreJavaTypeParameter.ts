@@ -19,6 +19,10 @@ export class PreJavaTypeParameter extends PreJavaType {
             this.name = name
     }
 
+    getHierachyDepth() {
+        return 1
+    }
+
     getSimpleName(): string { return this.name }
 
     getPackageName(): string { return null }

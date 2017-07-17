@@ -14,6 +14,10 @@ export class PreJavaTypeEnum extends PreJavaType {
         this.name = name
     }
 
+    getHierachyDepth() {
+        return 1
+    }
+
     addSourceType(enumType: ts.EnumType) {
         let enumDeclaration = enumType.getSymbol().valueDeclaration as ts.EnumDeclaration
         if (enumDeclaration.members && enumDeclaration.members.length) {

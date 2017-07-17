@@ -28,4 +28,8 @@ export class PreJavaTypeBuiltinJavaType extends PreJavaType {
     isCompletablePreJavaType() { return null }
 
     substituteTypeReal(replacer: TypeReplacer, cache: Map<PreJavaType, PreJavaType>): PreJavaType { return replacer(this) }
+
+    getHierachyDepth() {
+        return 1
+    }
 }

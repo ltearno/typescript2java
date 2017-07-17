@@ -6,6 +6,7 @@ import { PreJavaTypeReference } from './PreJavaTypeReference'
 export class PreJavaTypeUnion extends PreJavaType {
     packageName: string
     types: PreJavaType[]
+    typeParameters: PreJavaType[]
 
     setTypes(types: PreJavaType[]) {
         this.types = []
@@ -21,9 +22,11 @@ export class PreJavaTypeUnion extends PreJavaType {
             this.types.forEach(t => console.log(`- ${t.getParametrizedSimpleName()}`))
     }
 
-
-    // TODO : ADD TYPE PARAMETERS IF ANY, BUT FOR NOW THE DATA DOES NOT EXISTS IN THE UNION PJT STRUCTURE
-    getParametrization(): string { return '' }
+    getParametrization(): string {
+        if (this.typeParameters && this.typeParameters.length)
+            return `<${this.typeParameters.map(tp => tp.getParametrizedSimpleName()).join(', ')}>`
+        return ''
+    }
 
     setSimpleName(name: string) { }
 
@@ -41,7 +44,7 @@ export class PreJavaTypeUnion extends PreJavaType {
             this.packageName = name
     }
 
-    isClassLike() { return false }
+    isClassLike() { return true }
 
     isCompletablePreJavaType() { return null }
 
@@ -54,6 +57,10 @@ export class PreJavaTypeUnion extends PreJavaType {
             this.types = this.types.map(t => t.substituteType(replacer, cache, passThroughTypes)).filter(t => t != null)
 
         return this
+    }
+
+    getHierachyDepth() {
+        return 1
     }
 
     private transformTypeName(type: PreJavaType): string {

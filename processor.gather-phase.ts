@@ -81,6 +81,9 @@ export class GatherPhase {
         console.log(`simplify unions`)
         this.typeMap.simplifyUnions()
 
+        console.log(`remove duplicate overloads (with same type erasure)`)
+        this.typeMap.removeDuplicateOverloads()
+
         console.log(`change DTO interfaces into classes`)
         this.typeMap.changeDtoInterfacesIntoClasses()
 
@@ -90,12 +93,13 @@ export class GatherPhase {
                 break
         }
 
-        console.log(`develop union types in methods parameters into overrides`)
-        this.typeMap.developMethodOverridesForUnionParameters()
-
+        console.log(`(todo) develop union types in methods parameters into overrides`)
         console.log(`(todo) removing invalid method duplicates (same type erasure overrides and so on...)`)
         console.log(`(todo) merge types with same name and same structure`)
         console.log(`(todo) Array should be replaced by an externally provided type`)
+
+        console.log(`(todo) add methods from hierarchy`)
+        console.log(`(todo) remove duplicate methods in hierarchy`)
 
         console.log(`statistics:`)
         console.log(`${this.globalVariables.length} global variables`)

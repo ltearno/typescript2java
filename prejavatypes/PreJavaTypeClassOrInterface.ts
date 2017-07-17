@@ -31,24 +31,37 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
 
     comments: string[]
 
-    /** sometimes interfaces are better presented as classes so that DTO instantiation is easier in Java */
-    shouldOutputClass: boolean
+    isClass: boolean
 
-    isClassLike() { return this.shouldOutputClass || (this.prototypeNames && this.prototypeNames.size > 0) }
+    isClassLike() { return this.isClass }
 
     addSourceType(type: ts.ObjectType, typeParametersToApplyToAnonymousTypes: PreJavaTypeParameter[], context: ProcessContext) {
         if (!this.sourceTypes)
             this.sourceTypes = new Set()
         this.sourceTypes.add(type)
 
-        this.processSourceType(type, context)
-
-        if (typeParametersToApplyToAnonymousTypes && typeParametersToApplyToAnonymousTypes.length && type.objectFlags & ts.ObjectFlags.Anonymous && (this.typeParameters == null)) {
-            this.typeParameters = typeParametersToApplyToAnonymousTypes ? typeParametersToApplyToAnonymousTypes.slice() : null
-        }
+        this.processSourceType(type, typeParametersToApplyToAnonymousTypes, context)
     }
 
-    private processSourceType(type: ts.Type, context: ProcessContext) {
+    getHierachyDepth() {
+        let level = 1
+        if (this.baseTypes) {
+            this.baseTypes.forEach(baseType => {
+                let maybeLevel = 1 + baseType.getHierachyDepth()
+                if (maybeLevel > level)
+                    level = maybeLevel
+            })
+        }
+        return level
+    }
+
+    removeMethod(method: PreJavaTypeCallSignature) {
+        let index = this.methods.indexOf(method)
+        console.log(`remove method ${method.name} in type ${this.getSimpleName()}`)
+        method && this.methods && this.methods.splice(index, 1)
+    }
+
+    private processSourceType(type: ts.Type, typeParametersToApplyToAnonymousTypes: PreJavaTypeParameter[], context: ProcessContext) {
         if (!type)
             return
 
@@ -95,28 +108,32 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
         if (type.flags & ts.TypeFlags.Object) {
             let objectType = type as ts.ObjectType
 
-            if (objectType.objectFlags & ts.ObjectFlags.Class || objectType.objectFlags & ts.ObjectFlags.Interface) {
+            if (objectType.objectFlags & ts.ObjectFlags.Anonymous) {
+                this.setTypeParameters((typeParametersToApplyToAnonymousTypes && typeParametersToApplyToAnonymousTypes.length) ? typeParametersToApplyToAnonymousTypes.slice() : null)
+            }
+            else if (objectType.objectFlags & ts.ObjectFlags.Class || objectType.objectFlags & ts.ObjectFlags.Interface) {
                 let interfaceType = objectType as ts.InterfaceType
+
                 if (interfaceType.typeParameters && interfaceType.typeParameters.length) {
-                    this.setTypeParameters(interfaceType.typeParameters.map(tp => (new PreJavaTypeParameter(tp.symbol.getName(), context.getTypeMap().getOrCreatePreJavaTypeForTsType(tp.constraint, null)))))
+                    this.setTypeParameters(interfaceType.typeParameters.map(tp => (new PreJavaTypeParameter(tp.symbol.getName(), context.getTypeMap().getOrCreatePreJavaTypeForTsType(tp.constraint, false, null)))))
                 }
             }
         }
 
         let nit = type.getNumberIndexType()
         if (nit) {
-            this.setNumberIndexType(context.getTypeMap().getOrCreatePreJavaTypeForTsType(nit, this.typeParameters))
+            this.setNumberIndexType(context.getTypeMap().getOrCreatePreJavaTypeForTsType(nit, false, this.typeParameters))
         }
 
         let sit = type.getStringIndexType()
         if (sit) {
-            this.setStringIndexType(context.getTypeMap().getOrCreatePreJavaTypeForTsType(sit, this.typeParameters))
+            this.setStringIndexType(context.getTypeMap().getOrCreatePreJavaTypeForTsType(sit, false, this.typeParameters))
         }
 
         let baseTypes = type.getBaseTypes()
         if (baseTypes) {
             baseTypes.forEach(baseType => {
-                this.addBaseType(context.getTypeMap().getOrCreatePreJavaTypeForTsType(baseType, null /*no need*/))
+                this.addBaseType(context.getTypeMap().getOrCreatePreJavaTypeForTsType(baseType, false, null /*no need*/))
             })
         }
 
@@ -143,7 +160,7 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
                     }
                 }
                 else {
-                    let propertyPreJavaType = context.getTypeMap().getOrCreatePreJavaTypeForTsType(propertyType, this.typeParameters)
+                    let propertyPreJavaType = context.getTypeMap().getOrCreatePreJavaTypeForTsType(propertyType, false, this.typeParameters)
                     if (propertyPreJavaType instanceof PreJavaTypeClassOrInterface)
                         propertyPreJavaType.setSimpleName(`${propertyName.slice(0, 1).toUpperCase() + propertyName.slice(1)}Caller`)
 
@@ -320,6 +337,8 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
             console.log(`MULTIPLE PROTOTYPES when adding ${name}`)
             this.prototypeNames.forEach(p => console.log(`- ${p}`))
         }
+
+        this.isClass = true
 
         this.prototypeNames.add(name)
     }

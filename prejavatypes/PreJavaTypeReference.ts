@@ -25,6 +25,10 @@ export class PreJavaTypeReference extends PreJavaType {
 
     isCompletablePreJavaType() { return null }
 
+    getHierachyDepth() {
+        return this.type.getHierachyDepth()
+    }
+
     substituteTypeReal(replacer: TypeReplacer, cache: Map<PreJavaType, PreJavaType>, passThroughTypes: Set<PreJavaType>): PreJavaType {
         let stay = replacer(this)
         if (!stay || stay != this)

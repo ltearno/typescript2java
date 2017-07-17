@@ -11,6 +11,8 @@ export interface ProcessContext {
 export type TypeReplacer = { (type: PreJavaType): PreJavaType }
 
 export abstract class PreJavaType {
+    abstract getHierachyDepth(): number
+
     abstract getSimpleName(): string
 
     abstract getPackageName(): string
@@ -34,6 +36,8 @@ export abstract class PreJavaType {
         return `${this.getPackageName()}.${this.getParametrizedSimpleName()}`
     }
 
+    // means a class which extends it should print 'extends XXX'
+    // if not one would print 'implements XXX'
     abstract isClassLike(): boolean
 
     abstract dump()
