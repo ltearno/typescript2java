@@ -34,7 +34,7 @@ export class PreJavaTypeUnion extends PreJavaType {
         if ((!this.types) || this.types.length == 0)
             return 'EmptyUnion'
 
-        return this.transformTypeName(this).replace(new RegExp('\\?', 'g'), 'UNKOWNTYPE')
+        return this.getHumanizedName().replace(new RegExp('\\?', 'g'), 'UNKOWNTYPE')
     }
 
     getPackageName(): string { return this.packageName }
@@ -61,25 +61,5 @@ export class PreJavaTypeUnion extends PreJavaType {
 
     getHierachyDepth() {
         return 1
-    }
-
-    private transformTypeName(type: PreJavaType): string {
-        if (type instanceof PreJavaTypeClassOrInterface) {
-            let res = type.name
-            return res
-        }
-
-        if (type instanceof PreJavaTypeReference) {
-            let res = this.transformTypeName(type.type)
-            if (type.typeParameters && type.typeParameters.length)
-                res += `Of${type.typeParameters.map(t => this.transformTypeName(t)).join('And')}`
-            return res
-        }
-
-        if (type instanceof PreJavaTypeUnion) {
-            return `UnionOf${type.types.map(t => this.transformTypeName(t)).join('And')}`
-        }
-
-        return type.getSimpleName()
     }
 }

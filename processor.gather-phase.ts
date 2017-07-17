@@ -93,6 +93,9 @@ export class GatherPhase {
                 break
         }
 
+        console.log(`add missing methods from interface hierarchy in classes`)
+        this.typeMap.addMethodsFromInterfaceHierarchy()
+
         console.log(`(todo) develop union types in methods parameters into overrides`)
         console.log(`(todo) removing invalid method duplicates (same type erasure overrides and so on...)`)
         console.log(`(todo) merge types with same name and same structure`)

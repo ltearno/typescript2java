@@ -1,5 +1,6 @@
 import * as ts from "typescript"
 import { TsToPreJavaTypemap } from '../type-map'
+import { preJavaTypeVisit } from './PreJavaTypeVisit'
 
 export interface ProcessContext {
     createAnonymousTypeName(): string
@@ -34,6 +35,20 @@ export abstract class PreJavaType {
 
     getParametrizedFullyQualifiedName(): string {
         return `${this.getPackageName()}.${this.getParametrizedSimpleName()}`
+    }
+
+    getHumanizedName(): string {
+        let result = preJavaTypeVisit(this, {
+            onVisitReferenceType: type => {
+                let res = type.type.getHumanizedName()
+                if (type.typeParameters && type.typeParameters.length)
+                    res += `Of${type.typeParameters.map(t => t.getHumanizedName()).join('And')}`
+                return res
+            },
+            onVisitUnion: type => `UnionOf${type.types.map(t => t.getHumanizedName()).join('And')}`
+        })
+
+        return result || this.getSimpleName()
     }
 
     // means a class which extends it should print 'extends XXX'

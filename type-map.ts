@@ -2,6 +2,7 @@ import * as ts from "typescript"
 import * as path from "path";
 import { PreJavaType, TypeReplacer, ProcessContext } from './prejavatypes/PreJavaType'
 import { guessName } from './tools'
+import * as Visit from './prejavatypes/PreJavaTypeVisit'
 
 import { PreJavaTypeFakeType } from './prejavatypes/PreJavaTypeFakeType'
 import { PreJavaTypeBuiltinJavaType } from './prejavatypes/PreJavaTypeBuiltinJavaType'
@@ -120,6 +121,40 @@ export class TsToPreJavaTypemap {
         this.substituteType((type) => type instanceof PreJavaTypeFakeType ? null : type)
         this.substituteType((type) => type.getSimpleName() == '?' ? BUILTIN_TYPE_OBJECT : type)
         this.substituteType((type) => type.getSimpleName() == '' ? null : type)
+    }
+
+    // TODO : for classes  : add methods from interface hierarchy which are not in the method list
+    addMethodsFromInterfaceHierarchy() {
+        let recBrowseInterfaceHierarchy = (type: PreJavaType, visitor: { (visitedInterface: PreJavaTypeClassOrInterface) }) => {
+            Visit.preJavaTypeVisit(type, {
+                onVisitReferenceType: type => recBrowseInterfaceHierarchy(type.type, visitor),
+                onVisitClassOrInterfaceType: type => {
+                    if (!type.isClassLike())
+                        visitor(type)
+                    type.baseTypes && type.baseTypes.forEach(baseType => recBrowseInterfaceHierarchy(baseType, visitor))
+                }
+            })
+        }
+
+        for (let type of this.typeMap.values()) {
+            Visit.preJavaTypeVisit(type, {
+                onVisitClassOrInterfaceType: type => {
+                    if (type.isClassLike()) {
+                        recBrowseInterfaceHierarchy(type, visitedInterface => {
+                            visitedInterface.methods && visitedInterface.methods.forEach(visitedMethod => {
+                                if (!type.methods || !type.methods.some(m => m.name == visitedMethod.name))
+                                    type.addMethod(visitedMethod)
+                            })
+
+                            visitedInterface.properties && visitedInterface.properties.forEach(visitedProperty => {
+                                if (!type.properties || !type.properties.some(p => p.name == visitedProperty.name))
+                                    type.addProperty(visitedProperty)
+                            })
+                        })
+                    }
+                }
+            })
+        }
     }
 
     private groupBy<K, V>(items: V[], keySelector: { (value: V): K }) {
@@ -282,6 +317,21 @@ export class TsToPreJavaTypemap {
 
     convertSignature(name: string, tsSignature: ts.Signature, typeParametersToApplyToAnonymousTypes: PreJavaTypeParameter[]): PreJavaTypeCallSignature {
         if (('thisParameter' in tsSignature) && tsSignature['thisParameter'])
+            return null
+
+        let hasKeyOfInTypeParameters = tsSignature.getTypeParameters() && tsSignature.getTypeParameters().some(typeParameter => {
+            let symbol = typeParameter.getSymbol()
+            let declarations = symbol && symbol.declarations
+
+            return declarations && declarations.some(declaration => {
+                if (declaration.kind == ts.SyntaxKind.TypeParameter) {
+                    let constraint = declaration && (declaration as ts.TypeParameterDeclaration).constraint
+                    return constraint && constraint.kind == ts.SyntaxKind.TypeOperator && (constraint as ts.TypeOperatorNode).operator == ts.SyntaxKind.KeyOfKeyword
+                }
+            })
+        })
+
+        if (hasKeyOfInTypeParameters)
             return null
 
         let signatureTypeParameters = tsSignature.getTypeParameters() ? tsSignature.getTypeParameters().map(t => {

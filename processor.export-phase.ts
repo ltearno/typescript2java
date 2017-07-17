@@ -49,7 +49,9 @@ export class ExportPhase {
         'import': 'import_',
         'assert': 'assert_',
         'default': 'default_',
-        'continue': 'continue_'
+        'continue': 'continue_',
+
+        'className': 'clasName'
     }
 
     escapePropertyName(symbolName: string) {
@@ -100,13 +102,13 @@ export class ExportPhase {
                     javaWriter.importType(this.JS_OVERLAY)
 
                     flow.push(`@JsOverlay`).finishLine()
-                    flow.push(`public ${javaWriter.importTypeParametrized(unionedType)} as${unionedType.getSimpleName()}() {`).finishLine()
+                    flow.push(`public ${javaWriter.importTypeParametrized(unionedType)} as${unionedType.getHumanizedName()}() {`).finishLine()
                     flow.pushLineStart('    ')
                     flow.push(`return Js.uncheckedCast( this );`).finishLine()
                     flow.pullLineStart()
                     flow.push(`}`).finishLine()
 
-                    flow.push(`public static ${type.getParametrization()} ${type.getParametrizedSimpleName()} of(${unionedType.getSimpleName()} value) {`).finishLine()
+                    flow.push(`public static ${type.getParametrization()} ${type.getParametrizedSimpleName()} of${unionedType.getHumanizedName()}(${unionedType.getSimpleName()} value) {`).finishLine()
                     flow.pushLineStart('    ')
                     flow.push(`return Js.uncheckedCast( value );`).finishLine()
                     flow.pullLineStart()
@@ -345,12 +347,19 @@ export class ExportPhase {
 
                         let upcaseName = escapedPropertyName.slice(0, 1).toLocaleUpperCase() + escapedPropertyName.slice(1)
 
+                        let getterName = `get${upcaseName}`
+                        let setterName = `set${upcaseName}`
+                        if ((type as PreJavaTypeClassOrInterface).methods.some(m => m.name == getterName || m.name == setterName)) {
+                            getterName = getterName + '__'
+                            setterName = setterName + '__'
+                        }
+
                         flow.push(`@JsProperty( name = "${property.name}")`).finishLine()
-                        flow.push(`${isClass ? 'public native ' : ''}${javaWriter.importTypeParametrized(property.type)} get${upcaseName}();`).finishLine()
+                        flow.push(`${isClass ? 'public native ' : ''}${javaWriter.importTypeParametrized(property.type)} ${getterName}();`).finishLine()
 
                         flow.blankLine()
                         flow.push(`@JsProperty( name = "${property.name}")`).finishLine()
-                        flow.push(`${isClass ? 'public native ' : ''}void set${upcaseName}( ${javaWriter.importTypeParametrized(property.type)} value );`).finishLine()
+                        flow.push(`${isClass ? 'public native ' : ''}void ${setterName}( ${javaWriter.importTypeParametrized(property.type)} value );`).finishLine()
                     })
                 }
 
