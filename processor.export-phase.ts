@@ -11,6 +11,7 @@ import { PreJavaTypeBuiltinJavaType } from './prejavatypes/PreJavaTypeBuiltinJav
 import { PreJavaTypeEnum } from './prejavatypes/PreJavaTypeEnum'
 import { PreJavaTypeUnion } from './prejavatypes/PreJavaTypeUnion'
 import { PreJavaTypeParameter } from './prejavatypes/PreJavaTypeParameter'
+import { PreJavaTypeTuple, TUPLE_TYPE_VARIABLE_NAMES } from './prejavatypes/PreJavaTypeTuple'
 
 function hasImplementationInHierarchy(type: PreJavaType) {
     if (type instanceof PreJavaTypeClassOrInterface) {
@@ -27,9 +28,6 @@ function hasImplementationInHierarchy(type: PreJavaType) {
 }
 
 export class ExportPhase {
-    private BY_INDEX_SETTER = `JsTools.setItem`
-    private BY_INDEX_GETTER = `JsTools.getItem`
-
     constructor(public gatherPhase: GatherPhase.GatherPhase) { }
 
     exportJavaUnit(type: PreJavaType, javaWriter: JavaWriter, flow: TextFlow, baseDirectory: string) {
@@ -93,6 +91,8 @@ export class ExportPhase {
     JS_PROPERTY = new PreJavaTypeBuiltinJavaType('jsinterop.annotations', 'JsProperty')
     JS_PACKAGE = new PreJavaTypeBuiltinJavaType('jsinterop.annotations', 'JsPackage')
     JS_METHOD = new PreJavaTypeBuiltinJavaType('jsinterop.annotations', 'JsMethod')
+    JS_ARRAY_LIKE = new PreJavaTypeBuiltinJavaType('jsinterop.base', 'JsArrayLike')
+    JS = new PreJavaTypeBuiltinJavaType('jsinterop.base', 'Js')
 
     exportNodes(program: ts.Program, baseDirectory: string) {
         for (let type of this.gatherPhase.typeMap.typeMap.values()) {
@@ -101,6 +101,7 @@ export class ExportPhase {
                 let flow = new TextFlow()
 
                 javaWriter.importType(this.JS_TYPE)
+                javaWriter.importType(this.JS)
 
                 flow.startJavaDocComments()
                 flow.push(`Union adapter`).finishLine()
@@ -130,9 +131,57 @@ export class ExportPhase {
 
                 this.exportJavaUnit(type, javaWriter, flow, baseDirectory)
             }
+            else if (type instanceof PreJavaTypeTuple) {
+                let javaWriter = new JavaWriter(type.getPackageName())
+                let flow = new TextFlow()
+
+                javaWriter.importType(this.JS_TYPE)
+
+                flow.startJavaDocComments()
+                flow.push(`Tuple adapter`).finishLine()
+                flow.endJavaDocComments()
+
+                javaWriter.importType(this.JS_PACKAGE)
+                flow.push(`@JsType(isNative=true, namespace=JsPackage.GLOBAL, name="?")`).finishLine()
+                flow.push(`public class ${type.getParametrizedSimpleName()} {`).finishLine()
+                flow.pushLineStart('    ')
+                javaWriter.importType(this.JS_OVERLAY)
+                javaWriter.importType(this.JS)
+                for (let i = 0; i < type.nbTypeParameters; i++) {
+                    let variableName = TUPLE_TYPE_VARIABLE_NAMES[i]
+
+                    flow.push(`@JsOverlay`).finishLine()
+                    flow.push(`public ${variableName} getNb${i + 1}() {`).finishLine()
+                    flow.pushLineStart('    ')
+                    flow.push(`return (${variableName}) Js.asArrayLike(this).getAt(${i});`).finishLine()
+                    flow.pullLineStart()
+                    flow.push(`}`).finishLine()
+
+                    flow.push(`@JsOverlay`).finishLine()
+                    flow.push(`public void setNb${i + 1}(${variableName} value) {`).finishLine()
+                    flow.pushLineStart('    ')
+                    flow.push(`Js.asArrayLike(this).setAt(${i}, value);`).finishLine()
+                    flow.pullLineStart()
+                    flow.push(`}`).finishLine()
+                }
+
+                flow.push(`@JsOverlay`).finishLine()
+                flow.push(`public ${javaWriter.importType(this.JS_ARRAY_LIKE)}<Object> asList() {`).finishLine()
+                flow.pushLineStart('    ')
+                flow.push(`return Js.uncheckedCast(this);`).finishLine()
+                flow.pullLineStart()
+                flow.push(`}`).finishLine()
+
+                flow.pullLineStart()
+                flow.push(`}`).finishLine()
+
+                this.exportJavaUnit(type, javaWriter, flow, baseDirectory)
+            }
             else if (type instanceof PreJavaTypeEnum) {
                 let javaWriter = new JavaWriter(type.getPackageName())
                 let flow = new TextFlow()
+
+                javaWriter.importType(this.JS)
 
                 flow.startJavaDocComments()
                 flow.push(`Enumeration adapter`).finishLine()
@@ -186,7 +235,7 @@ export class ExportPhase {
                     }
                 }
                 javaWriter.importType(this.JS_TYPE)
-                if (!prototypeName)
+                if (!prototypeNamespace)
                     javaWriter.importType(this.JS_PACKAGE)
                 flow.push(`@JsType(isNative=true, namespace=${prototypeNamespace ? ('"' + prototypeNamespace + '"') : 'JsPackage.GLOBAL'}, name=${prototypeName ? ('"' + prototypeName + '"') : '"Object"'})`)
                 flow.finishLine()
@@ -241,12 +290,13 @@ export class ExportPhase {
                 let nit = type.numberIndexType
                 if (nit) {
                     javaWriter.importType(this.JS_OVERLAY)
+                    javaWriter.importType(this.JS)
 
                     flow.blankLine()
                     flow.push(`@JsOverlay`).finishLine()
                     flow.push(`${isClass ? 'public' : 'default'} void setByIndex(int index, ${javaWriter.importTypeParametrized(nit)} value) {`).finishLine()
                     flow.pushLineStart('    ')
-                    flow.push(`${this.BY_INDEX_SETTER}(index, value);`).finishLine()
+                    flow.push(`Js.asArrayLike(this).setAt(index, value);`).finishLine()
                     flow.pullLineStart()
                     flow.push(`}`).finishLine()
 
@@ -254,7 +304,7 @@ export class ExportPhase {
                     flow.push(`@JsOverlay`).finishLine()
                     flow.push(`${isClass ? 'public' : 'default'} ${javaWriter.importTypeParametrized(nit)} getByIndex(int index) {`).finishLine()
                     flow.pushLineStart('    ')
-                    flow.push(`return (${javaWriter.importTypeParametrized(nit)})(Object) ${this.BY_INDEX_GETTER}(index);`).finishLine()
+                    flow.push(`return Js.asArrayLike(this).getAt(index);`).finishLine()
                     flow.pullLineStart()
                     flow.push(`}`).finishLine()
                 }
@@ -262,12 +312,13 @@ export class ExportPhase {
                 let sit = type.stringIndexType
                 if (sit) {
                     javaWriter.importType(this.JS_OVERLAY)
+                    javaWriter.importType(this.JS)
 
                     flow.blankLine()
                     flow.push(`@JsOverlay`).finishLine()
                     flow.push(`public void setByIndex(String index, ${javaWriter.importTypeParametrized(sit)} value) {`).finishLine()
                     flow.pushLineStart('    ')
-                    flow.push(`${this.BY_INDEX_SETTER}(index, value);`).finishLine()
+                    flow.push(`Js.asPropertyMap(this).set(index, value);`).finishLine()
                     flow.pullLineStart()
                     flow.push(`}`).finishLine()
 
@@ -275,8 +326,7 @@ export class ExportPhase {
                     flow.push(`@JsOverlay`).finishLine()
                     flow.push(`public ${javaWriter.importTypeParametrized(sit)} getByIndex(String index) {`).finishLine()
                     flow.pushLineStart('    ')
-                    flow.push('// TODO : Should use Js.uncheckedCast...').finishLine()
-                    flow.push(`return (${javaWriter.importTypeParametrized(sit)})(Object) ${this.BY_INDEX_GETTER}(index);`).finishLine()
+                    flow.push(`return Js.asPropertyMap(this).get(index);`).finishLine()
                     flow.pullLineStart()
                     flow.push(`}`).finishLine()
                 }

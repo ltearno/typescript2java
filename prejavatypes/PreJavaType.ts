@@ -8,22 +8,13 @@ export interface ProcessContext {
     getTypeMap: () => TsToPreJavaTypemap
 }
 
-export interface CompletablePreJavaType {
-    isProcessed(): boolean
-
-    processSourceTypes(context: ProcessContext)
-}
-
 export type TypeReplacer = { (type: PreJavaType): PreJavaType }
 
 export abstract class PreJavaType {
-    sourceTypes: Set<ts.Type>
-
     abstract getSimpleName(): string
-    abstract setSimpleName(name: string)
 
-    abstract setPackageName(name: string)
     abstract getPackageName(): string
+    abstract setPackageName(name: string)
 
     abstract getParametrization(): string
 
@@ -47,8 +38,6 @@ export abstract class PreJavaType {
 
     abstract dump()
 
-    abstract isCompletablePreJavaType(): CompletablePreJavaType
-
     /** returns the type by which it should be substituted */
     abstract substituteTypeReal(replacer: TypeReplacer, cache: Map<PreJavaType, PreJavaType>, passThroughTypes: Set<PreJavaType>): PreJavaType
     substituteType(replacer: TypeReplacer, cache: Map<PreJavaType, PreJavaType>, passThroughTypes: Set<PreJavaType>): PreJavaType {
@@ -64,11 +53,5 @@ export abstract class PreJavaType {
         let res = this.substituteTypeReal(replacer, cache, passThroughTypes)
         cache.set(this, res)
         return res
-    }
-
-    addSourceType(type: ts.Type) {
-        if (!this.sourceTypes)
-            this.sourceTypes = new Set()
-        this.sourceTypes.add(type)
     }
 }

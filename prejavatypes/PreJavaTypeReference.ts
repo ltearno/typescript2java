@@ -1,15 +1,9 @@
 import * as ts from "typescript"
-import { PreJavaType, CompletablePreJavaType, ProcessContext, TypeReplacer } from './PreJavaType'
+import { PreJavaType, ProcessContext, TypeReplacer } from './PreJavaType'
 
 export class PreJavaTypeReference extends PreJavaType {
     type: PreJavaType
     typeParameters: PreJavaType[]
-
-    constructor(type: PreJavaType, typeParameters: PreJavaType[]) {
-        super()
-        this.type = type
-        this.typeParameters = typeParameters
-    }
 
     dump() { console.log(`TypeReference to ${this.type.getParametrizedSimpleName()}`) }
 

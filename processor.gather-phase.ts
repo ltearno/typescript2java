@@ -5,7 +5,7 @@ import { type } from "os";
 import * as TypeMap from './type-map'
 import { TsToPreJavaTypemap } from './type-map'
 
-import { PreJavaType, CompletablePreJavaType, ProcessContext } from './prejavatypes/PreJavaType'
+import { PreJavaType, ProcessContext } from './prejavatypes/PreJavaType'
 import { PreJavaTypeClassOrInterface } from './prejavatypes/PreJavaTypeClassOrInterface'
 import { PreJavaTypeCallSignature } from './prejavatypes/PreJavaTypeCallSignature'
 
@@ -25,14 +25,20 @@ export class GatherPhase {
 
     globalMethods: PreJavaTypeCallSignature[] = []
 
-    private currentIdAnonymousTypes = 1
-
     private ignoredSyntaxKinds: Set<ts.SyntaxKind> = new Set()
 
     constructor(private baseJavaPackage: string,
         private javaPackages: { [key: string]: string },
         private program: ts.Program) {
-        this.typeMap = new TsToPreJavaTypemap(program)
+        this.typeMap = new TsToPreJavaTypemap(program, (sourceFile: ts.SourceFile) => {
+            let relative = path.relative(this.program.getCurrentDirectory(), sourceFile.fileName);
+            for (let pathPrefix in this.javaPackages) {
+                if (!path.relative(pathPrefix, relative).startsWith('..')) {
+                    return this.javaPackages[pathPrefix]
+                }
+            }
+            return null
+        })
     }
 
     addTypesFromSourceFile(sourceFile: ts.SourceFile, onlyExportedSymbols: boolean) {
@@ -66,22 +72,11 @@ export class GatherPhase {
     }
 
     sumup() {
-        console.log(`processing types...`)
-        while (true) {
-            let notProcessed = this.typeMap.getNotProcessedTypes()
-            if (notProcessed == null || notProcessed.length <= 0)
-                break
-
-            for (let preJavaType of notProcessed) {
-                this.processClassOrInterfaceDeclaration(preJavaType)
-            }
-        }
-
         console.log(`removing unsupported types`)
         this.typeMap.removeNotSupportedTypes()
 
         console.log(`unanonymising types`)
-        this.currentIdAnonymousTypes = this.typeMap.ensureAllTypesHaveName(this.currentIdAnonymousTypes, this.baseJavaPackage)
+        this.typeMap.ensureAllTypesHaveName(this.baseJavaPackage)
 
         console.log(`simplify unions`)
         this.typeMap.simplifyUnions()
@@ -149,33 +144,5 @@ export class GatherPhase {
             if (signature)
                 this.globalMethods.push(signature)
         }
-    }
-
-    processContext: ProcessContext = {
-        createAnonymousTypeName: () => `AnonymousType${this.currentIdAnonymousTypes++}`,
-
-        getJavaPackage: (sourceFile: ts.SourceFile) => {
-            let relative = path.relative(this.program.getCurrentDirectory(), sourceFile.fileName);
-            for (let pathPrefix in this.javaPackages) {
-                if (!path.relative(pathPrefix, relative).startsWith('..')) {
-                    return this.javaPackages[pathPrefix]
-                }
-            }
-            return null
-        },
-
-        getProgram: () => this.program,
-
-        getTypeMap: () => this.typeMap
-    }
-
-    private processClassOrInterfaceDeclaration(preJavaType: PreJavaType & CompletablePreJavaType) {
-        if (preJavaType.isProcessed())
-            return
-
-        preJavaType.processSourceTypes(this.processContext)
-
-        if (!preJavaType.sourceTypes)
-            return
     }
 }

@@ -1,5 +1,5 @@
 import * as ts from "typescript"
-import { PreJavaType, CompletablePreJavaType, ProcessContext, TypeReplacer } from './PreJavaType'
+import { PreJavaType, ProcessContext, TypeReplacer } from './PreJavaType'
 import { PreJavaTypeParameter } from './PreJavaTypeParameter'
 export interface PreJavaTypeFormalParameter {
     name: string

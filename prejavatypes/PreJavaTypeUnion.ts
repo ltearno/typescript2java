@@ -1,5 +1,5 @@
 import * as ts from "typescript"
-import { PreJavaType, CompletablePreJavaType, ProcessContext, TypeReplacer } from './PreJavaType'
+import { PreJavaType, ProcessContext, TypeReplacer } from './PreJavaType'
 import { PreJavaTypeClassOrInterface } from './PreJavaTypeClassOrInterface'
 import { PreJavaTypeReference } from './PreJavaTypeReference'
 
@@ -7,8 +7,7 @@ export class PreJavaTypeUnion extends PreJavaType {
     packageName: string
     types: PreJavaType[]
 
-    constructor(types: PreJavaType[]) {
-        super()
+    setTypes(types: PreJavaType[]) {
         this.types = []
         types.forEach(type => {
             if (this.types.indexOf(type) < 0)

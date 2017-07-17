@@ -1,5 +1,5 @@
 import * as ts from "typescript";
-import { PreJavaType, CompletablePreJavaType, ProcessContext, TypeReplacer } from './PreJavaType'
+import { PreJavaType, ProcessContext, TypeReplacer } from './PreJavaType'
 import { PreJavaTypeParameter } from './PreJavaTypeParameter'
 import { PreJavaTypeCallSignature } from './PreJavaTypeCallSignature'
 import { guessName } from '../tools'
@@ -11,8 +11,8 @@ export interface PreJavaTypeProperty {
     comments?: string[]
 }
 
-export class PreJavaTypeClassOrInterface extends PreJavaType implements CompletablePreJavaType {
-    processed: boolean = false
+export class PreJavaTypeClassOrInterface extends PreJavaType {
+    sourceTypes: Set<ts.Type>
 
     name: string = null
     packageName: string
@@ -36,129 +36,137 @@ export class PreJavaTypeClassOrInterface extends PreJavaType implements Completa
 
     isClassLike() { return this.shouldOutputClass || (this.prototypeNames && this.prototypeNames.size > 0) }
 
-    processSourceTypes(context: ProcessContext) {
-        // TODO
-        if (this.processed || !this.sourceTypes || !this.sourceTypes.size)
+    addSourceType(type: ts.ObjectType, typeParametersToApplyToAnonymousTypes: PreJavaTypeParameter[], context: ProcessContext) {
+        if (!this.sourceTypes)
+            this.sourceTypes = new Set()
+        this.sourceTypes.add(type)
+
+        this.processSourceType(type, context)
+
+        if (typeParametersToApplyToAnonymousTypes && typeParametersToApplyToAnonymousTypes.length && type.objectFlags & ts.ObjectFlags.Anonymous && (this.typeParameters == null)) {
+            this.typeParameters = typeParametersToApplyToAnonymousTypes ? typeParametersToApplyToAnonymousTypes.slice() : null
+        }
+    }
+
+    private processSourceType(type: ts.Type, context: ProcessContext) {
+        if (!type)
             return
 
-        this.processed = true
+        let symbol = type.getSymbol()
+        if (symbol) {
+            if ((symbol.flags & ts.SymbolFlags.Class) || (symbol.flags & ts.SymbolFlags.Interface))
+                this.setSimpleName(symbol.getName())
+            else if (symbol.flags & ts.SymbolFlags.TypeLiteral)
+                this.setSimpleName(context.createAnonymousTypeName())
 
-        for (let type of this.sourceTypes) {
-            let symbol = type.getSymbol()
-            if (symbol) {
-                if ((symbol.flags & ts.SymbolFlags.Class) || (symbol.flags & ts.SymbolFlags.Interface))
-                    this.setSimpleName(symbol.getName())
-                else if (symbol.flags & ts.SymbolFlags.TypeLiteral)
-                    this.setSimpleName(context.createAnonymousTypeName())
+            if (symbol.getDeclarations()) {
+                symbol.getDeclarations()
+                    .filter(d => d.kind == ts.SyntaxKind.ClassDeclaration)
+                    .forEach((declaration: ts.ClassDeclaration) => {
+                        let jsNamespace = null
+                        let jsName = guessName(declaration.name)
 
-                if (symbol.getDeclarations()) {
-                    symbol.getDeclarations()
-                        .filter(d => d.kind == ts.SyntaxKind.ClassDeclaration)
-                        .forEach((declaration: ts.ClassDeclaration) => {
-                            let jsNamespace = null
-                            let jsName = guessName(declaration.name)
+                        if (jsName) {
+                            jsNamespace = context.getJavaPackage(declaration.getSourceFile())
+                            this.addPrototypeName(jsNamespace, jsName)
+                        }
 
-                            if (jsName) {
-                                jsNamespace = context.getJavaPackage(declaration.getSourceFile())
-                                this.addPrototypeName(jsNamespace, jsName)
-                            }
-
-                            if (jsNamespace)
-                                this.setPackageName(jsNamespace)
-                        })
-                }
-
-                if (symbol.valueDeclaration) {
-                    let constructorType = context.getProgram().getTypeChecker().getTypeOfSymbolAtLocation(symbol, symbol.valueDeclaration)
-                    let constructors = constructorType.getConstructSignatures()
-                    if (constructors) {
-                        constructors.forEach(constructorSignature => {
-                            let signature = context.getTypeMap().convertSignature(null, constructorSignature, this.typeParameters)
-                            this.addConstructorSignature(signature)
-                        })
-                    }
-                }
-
-                let comments = this.getCommentFromSymbol(symbol)
-                if (comments && comments.length > 0)
-                    this.addComments(comments)
+                        if (jsNamespace)
+                            this.setPackageName(jsNamespace)
+                    })
             }
 
-            if (type.flags & ts.TypeFlags.Object) {
-                let objectType = type as ts.ObjectType
-
-                if (objectType.objectFlags & ts.ObjectFlags.Class || objectType.objectFlags & ts.ObjectFlags.Interface) {
-                    let interfaceType = objectType as ts.InterfaceType
-                    if (interfaceType.typeParameters && interfaceType.typeParameters.length) {
-                        this.setTypeParameters(interfaceType.typeParameters.map(tp => (new PreJavaTypeParameter(tp.symbol.getName(), context.getTypeMap().getOrCreatePreJavaTypeForTsType(tp.constraint, null)))))
-                    }
+            if (symbol.valueDeclaration) {
+                let constructorType = context.getProgram().getTypeChecker().getTypeOfSymbolAtLocation(symbol, symbol.valueDeclaration)
+                let constructors = constructorType.getConstructSignatures()
+                if (constructors) {
+                    constructors.forEach(constructorSignature => {
+                        let signature = context.getTypeMap().convertSignature(null, constructorSignature, this.typeParameters)
+                        this.addConstructorSignature(signature)
+                    })
                 }
             }
 
-            let nit = type.getNumberIndexType()
-            if (nit) {
-                this.setNumberIndexType(context.getTypeMap().getOrCreatePreJavaTypeForTsType(nit, this.typeParameters))
+            let comments = this.getCommentFromSymbol(symbol)
+            if (comments && comments.length > 0)
+                this.addComments(comments)
+        }
+
+        if (type.flags & ts.TypeFlags.Object) {
+            let objectType = type as ts.ObjectType
+
+            if (objectType.objectFlags & ts.ObjectFlags.Class || objectType.objectFlags & ts.ObjectFlags.Interface) {
+                let interfaceType = objectType as ts.InterfaceType
+                if (interfaceType.typeParameters && interfaceType.typeParameters.length) {
+                    this.setTypeParameters(interfaceType.typeParameters.map(tp => (new PreJavaTypeParameter(tp.symbol.getName(), context.getTypeMap().getOrCreatePreJavaTypeForTsType(tp.constraint, null)))))
+                }
             }
+        }
 
-            let sit = type.getStringIndexType()
-            if (sit) {
-                this.setStringIndexType(context.getTypeMap().getOrCreatePreJavaTypeForTsType(sit, this.typeParameters))
-            }
+        let nit = type.getNumberIndexType()
+        if (nit) {
+            this.setNumberIndexType(context.getTypeMap().getOrCreatePreJavaTypeForTsType(nit, this.typeParameters))
+        }
 
-            let baseTypes = type.getBaseTypes()
-            if (baseTypes) {
-                baseTypes.forEach(baseType => {
-                    this.addBaseType(context.getTypeMap().getOrCreatePreJavaTypeForTsType(baseType, null /*no need*/))
-                })
-            }
+        let sit = type.getStringIndexType()
+        if (sit) {
+            this.setStringIndexType(context.getTypeMap().getOrCreatePreJavaTypeForTsType(sit, this.typeParameters))
+        }
 
-            let properties = (type as ts.InterfaceTypeWithDeclaredMembers).declaredProperties// type.getProperties()
-            if (properties && properties.length) {
-                properties.forEach(property => {
-                    let propertyName = property.getName()
-                    if (!property.valueDeclaration)
-                        return
+        let baseTypes = type.getBaseTypes()
+        if (baseTypes) {
+            baseTypes.forEach(baseType => {
+                this.addBaseType(context.getTypeMap().getOrCreatePreJavaTypeForTsType(baseType, null /*no need*/))
+            })
+        }
 
-                    let comments = this.getCommentFromSymbol(property)
+        let properties = (type as ts.InterfaceTypeWithDeclaredMembers).declaredProperties// type.getProperties()
+        if (properties && properties.length) {
+            properties.forEach(property => {
+                let propertyName = property.getName()
+                if (!property.valueDeclaration)
+                    return
 
-                    let propertyType = context.getProgram().getTypeChecker().getTypeAtLocation(property.valueDeclaration)
+                let comments = this.getCommentFromSymbol(property)
 
-                    // TODO : generating property accessors for callable types should be configurable
-                    let callSignatures = propertyType.getCallSignatures()
-                    if (callSignatures && callSignatures.length && !(propertyName.startsWith('on'))) {
-                        for (let callSignature of callSignatures) {
-                            let method = context.getTypeMap().convertSignature(propertyName, callSignature, this.typeParameters)
-                            if (method) {
-                                method.addComments(comments)
-                                this.addMethod(method)
-                            }
+                let propertyType = context.getProgram().getTypeChecker().getTypeAtLocation(property.valueDeclaration)
+
+                // TODO : generating property accessors for callable types should be configurable
+                let callSignatures = propertyType.getCallSignatures()
+                if (callSignatures && callSignatures.length && !(propertyName.startsWith('on'))) {
+                    for (let callSignature of callSignatures) {
+                        let method = context.getTypeMap().convertSignature(propertyName, callSignature, this.typeParameters)
+                        if (method) {
+                            method.addComments(comments)
+                            this.addMethod(method)
                         }
                     }
-                    else {
-                        let propertyPreJavaType = context.getTypeMap().getOrCreatePreJavaTypeForTsType(propertyType, this.typeParameters)
+                }
+                else {
+                    let propertyPreJavaType = context.getTypeMap().getOrCreatePreJavaTypeForTsType(propertyType, this.typeParameters)
+                    if (propertyPreJavaType instanceof PreJavaTypeClassOrInterface)
                         propertyPreJavaType.setSimpleName(`${propertyName.slice(0, 1).toUpperCase() + propertyName.slice(1)}Caller`)
 
-                        this.addProperty({
-                            name: propertyName,
-                            type: propertyPreJavaType,
-                            writable: true,
-                            comments
-                        })
-                    }
-                })
-            }
+                    this.addProperty({
+                        name: propertyName,
+                        type: propertyPreJavaType,
+                        writable: true,
+                        comments
+                    })
+                }
+            })
+        }
 
-            let callSignatures = type.getCallSignatures()
-            if (callSignatures && callSignatures.length) {
-                // TODO : Check that the method is alone so that it is a correct functional type
-                // TODO : check if it can be melted down with other similar types
-                // TODO : try to get a name for it from where it has been created (callback of a function, ...)
-                callSignatures.forEach(callSignature => {
-                    let signature = context.getTypeMap().convertSignature('execute', callSignature, this.typeParameters)
-                    if (signature)
-                        this.addMethod(signature)
-                })
-            }
+        let callSignatures = type.getCallSignatures()
+        if (callSignatures && callSignatures.length) {
+            // TODO : Check that the method is alone so that it is a correct functional type
+            // TODO : check if it can be melted down with other similar types
+            // TODO : try to get a name for it from where it has been created (callback of a function, ...)
+            callSignatures.forEach(callSignature => {
+                let signature = context.getTypeMap().convertSignature('execute', callSignature, this.typeParameters)
+                if (signature)
+                    this.addMethod(signature)
+            })
         }
     }
 
@@ -243,11 +251,7 @@ export class PreJavaTypeClassOrInterface extends PreJavaType implements Completa
 
     getSimpleName(): string { return this.name }
 
-    isCompletablePreJavaType() { return this }
-
-    isProcessed() { return this.processed }
-
-    addComments(lines: string[]) {
+    private addComments(lines: string[]) {
         if (!this.comments)
             this.comments = []
         lines && lines.forEach(l => this.comments.push(l))

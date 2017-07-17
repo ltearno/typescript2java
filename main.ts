@@ -98,7 +98,7 @@ program.getSourceFiles().forEach(sourceFile => {
     console.log(`source ${sourceFile.fileName}`);
 
     let isInternalFile = !files.find(file => path.normalize(file) === path.normalize(sourceFile.fileName));
-    if (!isInternalFile)
+    if (true || !isInternalFile)
         syncPhase.addTypesFromSourceFile(sourceFile, !isInternalFile);
 });
 

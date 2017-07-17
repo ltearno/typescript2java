@@ -1,14 +1,13 @@
 import * as ts from "typescript"
-import { PreJavaType, CompletablePreJavaType, ProcessContext, TypeReplacer } from './PreJavaType'
+import { PreJavaType, ProcessContext, TypeReplacer } from './PreJavaType'
 
 export class PreJavaTypeParameter extends PreJavaType {
     name: string
     constraint: PreJavaType
 
-    constructor(name: string, constraint: PreJavaType) {
+    constructor(name: string, constraint: PreJavaType = null) {
         super()
         this.name = name
-        this.constraint = constraint
     }
 
     dump() { console.log(`TypeParameter ${this.name}`) }

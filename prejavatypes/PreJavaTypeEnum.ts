@@ -1,5 +1,5 @@
 import * as ts from "typescript"
-import { PreJavaType, CompletablePreJavaType, ProcessContext, TypeReplacer } from './PreJavaType'
+import { PreJavaType, ProcessContext, TypeReplacer } from './PreJavaType'
 
 export class PreJavaTypeEnum extends PreJavaType {
     packageName: string
@@ -12,6 +12,36 @@ export class PreJavaTypeEnum extends PreJavaType {
     constructor(name: string) {
         super()
         this.name = name
+    }
+
+    addSourceType(enumType: ts.EnumType) {
+        let enumDeclaration = enumType.getSymbol().valueDeclaration as ts.EnumDeclaration
+        if (enumDeclaration.members && enumDeclaration.members.length) {
+            let memberValue = 0
+            for (let enumMember of enumDeclaration.members) {
+                let propertyName = enumMember.name
+                if (propertyName.kind == ts.SyntaxKind.Identifier) {
+                    let memberName = (propertyName as ts.Identifier).text
+                    if (enumMember.initializer) {
+                        if (enumMember.initializer['text']) {
+                            let initializer = parseInt(enumMember.initializer['text'])
+                            if (initializer)
+                                memberValue = initializer
+                        }
+                    }
+
+                    this.members.push({
+                        name: memberName,
+                        value: memberValue
+                    })
+                }
+                else {
+                    console.warn(`unsupported enum member`)
+                }
+
+                memberValue++
+            }
+        }
     }
 
     dump() {
