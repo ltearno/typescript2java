@@ -345,8 +345,9 @@ export class TsToPreJavaTypemap {
             console.log()
 
         typeParametersToApplyToAnonymousTypes = (typeParametersToApplyToAnonymousTypes && typeParametersToApplyToAnonymousTypes.slice()) || []
-        if (signatureTypeParameters)
-            typeParametersToApplyToAnonymousTypes = typeParametersToApplyToAnonymousTypes.concat(signatureTypeParameters)
+        signatureTypeParameters && signatureTypeParameters
+            .filter(tp => !typeParametersToApplyToAnonymousTypes.some(tpIn => tpIn.name == tp.name))
+            .forEach(tp => typeParametersToApplyToAnonymousTypes.push(tp))
 
         let returnType = this.getOrCreatePreJavaTypeForTsType(tsSignature.getReturnType(), true, typeParametersToApplyToAnonymousTypes)
 
@@ -428,6 +429,8 @@ export class TsToPreJavaTypemap {
             return BUILTIN_TYPE_BOOLEAN
         if (tsType.flags & ts.TypeFlags.BooleanLiteral)
             return BUILTIN_TYPE_BOOLEAN
+        if (tsType.getSymbol() && tsType.getSymbol().getName() == 'Boolean')
+            return BUILTIN_TYPE_BOOLEAN
         if (tsType.flags & ts.TypeFlags.Void)
             return preferNothingVoid ? BUILTIN_TYPE_UNIT : BUILTIN_TYPE_VOID
         if (tsType.flags & ts.TypeFlags.Undefined)
@@ -439,6 +442,12 @@ export class TsToPreJavaTypemap {
 
         if (tsType.getSymbol() && tsType.getSymbol().getName() == 'String')
             return BUILTIN_TYPE_STRING
+
+        if (tsType.getSymbol() && tsType.getSymbol().getName() == 'Object')
+            return BUILTIN_TYPE_OBJECT
+
+        if (tsType.getSymbol() && tsType.getSymbol().getName() == 'Number')
+            return BUILTIN_TYPE_NUMBER
 
         if (tsType.flags & ts.TypeFlags.ESSymbol)
             return FAKE_TYPE_ESSYMBOL
