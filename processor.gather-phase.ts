@@ -33,8 +33,12 @@ export class GatherPhase {
         this.typeMap = new TsToPreJavaTypemap(program, (sourceFile: ts.SourceFile) => {
             let relative = path.relative(this.program.getCurrentDirectory(), sourceFile.fileName);
             for (let pathPrefix in this.javaPackages) {
-                if (!path.relative(pathPrefix, relative).startsWith('..')) {
-                    return this.javaPackages[pathPrefix]
+                let sourceRelativePath = path.relative(pathPrefix, relative)
+                if (!sourceRelativePath.startsWith('..')) {
+                    let dirRelativePackagePath = path.dirname(sourceRelativePath).replace(new RegExp('\\\\', 'g'), '.').replace(new RegExp('-', 'g'), '.').replace(new RegExp('\\/', 'g'), '.')
+                    let packagePrefix = this.javaPackages[pathPrefix] + (dirRelativePackagePath == '.' ? '' : ('.' + dirRelativePackagePath))
+
+                    return packagePrefix
                 }
             }
             return null

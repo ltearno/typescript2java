@@ -108,6 +108,9 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
         if (type.flags & ts.TypeFlags.Object) {
             let objectType = type as ts.ObjectType
 
+            if (type.getSymbol() && type.getSymbol().getName() == 'Action')
+                console.log('yo')
+
             if (objectType.objectFlags & ts.ObjectFlags.Anonymous) {
                 this.setTypeParameters((typeParametersToApplyToAnonymousTypes && typeParametersToApplyToAnonymousTypes.length) ? typeParametersToApplyToAnonymousTypes.slice() : null)
             }
@@ -161,8 +164,8 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
                 }
                 else {
                     let propertyPreJavaType = context.getTypeMap().getOrCreatePreJavaTypeForTsType(propertyType, false, this.typeParameters)
-                    if (propertyPreJavaType instanceof PreJavaTypeClassOrInterface)
-                        propertyPreJavaType.setSimpleName(`${propertyName.slice(0, 1).toUpperCase() + propertyName.slice(1)}Caller`)
+                    //if (propertyPreJavaType instanceof PreJavaTypeClassOrInterface)
+                    //    propertyPreJavaType.setSimpleName(`${propertyName.slice(0, 1).toUpperCase() + propertyName.slice(1)}Caller`)
 
                     this.addProperty({
                         name: propertyName,

@@ -14,16 +14,16 @@ import { PreJavaTypeEnum } from './prejavatypes/PreJavaTypeEnum'
 import { PreJavaTypeParameter } from './prejavatypes/PreJavaTypeParameter'
 import { PreJavaTypeCallSignature, PreJavaTypeFormalParameter } from './prejavatypes/PreJavaTypeCallSignature'
 
-const BUILTIN_TYPE_OBJECT = new PreJavaTypeBuiltinJavaType('java.lang', 'Object')
-const BUILTIN_TYPE_STRING = new PreJavaTypeBuiltinJavaType('java.lang', 'String')
-const BUILTIN_TYPE_NUMBER = new PreJavaTypeBuiltinJavaType('java.lang', 'Number')
-const BUILTIN_TYPE_BOOLEAN = new PreJavaTypeBuiltinJavaType('java.lang', 'Boolean')
-const BUILTIN_TYPE_UNIT = new PreJavaTypeBuiltinJavaType(null, 'void')
-const BUILTIN_TYPE_VOID = new PreJavaTypeBuiltinJavaType('java.lang', 'Void')
+export const BUILTIN_TYPE_OBJECT = new PreJavaTypeBuiltinJavaType('java.lang', 'Object')
+export const BUILTIN_TYPE_STRING = new PreJavaTypeBuiltinJavaType('java.lang', 'String')
+export const BUILTIN_TYPE_NUMBER = new PreJavaTypeBuiltinJavaType('java.lang', 'Number')
+export const BUILTIN_TYPE_BOOLEAN = new PreJavaTypeBuiltinJavaType('java.lang', 'Boolean')
+export const BUILTIN_TYPE_UNIT = new PreJavaTypeBuiltinJavaType(null, 'void')
+export const BUILTIN_TYPE_VOID = new PreJavaTypeBuiltinJavaType('java.lang', 'Void')
 
-const FAKE_TYPE_INTERSECTION = new PreJavaTypeFakeType('gwt.ext', 'FakeIntersection')
-const FAKE_TYPE_ESSYMBOL = new PreJavaTypeFakeType('gwt.ext', 'FakeEsSymbol')
-const FAKE_TYPE_INDEXEDACCESS = new PreJavaTypeFakeType('gwt.ext', 'FakeIndexedAccess')
+export const FAKE_TYPE_INTERSECTION = new PreJavaTypeFakeType('gwt.ext', 'FakeIntersection')
+export const FAKE_TYPE_ESSYMBOL = new PreJavaTypeFakeType('gwt.ext', 'FakeEsSymbol')
+export const FAKE_TYPE_INDEXEDACCESS = new PreJavaTypeFakeType('gwt.ext', 'FakeIndexedAccess')
 
 export class TsToPreJavaTypemap {
     private currentIdAnonymousTypes = 1
@@ -123,7 +123,7 @@ export class TsToPreJavaTypemap {
         this.substituteType((type) => type.getSimpleName() == '' ? null : type)
     }
 
-    // TODO : for classes  : add methods from interface hierarchy which are not in the method list
+    // TODO : for classes : add methods from interface hierarchy which are not in the method list
     addMethodsFromInterfaceHierarchy() {
         let recBrowseInterfaceHierarchy = (type: PreJavaType, visitor: { (visitedInterface: PreJavaTypeClassOrInterface) }) => {
             Visit.preJavaTypeVisit(type, {
@@ -143,7 +143,7 @@ export class TsToPreJavaTypemap {
                         recBrowseInterfaceHierarchy(type, visitedInterface => {
                             visitedInterface.methods && visitedInterface.methods.forEach(visitedMethod => {
                                 if (!type.methods || !type.methods.some(m => m.name == visitedMethod.name))
-                                    type.addMethod(visitedMethod)
+                                    type.addMethod(visitedMethod) // TODO Take care of the concretized type parameters
                             })
 
                             visitedInterface.properties && visitedInterface.properties.forEach(visitedProperty => {
@@ -179,68 +179,36 @@ export class TsToPreJavaTypemap {
         for (let type of this.typeMap.values()) {
             if (type instanceof PreJavaTypeClassOrInterface && type.methods && type.methods.length) {
                 let classOrInterface = type as PreJavaTypeClassOrInterface
-                let methodsByName = this.groupBy(type.methods, method => method.name)
-                for (let methodGroup of methodsByName.values()) {
+                // TODO in the process we loose type parameters information.
+                // TODO so when sometimes instead of removing a method, we should arrange type parameters according to the removed method
+                let methodsByNameAndParameters = this.groupBy(type.methods, method => method.name + '-' + (method.parameters ? method.parameters.map(p => p.type.getFullyQualifiedName()).join('-') : ''))
+                for (let methodGroup of methodsByNameAndParameters.values()) {
                     if (methodGroup.length < 2)
                         continue
 
-                    // minimal type hierarchy depth
-                    let methodsByReturnType = this.groupBy(methodGroup, method => method.returnType)
-                    let methodsToFilterForParameter: PreJavaTypeCallSignature[] = []
-                    if (methodsByReturnType.size <= 0) {
-                        console.log(`weirdo 77`)
-                        continue
-                    }
-                    else if (methodsByReturnType.size == 1) {
-                        // everything ok so far
-                        // need to use the group of methods we have
-                        methodsToFilterForParameter = methodsByReturnType.values().next().value
-                    }
-                    else {
-                        // only keep one, the most general
-                        let minHierarchyDepth = 1000
-                        for (let returnType of methodsByReturnType.keys()) {
-                            let depth = returnType.getHierachyDepth()
-                            if (depth < minHierarchyDepth)
-                                minHierarchyDepth = depth
-                        }
-
-                        let minHierarchyDepthPrototypes: PreJavaType[] = []
-                        for (let returnType of methodsByReturnType.keys()) {
-                            let depth = returnType.getHierachyDepth()
-                            if (depth == minHierarchyDepth)
-                                minHierarchyDepthPrototypes.push(returnType)
-                            else
-                                methodsByReturnType.get(returnType).forEach(m => classOrInterface.removeMethod(m))
-                        }
-
-                        if (minHierarchyDepthPrototypes.length <= 0) {
-                            console.log(`weirdo 940`)
-                            continue
-                        }
-                        else if (minHierarchyDepthPrototypes.length == 1) {
-                            // ok that is the one group of methods
-                            methodsToFilterForParameter = methodsByReturnType.get(minHierarchyDepthPrototypes[0])
-                        }
-                        else {
-                            // TODO choose one, but which one ?
-                            // TODO maybe transform them to use Object
-                            methodsToFilterForParameter = methodsByReturnType.get(minHierarchyDepthPrototypes[0])
-
-                            // remove non used methods
-                            for (let i = 1; i < minHierarchyDepthPrototypes.length; i++)
-                                methodsByReturnType.get(minHierarchyDepthPrototypes[i])
-                                    .forEach(m => classOrInterface.removeMethod(m))
-                        }
-
-                        // TODO need to remove the ones we did not keep
+                    // only keep one, the most general return type
+                    let minHierarchyDepth = 1000
+                    for (let method of methodGroup) {
+                        let depth = method.returnType.getHierachyDepth()
+                        if (depth < minHierarchyDepth)
+                            minHierarchyDepth = depth
                     }
 
-                    // those methods are the one which are left...
+                    let minReturnTypeHierarchyDepthMethods: PreJavaTypeCallSignature[] = []
+                    for (let method of methodGroup) {
+                        let returnType = method.returnType
+                        if (returnType.getHierachyDepth() == minHierarchyDepth)
+                            minReturnTypeHierarchyDepthMethods.push(method)
+                        else
+                            classOrInterface.removeMethod(method)
+                    }
+
+                    if (minReturnTypeHierarchyDepthMethods.length > 1) {
+                        // TODO let's keep the first one but we could fins something else, use Object, create a Union type, ...
+                        for (let i = 1; i < minReturnTypeHierarchyDepthMethods.length; i++)
+                            classOrInterface.removeMethod(minReturnTypeHierarchyDepthMethods[i])
+                    }
                 }
-                // use type erased methods
-                // group by name, select most general return type, in this group, select the most general parameter types
-                // method signature typerased footprint => those with same sig resume to the most general
             }
         }
     }
@@ -341,9 +309,6 @@ export class TsToPreJavaTypemap {
             return res
         }) : null
 
-        if (name == 'sort')
-            console.log()
-
         typeParametersToApplyToAnonymousTypes = (typeParametersToApplyToAnonymousTypes && typeParametersToApplyToAnonymousTypes.slice()) || []
         signatureTypeParameters && signatureTypeParameters
             .filter(tp => !typeParametersToApplyToAnonymousTypes.some(tpIn => tpIn.name == tp.name))
@@ -355,34 +320,46 @@ export class TsToPreJavaTypemap {
             signatureTypeParameters,
             returnType,
             name,
-            tsSignature.getParameters() ? tsSignature.getParameters().map(p => {
-                let parameteryType = this.program.getTypeChecker().getTypeAtLocation(p.valueDeclaration)
-                let objectType = (parameteryType.flags & ts.TypeFlags.Object) && parameteryType as ts.ObjectType
-                let referenceType = objectType && (objectType.objectFlags & ts.ObjectFlags.Reference) && parameteryType as ts.TypeReference
-                let dotdotdot = false
+            tsSignature.getParameters()
+                ? tsSignature.getParameters()
+                    .map(p => {
+                        let parameteryType = this.program.getTypeChecker().getTypeAtLocation(p.valueDeclaration)
+                        if (parameteryType
+                            && parameteryType.symbol
+                            && parameteryType.symbol.declarations
+                            && parameteryType.symbol.declarations.length
+                            && parameteryType.symbol.declarations.some((d: any) => {
+                                return d && d.locals && d.locals.length && d.locals.get && d.locals.get('this')
+                            }))
+                            return null
+                        let objectType = (parameteryType.flags & ts.TypeFlags.Object) && parameteryType as ts.ObjectType
+                        let referenceType = objectType && (objectType.objectFlags & ts.ObjectFlags.Reference) && parameteryType as ts.TypeReference
+                        let dotdotdot = false
 
-                let de = p.valueDeclaration as ts.ParameterDeclaration
-                if (de.dotDotDotToken) {
-                    if (referenceType && referenceType.typeArguments && referenceType.typeArguments.length == 1) {
-                        parameteryType = referenceType.typeArguments[0]
-                        dotdotdot = true
-                    }
-                    else {
-                        console.error(`... token in parameters but expected type is not good`)
-                    }
-                }
+                        let de = p.valueDeclaration as ts.ParameterDeclaration
+                        if (de.dotDotDotToken) {
+                            if (referenceType && referenceType.typeArguments && referenceType.typeArguments.length == 1) {
+                                parameteryType = referenceType.typeArguments[0]
+                                dotdotdot = true
+                            }
+                            else {
+                                console.error(`... token in parameters but expected type is not good`)
+                            }
+                        }
 
-                let preJavaParameterType = this.getOrCreatePreJavaTypeForTsType(parameteryType, false, typeParametersToApplyToAnonymousTypes)
+                        let preJavaParameterType = this.getOrCreatePreJavaTypeForTsType(parameteryType, false, typeParametersToApplyToAnonymousTypes)
 
-                let result: PreJavaTypeFormalParameter = {
-                    name: p.name,
-                    type: preJavaParameterType,
-                    optional: (de.questionToken) != null || (de.initializer != null),
-                    dotdotdot
-                }
+                        let result: PreJavaTypeFormalParameter = {
+                            name: p.name,
+                            type: preJavaParameterType,
+                            optional: (de.questionToken) != null || (de.initializer != null),
+                            dotdotdot
+                        }
 
-                return result
-            }) : null
+                        return result
+                    })
+                    .filter(p => p != null)
+                : null
         )
     }
 

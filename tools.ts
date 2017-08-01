@@ -53,6 +53,19 @@ export function guessName(identifier: ts.Identifier | ts.BindingPattern): string
     return "[UNKNOWN]"
 }
 
+export function dumpObject(o: any) {
+    for (let key in o) {
+        if (!Object.getOwnPropertyDescriptor(o, key))
+            continue
+
+        let value = o[key]
+        if (typeof value === 'object') {
+            console.log(`${key} : {`)
+            console.log(`}`)
+        }
+    }
+}
+
 export function debugNode(node: ts.Node, space: string, rec: boolean = true) {
     let text = '(unk name)'
 

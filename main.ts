@@ -78,16 +78,9 @@ if (emitResult.emitSkipped) {
 
 console.log(`Adding exportable nodes...`);
 
-let baseJavaPackage = 'fr.lteconsulting.angular2gwt.client.interop';
+let baseJavaPackage = 'fr.lteconsulting.angular2gwt.interop';
 let javaPackages = {
-    "tests/@angular/common/": "ng.core",
-    "tests/@angular/compiler/": "ng.core",
-    "tests/@angular/core/": "ng.core",
-    "tests/@angular/forms/": "ng.forms",
-    "tests/@angular/http/": "ng.http",
-    "tests/@angular/platform-browser/": "ng.platformBrowser",
-    "tests/@angular/platform-browser-dynamic/": "ng.platformBrowserDynamic",
-    "tests/@angular/router/": "ng.router",
+    "tests/@angular/": "ng",
     "tests/rxjs": "rxjs",
     "tests": "fr.lteconsulting.test"
 }
