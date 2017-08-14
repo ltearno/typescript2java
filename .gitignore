@@ -5,3 +5,6 @@ out/
 out.txt
 *.js
 *.map
+tests/
+tests.full/
+tests.mini/
