@@ -13,7 +13,7 @@ export class PreJavaTypeTuple extends PreJavaType {
     }
 
     dump() {
-        console.log(`tuple ${this.getParametrizedSimpleName()}`)
+        console.log(`tuple ${this.getParametrizedSimpleName(null)}`)
     }
 
     getParametrization(): string {

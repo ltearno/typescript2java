@@ -289,7 +289,7 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
 
         if (this.baseTypes && this.baseTypes.size) {
             console.log('base types:')
-            this.baseTypes.forEach(type => console.log(`- ${type.getParametrizedSimpleName()}`))
+            this.baseTypes.forEach(type => console.log(`- ${type.getParametrizedSimpleName(null)}`))
         }
 
         if (this.comments && this.comments.length) {
@@ -314,15 +314,15 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
             for (let property of this.properties) {
                 if (property.comments && property.comments.length)
                     console.log(property.comments.map(c => `/* ${c} */`).join('\n'))
-                console.log(`${property.type.getParametrizedSimpleName()} ${property.name} ${property.writable ? '' : 'READ-ONLY'}`)
+                console.log(`${property.type.getParametrizedSimpleName(null)} ${property.name} ${property.writable ? '' : 'READ-ONLY'}`)
             }
         }
 
         if (this.numberIndexType) {
-            console.log(`index by number: ${this.numberIndexType.getParametrizedSimpleName()}`)
+            console.log(`index by number: ${this.numberIndexType.getParametrizedSimpleName(null)}`)
         }
         if (this.stringIndexType) {
-            console.log(`index by string: ${this.stringIndexType.getParametrizedSimpleName()}`)
+            console.log(`index by string: ${this.stringIndexType.getParametrizedSimpleName(null)}`)
         }
 
         if (this.methods && this.methods.length) {

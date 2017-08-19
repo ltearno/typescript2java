@@ -37,18 +37,18 @@ export class PreJavaTypeCallSignature {
         if (this.typeParameters) {
             res += '<'
             res += this.typeParameters.map(tp => {
-                return tp.name + (tp.constraint ? ` extends ${tp.constraint.getParametrizedSimpleName()}` : '')
+                return tp.name + (tp.constraint ? ` extends ${tp.constraint.getParametrizedSimpleName(null)}` : '')
             }).join()
             res += '> '
         }
 
         if (this.name)
-            res += `${this.returnType.getParametrizedSimpleName()} ${this.name}`
+            res += `${this.returnType.getParametrizedSimpleName(null)} ${this.name}`
         else if (defaultName)
             res += `${defaultName}`
 
         if (this.parameters && this.parameters.length)
-            res += `(${this.parameters.map(p => p.type.getParametrizedSimpleName() + ' ' + p.name).join()})`
+            res += `(${this.parameters.map(p => p.type.getParametrizedSimpleName(null) + ' ' + p.name).join()})`
         else
             res += '()'
         return res

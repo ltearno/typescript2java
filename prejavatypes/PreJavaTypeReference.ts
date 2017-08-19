@@ -1,21 +1,25 @@
 import * as ts from "typescript"
 import { PreJavaType, ProcessContext, TypeReplacer } from './PreJavaType'
 
+/*export class PreJavaTypeTPEnvironnement extends PreJavaType {
+    type: PreJavaType
+}*/
+
 export class PreJavaTypeReference extends PreJavaType {
     type: PreJavaType
     typeParameters: PreJavaType[]
 
-    dump() { console.log(`TypeReference to ${this.type.getParametrizedSimpleName()}`) }
+    dump() { console.log(`TypeReference to ${this.type.getParametrizedSimpleName(null)}`) }
 
     getParametrization(): string {
         if (this.typeParameters && this.typeParameters.length)
-            return `<${this.typeParameters.map(tp => tp.getParametrizedSimpleName()).join(', ')}>`
+            return `<${this.typeParameters.map(tp => tp.getParametrizedSimpleName(null)).join(', ')}>`
         return ''
     }
 
     setSimpleName(name: string) { }
 
-    getSimpleName(): string { return this.type.getSimpleName() }
+    getSimpleName(): string { return this.type.getSimpleName(null) }
 
     getPackageName(): string { return this.type.getPackageName() }
 

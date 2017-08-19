@@ -17,14 +17,14 @@ export class PreJavaTypeUnion extends PreJavaType {
     }
 
     dump() {
-        console.log(`UnionType ${this.getParametrizedSimpleName()}`)
+        console.log(`UnionType ${this.getParametrizedSimpleName(null)}`)
         if (this.types && this.types.length)
-            this.types.forEach(t => console.log(`- ${t.getParametrizedSimpleName()}`))
+            this.types.forEach(t => console.log(`- ${t.getParametrizedSimpleName(null)}`))
     }
 
     getParametrization(): string {
         if (this.typeParameters && this.typeParameters.length)
-            return `<${this.typeParameters.map(tp => tp.getParametrizedSimpleName()).join(', ')}>`
+            return `<${this.typeParameters.map(tp => tp.getParametrizedSimpleName(null)).join(', ')}>`
         return ''
     }
 
@@ -34,7 +34,7 @@ export class PreJavaTypeUnion extends PreJavaType {
         if ((!this.types) || this.types.length == 0)
             return 'EmptyUnion'
 
-        return this.getHumanizedName().replace(new RegExp('\\?', 'g'), 'UNKOWNTYPE')
+        return this.getHumanizedName(null).replace(new RegExp('\\?', 'g'), 'UNKOWNTYPE')
     }
 
     getPackageName(): string { return this.packageName }

@@ -25,14 +25,14 @@ export class ExportPhase {
         content += `package ${type.getPackageName()};\n`
         content += '\n'
         for (let importedType of javaWriter.imports.keys())
-            content += `import ${importedType.getFullyQualifiedName()};\n`
+            content += `import ${importedType.getFullyQualifiedName(null)};\n`
         content += '\n'
         content += flow.content()
 
         let fileDirectory = path.join(baseDirectory, type.getPackageName().replace(new RegExp('\\.', 'g'), '/'))
         mkdirRec(fileDirectory)
 
-        let fileName = path.join(fileDirectory, `${type.getSimpleName()}.java`)
+        let fileName = path.join(fileDirectory, `${type.getSimpleName(null)}.java`)
         fs.writeFileSync(fileName, content, 'utf8')
     }
 
@@ -88,7 +88,7 @@ export class ExportPhase {
 
     exportNodes(program: ts.Program, baseDirectory: string) {
         for (let type of this.gatherPhase.typeMap.typeMap.values()) {
-            console.log(`export ${type.getParametrizedFullyQualifiedName()}`)
+            console.log(`export ${type.getParametrizedFullyQualifiedName(null)}`)
             preJavaTypeVisit(type, {
                 onVisitUnion: (type) => {
                     let javaWriter = new JavaWriter(type.getPackageName())
@@ -102,19 +102,19 @@ export class ExportPhase {
                     flow.endJavaDocComments()
                     javaWriter.importType(this.JS_PACKAGE)
                     flow.push(`@JsType(isNative=true, namespace=JsPackage.GLOBAL, name="?")`).finishLine()
-                    flow.push(`public class ${type.getParametrizedSimpleName()} {`).finishLine()
+                    flow.push(`public class ${type.getParametrizedSimpleName(null)} {`).finishLine()
                     flow.pushLineStart('    ')
                     for (let unionedType of type.types) {
                         javaWriter.importType(this.JS_OVERLAY)
 
                         flow.push(`@JsOverlay`).finishLine()
-                        flow.push(`public ${javaWriter.importTypeParametrized(unionedType)} as${unionedType.getHumanizedName()}() {`).finishLine()
+                        flow.push(`public ${javaWriter.importTypeParametrized(unionedType)} as${unionedType.getHumanizedName(null)}() {`).finishLine()
                         flow.pushLineStart('    ')
                         flow.push(`return Js.uncheckedCast( this );`).finishLine()
                         flow.pullLineStart()
                         flow.push(`}`).finishLine()
 
-                        flow.push(`public static ${type.getParametrization()} ${type.getParametrizedSimpleName()} of${unionedType.getHumanizedName()}(${unionedType.getSimpleName()} value) {`).finishLine()
+                        flow.push(`public static ${type.getParametrization()} ${type.getParametrizedSimpleName(null)} of${unionedType.getHumanizedName(null)}(${unionedType.getSimpleName(null)} value) {`).finishLine()
                         flow.pushLineStart('    ')
                         flow.push(`return Js.uncheckedCast( value );`).finishLine()
                         flow.pullLineStart()
@@ -137,7 +137,7 @@ export class ExportPhase {
 
                     javaWriter.importType(this.JS_PACKAGE)
                     flow.push(`@JsType(isNative=true, namespace=JsPackage.GLOBAL, name="?")`).finishLine()
-                    flow.push(`public class ${type.getParametrizedSimpleName()} {`).finishLine()
+                    flow.push(`public class ${type.getParametrizedSimpleName(null)} {`).finishLine()
                     flow.pushLineStart('    ')
                     javaWriter.importType(this.JS_OVERLAY)
                     javaWriter.importType(this.JS)
@@ -180,10 +180,10 @@ export class ExportPhase {
                     flow.startJavaDocComments()
                     flow.push(`Enumeration adapter`).finishLine()
                     flow.endJavaDocComments()
-                    flow.push(`public abstract class ${type.getParametrizedSimpleName()} extends Number {`).finishLine()
+                    flow.push(`public abstract class ${type.getParametrizedSimpleName(null)} extends Number {`).finishLine()
                     flow.pushLineStart('    ')
                     for (let member of type.members)
-                        flow.push(`public static ${type.getParametrizedSimpleName()} ${member.name} = Js.uncheckedCast( ${member.value} );`).finishLine()
+                        flow.push(`public static ${type.getParametrizedSimpleName(null)} ${member.name} = Js.uncheckedCast( ${member.value} );`).finishLine()
                     flow.pullLineStart()
                     flow.push(`}`).finishLine()
 

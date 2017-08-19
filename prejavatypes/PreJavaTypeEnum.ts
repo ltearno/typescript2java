@@ -49,7 +49,7 @@ export class PreJavaTypeEnum extends PreJavaType {
     }
 
     dump() {
-        console.log(`enum ${this.getParametrizedSimpleName()}`)
+        console.log(`enum ${this.getParametrizedSimpleName(null)}`)
         if (this.members && this.members.length)
             this.members.forEach(m => console.log(`enum member ${m.name} = ${m.value}`))
     }

@@ -42,7 +42,7 @@ export class TsToPreJavaTypemap {
     ensureAllTypesHaveName(defaultPackageName: string) {
         for (let type of this.typeMap.values()) {
             if (type instanceof PreJavaTypeClassOrInterface) {
-                if (type.getParametrizedSimpleName() == null)
+                if (type.getParametrizedSimpleName(null) == null)
                     type.setSimpleName(`AnonymousType_${this.currentIdAnonymousTypes++}`)
             }
             if (defaultPackageName && !type.getPackageName())
@@ -119,8 +119,8 @@ export class TsToPreJavaTypemap {
 
     removeNotSupportedTypes() {
         this.substituteType((type) => type instanceof PreJavaTypeFakeType ? null : type)
-        this.substituteType((type) => type.getSimpleName() == '?' ? BUILTIN_TYPE_OBJECT : type)
-        this.substituteType((type) => type.getSimpleName() == '' ? null : type)
+        this.substituteType((type) => type.getSimpleName(null) == '?' ? BUILTIN_TYPE_OBJECT : type)
+        this.substituteType((type) => type.getSimpleName(null) == '' ? null : type)
     }
 
     // TODO : for classes : add methods from interface hierarchy which are not in the method list
@@ -181,7 +181,7 @@ export class TsToPreJavaTypemap {
                 let classOrInterface = type as PreJavaTypeClassOrInterface
                 // TODO in the process we loose type parameters information.
                 // TODO so when sometimes instead of removing a method, we should arrange type parameters according to the removed method
-                let methodsByNameAndParameters = this.groupBy(type.methods, method => method.name + '-' + (method.parameters ? method.parameters.map(p => p.type.getFullyQualifiedName()).join('-') : ''))
+                let methodsByNameAndParameters = this.groupBy(type.methods, method => method.name + '-' + (method.parameters ? method.parameters.map(p => p.type.getFullyQualifiedName(null)).join('-') : ''))
                 for (let methodGroup of methodsByNameAndParameters.values()) {
                     if (methodGroup.length < 2)
                         continue

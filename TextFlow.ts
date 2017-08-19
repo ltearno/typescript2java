@@ -112,7 +112,7 @@ export class JavaWriter {
 
     importType(type: PreJavaType): string {
         if (type.getPackageName() == null || type.getPackageName() == this.unitPackageName || type.getPackageName() == 'java.lang')
-            return type.getSimpleName()
+            return type.getSimpleName(null)
 
         if (type instanceof PreJavaTypeParameter) {
             type.constraint && this.importType(type.constraint)
@@ -127,10 +127,10 @@ export class JavaWriter {
         if (this.imports.has(type))
             return this.imports.get(type)
 
-        let name = type.getSimpleName()
+        let name = type.getSimpleName(null)
         for (let simpleName of this.imports.values()) {
             if (simpleName == name) {
-                let fqn = type.getFullyQualifiedName()
+                let fqn = type.getFullyQualifiedName(null)
                 this.imports.set(type, fqn)
                 return fqn
             }
