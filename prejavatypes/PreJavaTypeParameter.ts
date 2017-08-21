@@ -23,15 +23,17 @@ export class PreJavaTypeParameter extends PreJavaType {
         return 1
     }
 
-    getSimpleName(): string { return this.name }
+    getSimpleName(typeParametersEnv: { [key: string]: PreJavaType }): string {
+        if (typeParametersEnv && typeParametersEnv[this.name])
+            return typeParametersEnv[this.name].getSimpleName(typeParametersEnv)
+        return this.name
+    }
 
     getPackageName(): string { return null }
 
     setPackageName(name: string) { }
 
     isClassLike() { return false }
-
-    isCompletablePreJavaType() { return null }
 
     substituteTypeReal(replacer: TypeReplacer, cache: Map<PreJavaType, PreJavaType>, passThroughTypes: Set<PreJavaType>): PreJavaType {
         let stay = replacer(this)

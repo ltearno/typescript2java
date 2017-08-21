@@ -116,7 +116,7 @@ export class JavaWriter {
 
         if (type instanceof PreJavaTypeParameter) {
             type.constraint && this.importType(type.constraint)
-            return type.getSimpleName()
+            return type.getSimpleName(null)
         }
 
         if (type instanceof PreJavaTypeReference) {
@@ -142,7 +142,7 @@ export class JavaWriter {
 
     importTypeParametrized(type: PreJavaType): string {
         let res = this.importType(type)
-        return res + type.getParametrization()
+        return res + type.getParametrization(null)
     }
 
     // package name

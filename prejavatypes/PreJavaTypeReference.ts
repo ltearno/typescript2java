@@ -1,9 +1,50 @@
 import * as ts from "typescript"
 import { PreJavaType, ProcessContext, TypeReplacer } from './PreJavaType'
 
-/*export class PreJavaTypeTPEnvironnement extends PreJavaType {
+export class PreJavaTypeTPEnvironnement extends PreJavaType {
     type: PreJavaType
-}*/
+    environment: { [key: string]: PreJavaType }
+
+    dump() {
+        console.log(`TypeEnvironment for`)
+        this.type.dump()
+    }
+
+    getParametrization(typeParametersEnv: { [key: string]: PreJavaType }): string {
+        let env = typeParametersEnv
+        if (typeParametersEnv && this.environment) {
+            env = Object.create(typeParametersEnv)
+            for (let ppty in this.environment)
+                env[ppty] = this.environment[ppty]
+        }
+        return this.type.getParametrization(env)
+    }
+
+    getHierachyDepth() {
+        return this.type.getHierachyDepth()
+    }
+
+    getSimpleName(): string { return this.type.getSimpleName(this.environment) }
+
+    getPackageName(): string { return this.type.getPackageName() }
+    setPackageName(name: string) { this.type.setPackageName(name) }
+
+    isClassLike() {
+        return this.type.isClassLike()
+    }
+
+    substituteTypeReal(replacer: TypeReplacer, cache: Map<PreJavaType, PreJavaType>, passThroughTypes: Set<PreJavaType>): PreJavaType {
+        let stay = replacer(this)
+        if (!stay || stay != this)
+            return null
+
+        this.type = replacer(this.type)
+        if (!this.type)
+            return null
+
+        return this
+    }
+}
 
 export class PreJavaTypeReference extends PreJavaType {
     type: PreJavaType
@@ -16,8 +57,6 @@ export class PreJavaTypeReference extends PreJavaType {
             return `<${this.typeParameters.map(tp => tp.getParametrizedSimpleName(null)).join(', ')}>`
         return ''
     }
-
-    setSimpleName(name: string) { }
 
     getSimpleName(): string { return this.type.getSimpleName(null) }
 

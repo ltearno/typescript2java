@@ -19,13 +19,13 @@ export abstract class PreJavaType {
     abstract getPackageName(): string
     abstract setPackageName(name: string)
 
-    abstract getParametrization(): string
+    abstract getParametrization(typeParametersEnv: { [key: string]: PreJavaType }): string
 
     getParametrizedSimpleName(typeParametersEnv: { [key: string]: PreJavaType }): string {
         let simpleName = this.getSimpleName(typeParametersEnv)
         if (!simpleName)
             return null
-        let parametrization = this.getParametrization()
+        let parametrization = this.getParametrization(typeParametersEnv)
         return simpleName + (parametrization ? parametrization : '')
     }
 
