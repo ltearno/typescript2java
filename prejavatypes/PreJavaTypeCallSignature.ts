@@ -18,8 +18,8 @@ export class PreJavaTypeCallSignature {
     constructor(typeParameters: PreJavaTypeParameter[], returnType: PreJavaType, name: string, parameters: PreJavaTypeFormalParameter[]) {
         this.typeParameters = typeParameters
         this.returnType = returnType
-        this.name = name,
-            this.parameters = parameters
+        this.name = name
+        this.parameters = parameters
     }
 
     addComments(comments: string[]) {

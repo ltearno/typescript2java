@@ -28,7 +28,14 @@ let walkSync = function (dir, filelist = []) {
     return filelist;
 };
 
-let sourceRootDir = './tests';
+let sourceRootDir = './tests.mini'
+let baseJavaPackage = 'fr.lteconsulting.angular2gwt.interop';
+let javaPackages = {
+    "tests/@angular/": "ng",
+    "tests/rxjs": "rxjs",
+    "tests": "fr.lteconsulting.test"
+}
+let processInternalTypes = false
 
 let files = walkSync(sourceRootDir)
 
@@ -78,20 +85,13 @@ if (emitResult.emitSkipped) {
 
 console.log(`Adding exportable nodes...`);
 
-let baseJavaPackage = 'fr.lteconsulting.angular2gwt.interop';
-let javaPackages = {
-    "tests/@angular/": "ng",
-    "tests/rxjs": "rxjs",
-    "tests": "fr.lteconsulting.test"
-}
-
 let syncPhase = new GatherPhase(baseJavaPackage, javaPackages, program)
 
 program.getSourceFiles().forEach(sourceFile => {
     console.log(`source ${sourceFile.fileName}`);
 
     let isInternalFile = !files.find(file => path.normalize(file) === path.normalize(sourceFile.fileName));
-    if (true || !isInternalFile)
+    if (processInternalTypes || !isInternalFile)
         syncPhase.addTypesFromSourceFile(sourceFile, !isInternalFile);
 });
 

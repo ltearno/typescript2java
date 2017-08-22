@@ -12,7 +12,7 @@ export class PreJavaTypeParameter extends PreJavaType {
 
     dump() { console.log(`TypeParameter ${this.name}`) }
 
-    getParametrization(): string { return '' }
+    getTypeParameters(typeParametersEnv: { [key: string]: PreJavaType }) { return null }
 
     setSimpleName(name: string) {
         if (this.name != null)

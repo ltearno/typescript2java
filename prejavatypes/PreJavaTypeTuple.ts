@@ -1,32 +1,35 @@
 import * as ts from "typescript"
 import { PreJavaType, ProcessContext, TypeReplacer } from './PreJavaType'
+import { PreJavaTypeParameter } from './PreJavaTypeParameter'
 
 export const TUPLE_TYPE_VARIABLE_NAMES = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K']
 
 export class PreJavaTypeTuple extends PreJavaType {
     packageName: string
-    nbTypeParameters: number
+    typeParameters: PreJavaTypeParameter[]
 
     constructor(type: ts.TypeReference) {
         super()
-        this.nbTypeParameters = type.typeArguments && type.typeArguments.length
+        let nbTypeParameters = type.typeArguments && type.typeArguments.length
+        if (nbTypeParameters)
+            this.typeParameters = TUPLE_TYPE_VARIABLE_NAMES.slice(0, nbTypeParameters).map(name => new PreJavaTypeParameter(name))
+        else
+            this.typeParameters = null
     }
 
     dump() {
         console.log(`tuple ${this.getParametrizedSimpleName(null)}`)
     }
 
-    getParametrization(): string {
-        if (!this.nbTypeParameters)
-            return ''
-        return `<${TUPLE_TYPE_VARIABLE_NAMES.slice(0, this.nbTypeParameters).join(', ')}>`
+    getTypeParameters(typeParametersEnv: { [key: string]: PreJavaType }) {
+        return this.typeParameters
     }
 
     getSimpleName(): string {
-        if (this.nbTypeParameters == 2)
+        if (this.typeParameters && this.typeParameters.length == 2)
             return `Tuple`
         else
-            return `TupleOf${this.nbTypeParameters}`
+            return `TupleOf${this.typeParameters.length}`
     }
 
     getPackageName(): string { return this.packageName }

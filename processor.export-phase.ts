@@ -114,7 +114,7 @@ export class ExportPhase {
                         flow.pullLineStart()
                         flow.push(`}`).finishLine()
 
-                        flow.push(`public static ${type.getParametrization()} ${type.getParametrizedSimpleName(null)} of${unionedType.getHumanizedName(null)}(${unionedType.getSimpleName(null)} value) {`).finishLine()
+                        flow.push(`public static ${type.getParametrization(null)} ${type.getParametrizedSimpleName(null)} of${unionedType.getHumanizedName(null)}(${unionedType.getSimpleName(null)} value) {`).finishLine()
                         flow.pushLineStart('    ')
                         flow.push(`return Js.uncheckedCast( value );`).finishLine()
                         flow.pullLineStart()
@@ -141,7 +141,7 @@ export class ExportPhase {
                     flow.pushLineStart('    ')
                     javaWriter.importType(this.JS_OVERLAY)
                     javaWriter.importType(this.JS)
-                    for (let i = 0; i < type.nbTypeParameters; i++) {
+                    for (let i = 0; i < type.typeParameters.length; i++) {
                         let variableName = TUPLE_TYPE_VARIABLE_NAMES[i]
 
                         flow.push(`@JsOverlay`).finishLine()

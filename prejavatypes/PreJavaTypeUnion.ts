@@ -2,11 +2,12 @@ import * as ts from "typescript"
 import { PreJavaType, ProcessContext, TypeReplacer } from './PreJavaType'
 import { PreJavaTypeClassOrInterface } from './PreJavaTypeClassOrInterface'
 import { PreJavaTypeReference } from './PreJavaTypeReference'
+import { PreJavaTypeParameter } from './PreJavaTypeParameter'
 
 export class PreJavaTypeUnion extends PreJavaType {
     packageName: string
     types: PreJavaType[]
-    typeParameters: PreJavaType[]
+    typeParameters: PreJavaTypeParameter[]
 
     setTypes(types: PreJavaType[]) {
         this.types = []
@@ -22,11 +23,7 @@ export class PreJavaTypeUnion extends PreJavaType {
             this.types.forEach(t => console.log(`- ${t.getParametrizedSimpleName(null)}`))
     }
 
-    getParametrization(): string {
-        if (this.typeParameters && this.typeParameters.length)
-            return `<${this.typeParameters.map(tp => tp.getParametrizedSimpleName(null)).join(', ')}>`
-        return ''
-    }
+    getTypeParameters(typeParametersEnv: { [key: string]: PreJavaType }) { return this.typeParameters }
 
     setSimpleName(name: string) { }
 

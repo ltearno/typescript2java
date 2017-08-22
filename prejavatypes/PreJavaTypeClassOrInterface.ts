@@ -108,9 +108,6 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
         if (type.flags & ts.TypeFlags.Object) {
             let objectType = type as ts.ObjectType
 
-            if (type.getSymbol() && type.getSymbol().getName() == 'Action')
-                console.log('yo')
-
             if (objectType.objectFlags & ts.ObjectFlags.Anonymous) {
                 this.setTypeParameters((typeParametersToApplyToAnonymousTypes && typeParametersToApplyToAnonymousTypes.length) ? typeParametersToApplyToAnonymousTypes.slice() : null)
             }
@@ -254,12 +251,7 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
             this.packageName = packageName
     }
 
-    getParametrization(): string {
-        if (this.typeParameters && this.typeParameters.length)
-            return `<${this.typeParameters.map(tp => tp.name).join(', ')}>`
-        else
-            return ''
-    }
+    getTypeParameters(typeParametersEnv: { [key: string]: PreJavaType }) { return this.typeParameters }
 
     setSimpleName(name: string) {
         if (name == '__type')

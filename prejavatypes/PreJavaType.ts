@@ -1,6 +1,7 @@
 import * as ts from "typescript"
 import { TsToPreJavaTypemap } from '../type-map'
 import { preJavaTypeVisit } from './PreJavaTypeVisit'
+import { PreJavaTypeParameter } from './PreJavaTypeParameter'
 
 export interface ProcessContext {
     createAnonymousTypeName(): string
@@ -19,7 +20,15 @@ export abstract class PreJavaType {
     abstract getPackageName(): string
     abstract setPackageName(name: string)
 
-    abstract getParametrization(typeParametersEnv: { [key: string]: PreJavaType }): string
+    abstract getTypeParameters(typeParametersEnv: { [key: string]: PreJavaType }): PreJavaTypeParameter[]
+
+    getParametrization(typeParametersEnv: { [key: string]: PreJavaType }): string {
+        let typeParameters = this.getTypeParameters(typeParametersEnv)
+        if (typeParameters && typeParameters.length)
+            return `<${typeParameters.map(tp => tp.name).join(', ')}>`
+        else
+            return ''
+    }
 
     getParametrizedSimpleName(typeParametersEnv: { [key: string]: PreJavaType }): string {
         let simpleName = this.getSimpleName(typeParametersEnv)

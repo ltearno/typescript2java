@@ -2,22 +2,24 @@ import * as ts from "typescript"
 import { PreJavaType, ProcessContext, TypeReplacer } from './PreJavaType'
 
 export class PreJavaTypeTPEnvironnement extends PreJavaType {
-    type: PreJavaType
-    environment: { [key: string]: PreJavaType }
+    constructor(public type: PreJavaType,
+        public environment: { [key: string]: PreJavaType }) {
+        super()
+    }
 
     dump() {
         console.log(`TypeEnvironment for`)
         this.type.dump()
     }
 
-    getParametrization(typeParametersEnv: { [key: string]: PreJavaType }): string {
-        let env = typeParametersEnv
+    getTypeParameters(typeParametersEnv: { [key: string]: PreJavaType }) {
+        let env = typeParametersEnv || this.environment
         if (typeParametersEnv && this.environment) {
             env = Object.create(typeParametersEnv)
             for (let ppty in this.environment)
                 env[ppty] = this.environment[ppty]
         }
-        return this.type.getParametrization(env)
+        return this.type.getTypeParameters(env)
     }
 
     getHierachyDepth() {
@@ -52,10 +54,8 @@ export class PreJavaTypeReference extends PreJavaType {
 
     dump() { console.log(`TypeReference to ${this.type.getParametrizedSimpleName(null)}`) }
 
-    getParametrization(): string {
-        if (this.typeParameters && this.typeParameters.length)
-            return `<${this.typeParameters.map(tp => tp.getParametrizedSimpleName(null)).join(', ')}>`
-        return ''
+    getTypeParameters(typeParametersEnv: { [key: string]: PreJavaType }) {
+        return this.type.getTypeParameters(typeParametersEnv)
     }
 
     getSimpleName(): string { return this.type.getSimpleName(null) }

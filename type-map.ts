@@ -6,7 +6,7 @@ import * as Visit from './prejavatypes/PreJavaTypeVisit'
 
 import { PreJavaTypeFakeType } from './prejavatypes/PreJavaTypeFakeType'
 import { PreJavaTypeBuiltinJavaType } from './prejavatypes/PreJavaTypeBuiltinJavaType'
-import { PreJavaTypeReference } from './prejavatypes/PreJavaTypeReference'
+import { PreJavaTypeReference, PreJavaTypeTPEnvironnement } from './prejavatypes/PreJavaTypeReference'
 import { PreJavaTypeUnion } from './prejavatypes/PreJavaTypeUnion'
 import { PreJavaTypeClassOrInterface, PreJavaTypeProperty } from './prejavatypes/PreJavaTypeClassOrInterface'
 import { PreJavaTypeTuple } from './prejavatypes/PreJavaTypeTuple'
@@ -125,12 +125,20 @@ export class TsToPreJavaTypemap {
 
     // TODO : for classes : add methods from interface hierarchy which are not in the method list
     addMethodsFromInterfaceHierarchy() {
-        let recBrowseInterfaceHierarchy = (type: PreJavaType, visitor: { (visitedInterface: PreJavaTypeClassOrInterface) }) => {
+        let recBrowseInterfaceHierarchy = (type: PreJavaType, visitor: { (visitedInterface: PreJavaTypeClassOrInterface, typeVariableEnv: { [key: string]: PreJavaType }) }, typeVariableEnv: { [key: string]: PreJavaType } = null) => {
             Visit.preJavaTypeVisit(type, {
-                onVisitReferenceType: type => recBrowseInterfaceHierarchy(type.type, visitor),
+                onVisitReferenceType: type => {
+                    let env: { [key: string]: PreJavaType } = Object.create(typeVariableEnv)
+                    let typeParameters = type.type.getTypeParameters(typeVariableEnv)
+                    for (let tpi = 0; tpi < type.typeParameters.length; tpi++)
+                        env[typeParameters[tpi].getSimpleName(typeVariableEnv)] = type.typeParameters[tpi]
+
+                    recBrowseInterfaceHierarchy(type.type, visitor, env)
+                },
+
                 onVisitClassOrInterfaceType: type => {
                     if (!type.isClassLike())
-                        visitor(type)
+                        visitor(type, typeVariableEnv)
                     type.baseTypes && type.baseTypes.forEach(baseType => recBrowseInterfaceHierarchy(baseType, visitor))
                 }
             })
@@ -140,15 +148,18 @@ export class TsToPreJavaTypemap {
             Visit.preJavaTypeVisit(type, {
                 onVisitClassOrInterfaceType: type => {
                     if (type.isClassLike()) {
-                        recBrowseInterfaceHierarchy(type, visitedInterface => {
+                        recBrowseInterfaceHierarchy(type, (visitedInterface, typeVariableEnv) => {
                             visitedInterface.methods && visitedInterface.methods.forEach(visitedMethod => {
-                                if (!type.methods || !type.methods.some(m => m.name == visitedMethod.name))
-                                    type.addMethod(visitedMethod) // TODO Take care of the concretized type parameters
+                                if (!type.methods || !type.methods.some(m => m.name == visitedMethod.name)) {
+                                    let method = new PreJavaTypeCallSignature(visitedInterface.typeParameters, visitedMethod.returnType, visitedMethod.name, visitedMethod.parameters)
+                                    method.returnType = new PreJavaTypeTPEnvironnement(visitedMethod.returnType, typeVariableEnv)
+                                    type.addMethod(method) // TODO Take care of the concretized type parameters
+                                }
                             })
 
                             visitedInterface.properties && visitedInterface.properties.forEach(visitedProperty => {
                                 if (!type.properties || !type.properties.some(p => p.name == visitedProperty.name))
-                                    type.addProperty(visitedProperty)
+                                    type.addProperty(visitedProperty) // TODO Take care of the concretized type parameters
                             })
                         })
                     }
@@ -461,8 +472,8 @@ export class TsToPreJavaTypemap {
 
             let res = new PreJavaTypeUnion()
             this.typeMap.set(typeKey, res)
+            res.typeParameters = typeParametersToApplyToAnonymousTypes
             res.setTypes(unionType.types.map(t => this.getOrCreatePreJavaTypeForTsType(t, false, typeParametersToApplyToAnonymousTypes)))
-            res.typeParameters = typeParametersToApplyToAnonymousTypes && typeParametersToApplyToAnonymousTypes.slice()
 
             return res
         }

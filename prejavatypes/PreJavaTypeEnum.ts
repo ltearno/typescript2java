@@ -54,7 +54,7 @@ export class PreJavaTypeEnum extends PreJavaType {
             this.members.forEach(m => console.log(`enum member ${m.name} = ${m.value}`))
     }
 
-    getParametrization(): string { return '' }
+    getTypeParameters(typeParametersEnv: { [key: string]: PreJavaType }) { return null }
 
     setSimpleName(name: string) {
         if (!this.name)

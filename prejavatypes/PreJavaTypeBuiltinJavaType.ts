@@ -13,7 +13,7 @@ export class PreJavaTypeBuiltinJavaType extends PreJavaType {
 
     dump() { console.log(`Builtin type ${this.name}`) }
 
-    getParametrization(): string { return '' }
+    getTypeParameters(typeParametersEnv: { [key: string]: PreJavaType }) { return null }
 
     setSimpleName(name: string) { }
 
