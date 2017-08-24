@@ -23,7 +23,7 @@ configuration = {
     },
     processInternalTypes: true
 }
-if (true) {
+if (2*3>4) {
     configuration = {
         sourceRootDir: './tests.mini',
         baseJavaPackage: 'fr.lteconsulting.angular2gwt.interop',
@@ -32,7 +32,7 @@ if (true) {
             "tests/rxjs": "rxjs",
             "tests": "fr.lteconsulting.test"
         },
-        processInternalTypes: false
+        processInternalTypes: true
     }
 }
 

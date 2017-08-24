@@ -20,12 +20,12 @@ export abstract class PreJavaType {
     abstract getPackageName(): string
     abstract setPackageName(name: string)
 
-    abstract getTypeParameters(typeParametersEnv: { [key: string]: PreJavaType }): PreJavaTypeParameter[]
+    abstract getTypeParameters(typeParametersEnv: { [key: string]: PreJavaType }): PreJavaType[]
 
     getParametrization(typeParametersEnv: { [key: string]: PreJavaType }): string {
         let typeParameters = this.getTypeParameters(typeParametersEnv)
         if (typeParameters && typeParameters.length)
-            return `<${typeParameters.map(tp => tp.name).join(', ')}>`
+            return `<${typeParameters.map(tp => tp.getSimpleName(typeParametersEnv)).join(', ')}>`
         else
             return ''
     }

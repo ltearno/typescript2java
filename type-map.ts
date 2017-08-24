@@ -151,7 +151,7 @@ export class TsToPreJavaTypemap {
                         recBrowseInterfaceHierarchy(type, (visitedInterface, typeVariableEnv) => {
                             visitedInterface.methods && visitedInterface.methods.forEach(visitedMethod => {
                                 if (!type.methods || !type.methods.some(m => m.name == visitedMethod.name)) {
-                                    let method = new PreJavaTypeCallSignature(visitedInterface.typeParameters, visitedMethod.returnType, visitedMethod.name, visitedMethod.parameters)
+                                    let method = new PreJavaTypeCallSignature(visitedMethod.typeParameters, visitedMethod.returnType, visitedMethod.name, visitedMethod.parameters)
                                     method.returnType = new PreJavaTypeTPEnvironnement(visitedMethod.returnType, typeVariableEnv)
                                     type.addMethod(method) // TODO Take care of the concretized type parameters
                                 }
