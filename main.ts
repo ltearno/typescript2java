@@ -4,12 +4,42 @@ import * as ts from "typescript"
 import { GatherPhase } from "./processor.gather-phase"
 import * as ExportPhase from './processor.export-phase'
 
+interface Configuration {
+    sourceRootDir: string
+    baseJavaPackage: string
+    javaPackages: { [key: string]: string }
+    processInternalTypes: boolean
+}
+
+let configuration: Configuration
+
+configuration = {
+    sourceRootDir: './tests',
+    baseJavaPackage: 'fr.lteconsulting.angular2gwt.interop',
+    javaPackages: {
+        "tests/@angular/": "ng",
+        "tests/rxjs": "rxjs",
+        "tests": "fr.lteconsulting.test"
+    },
+    processInternalTypes: true
+}
+if (true) {
+    configuration = {
+        sourceRootDir: './tests.mini',
+        baseJavaPackage: 'fr.lteconsulting.angular2gwt.interop',
+        javaPackages: {
+            "tests/@angular/": "ng",
+            "tests/rxjs": "rxjs",
+            "tests": "fr.lteconsulting.test"
+        },
+        processInternalTypes: false
+    }
+}
+
+
+
 /**
  * TODO
- *
- * - Enums (suite)
- * - Callable
- * - new operator
  *
  * - generate multiple method signatures when optional parameters
  */
@@ -28,20 +58,11 @@ let walkSync = function (dir, filelist = []) {
     return filelist;
 };
 
-let sourceRootDir = './tests.mini'
-let baseJavaPackage = 'fr.lteconsulting.angular2gwt.interop';
-let javaPackages = {
-    "tests/@angular/": "ng",
-    "tests/rxjs": "rxjs",
-    "tests": "fr.lteconsulting.test"
-}
-let processInternalTypes = false
-
-let files = walkSync(sourceRootDir)
+let files = walkSync(configuration.sourceRootDir)
 
 let compilerOptions: ts.CompilerOptions = {
-    baseUrl: sourceRootDir,
-    rootDir: sourceRootDir,
+    baseUrl: configuration.sourceRootDir,
+    rootDir: configuration.sourceRootDir,
     moduleResolution: ts.ModuleResolutionKind.NodeJs,
     listFiles: true,
     typeRoots: ["./typings/index.d.ts"],
@@ -85,13 +106,13 @@ if (emitResult.emitSkipped) {
 
 console.log(`Adding exportable nodes...`);
 
-let syncPhase = new GatherPhase(baseJavaPackage, javaPackages, program)
+let syncPhase = new GatherPhase(configuration.baseJavaPackage, configuration.javaPackages, program)
 
 program.getSourceFiles().forEach(sourceFile => {
     console.log(`source ${sourceFile.fileName}`);
 
     let isInternalFile = !files.find(file => path.normalize(file) === path.normalize(sourceFile.fileName));
-    if (processInternalTypes || !isInternalFile)
+    if (configuration.processInternalTypes || !isInternalFile)
         syncPhase.addTypesFromSourceFile(sourceFile, !isInternalFile);
 });
 

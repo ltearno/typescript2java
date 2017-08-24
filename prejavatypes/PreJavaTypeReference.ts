@@ -55,7 +55,8 @@ export class PreJavaTypeReference extends PreJavaType {
     dump() { console.log(`TypeReference to ${this.type.getParametrizedSimpleName(null)}`) }
 
     getTypeParameters(typeParametersEnv: { [key: string]: PreJavaType }) {
-        return this.type.getTypeParameters(typeParametersEnv)
+        return this.typeParameters
+        //return this.type.getTypeParameters(typeParametersEnv)
     }
 
     getSimpleName(): string { return this.type.getSimpleName(null) }
