@@ -15,6 +15,7 @@ import { PreJavaTypeUnion } from './prejavatypes/PreJavaTypeUnion'
 import { PreJavaTypeParameter } from './prejavatypes/PreJavaTypeParameter'
 import { PreJavaTypeTuple, TUPLE_TYPE_VARIABLE_NAMES } from './prejavatypes/PreJavaTypeTuple'
 import { PreJavaTypeReference } from './prejavatypes/PreJavaTypeReference'
+import { PreJavaTypeCallSignature, PreJavaTypeFormalParameter } from './prejavatypes/PreJavaTypeCallSignature'
 
 
 export class ExportPhase {
@@ -236,6 +237,7 @@ export class ExportPhase {
                     flow.push(`public ${isClass ? 'class' : 'interface'} ${type.getSimpleName()}`)
                     if (type.typeParameters && type.typeParameters.length)
                         flow.push(`<${type.typeParameters.map(tp => javaWriter.importType(tp)).join(', ')}>`)
+                    let theClassBaseType: PreJavaType = null
                     if (type.baseTypes) {
                         let extendsTypes: PreJavaType[] = []
                         let implementsTypes: PreJavaType[] = []
@@ -250,8 +252,11 @@ export class ExportPhase {
                                 implementsTypes.push(baseType)
                         }
 
-                        if (extendsTypes.length)
+                        if (extendsTypes.length) {
                             flow.push(` extends ${extendsTypes.map(t => javaWriter.importTypeParametrized(t)).join(', ')}`)
+                            if (type.isClassLike())
+                                theClassBaseType = extendsTypes[0]
+                        }
 
                         if (implementsTypes.length)
                             flow.push(` implements ${implementsTypes.map(t => javaWriter.importTypeParametrized(t)).join(', ')}`)
@@ -264,23 +269,36 @@ export class ExportPhase {
                     flow.pushLineStart('    ')
 
                     if (isClass && type.constructorSignatures && type.constructorSignatures.length) {
-                        flow.blankLine()
-                            .push('/*\n    Constructors\n*/').finishLine()
+                        flow.blankLine().push('/*\n    Constructors\n*/').finishLine()
 
-                        type.constructorSignatures.forEach(constructr => {
-                            if (constructr.comments && constructr.comments.length) {
+                        // the base constructor if any
+                        let theBaseClassConstructorParameters: PreJavaTypeFormalParameter[] = null
+                        if (theClassBaseType) {
+                            if (theClassBaseType instanceof PreJavaTypeClassOrInterface) {
+                                theBaseClassConstructorParameters = theClassBaseType.constructorSignatures
+                                    && theClassBaseType.constructorSignatures.length
+                                    && theClassBaseType.constructorSignatures[0].parameters
+                            }
+                        }
+
+                        type.constructorSignatures.forEach(constructor => {
+                            if (constructor.comments && constructor.comments.length) {
                                 flow.startJavaDocComments()
-                                flow.push(constructr.comments)
+                                flow.push(constructor.comments)
                                 flow.endJavaDocComments()
                             }
 
                             let escapedMethodName = type.getSimpleName()
 
                             flow.push(`public ${type.getSimpleName()}(`)
-                            if (constructr.parameters)
-                                flow.push(constructr.parameters.map(p => `${javaWriter.importTypeParametrized(p.type)} ${this.escapePropertyName(p.name)}`).join(', ')).push(`)`)
+                            if (constructor.parameters)
+                                flow.push(constructor.parameters.map(p => `${javaWriter.importTypeParametrized(p.type)} ${this.escapePropertyName(p.name)}`).join(', ')).push(`)`)
 
-                            flow.push(`{\n}`).finishLine()
+                            flow.push(`{`).finishLine()
+                            if (theBaseClassConstructorParameters && theBaseClassConstructorParameters.length) {
+                                flow.pushLineStart('    ').push(`super(${theBaseClassConstructorParameters.map(p => 'null').join(', ')});`).finishLine().pullLineStart()
+                            }
+                            flow.push(`}`).finishLine()
                         })
                     }
 
