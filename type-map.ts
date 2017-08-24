@@ -325,9 +325,6 @@ export class TsToPreJavaTypemap {
             .filter(tp => !typeParametersToApplyToAnonymousTypes.some(tpIn => tpIn.name == tp.name))
             .forEach(tp => typeParametersToApplyToAnonymousTypes.push(tp))
 
-        if (name == 'deepAPath')
-            console.log('yop')
-
         let signatureReturnType = tsSignature.getReturnType()
         let returnType = this.getOrCreatePreJavaTypeForTsType(signatureReturnType, true, typeParametersToApplyToAnonymousTypes)
 
