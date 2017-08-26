@@ -150,7 +150,18 @@ export class TsToPreJavaTypemap {
                     if (type.isClassLike()) {
                         recBrowseInterfaceHierarchy(type, (visitedInterface, typeVariableEnv) => {
                             visitedInterface.methods && visitedInterface.methods.forEach(visitedMethod => {
-                                if (!type.methods || !type.methods.some(m => m.name == visitedMethod.name)) {
+                                if (!type.methods || !type.methods.some(m => {
+                                    // vérifie que deux méthodes ne sont pas identiques du point de vue de leur noms et des type erasure de leurs paramètres.
+                                    if (m.name != visitedMethod.name)
+                                        return false
+                                    if ((m.parameters && m.parameters.length) != (visitedMethod.parameters && visitedMethod.parameters.length))
+                                        return false
+                                    for (let i = 0; i < m.parameters.length; i++) {
+                                        if (m.parameters[i].type.getFullyQualifiedName(null) != visitedMethod.parameters[i].type.getFullyQualifiedName(null))
+                                            return false
+                                    }
+                                    return true
+                                })) {
                                     let method = new PreJavaTypeCallSignature(visitedMethod.typeParameters, visitedMethod.returnType, visitedMethod.name, visitedMethod.parameters)
                                     method.returnType = new PreJavaTypeTPEnvironnement(visitedMethod.returnType, typeVariableEnv)
                                     type.addMethod(method) // TODO Take care of the concretized type parameters
@@ -158,8 +169,15 @@ export class TsToPreJavaTypemap {
                             })
 
                             visitedInterface.properties && visitedInterface.properties.forEach(visitedProperty => {
-                                if (!type.properties || !type.properties.some(p => p.name == visitedProperty.name))
-                                    type.addProperty(visitedProperty) // TODO Take care of the concretized type parameters
+                                // TODO minimal management of property redefinitions : should allow the type to be tightened and not widened
+                                // TODO For the moment, we just keep the super type class
+                                let existingProperty = type.properties && type.properties.find(p => p.name == visitedProperty.name)
+                                if (existingProperty)
+                                    existingProperty.type = visitedProperty.type
+                                else
+                                    type.addProperty(visitedProperty)
+                                //if (!type.properties || !type.properties.some(p => p.name == visitedProperty.name))
+                                //    type.addProperty(visitedProperty) // TODO Take care of the concretized type parameters
                             })
                         })
                     }
@@ -295,8 +313,8 @@ export class TsToPreJavaTypemap {
     }
 
     convertSignature(name: string, tsSignature: ts.Signature, typeParametersToApplyToAnonymousTypes: PreJavaTypeParameter[]): PreJavaTypeCallSignature {
-        if (('thisParameter' in tsSignature) && tsSignature['thisParameter'])
-            return null
+        //if (('thisParameter' in tsSignature) && tsSignature['thisParameter'])
+        //    return null
 
         let hasKeyOfInTypeParameters = tsSignature.getTypeParameters() && tsSignature.getTypeParameters().some(typeParameter => {
             let symbol = typeParameter.getSymbol()
