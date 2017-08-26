@@ -56,7 +56,7 @@ export class ExportPhase {
         'default': 'default_',
         'continue': 'continue_',
 
-        'className': 'clasName'
+        'className': 'cssClassName'
     }
 
     escapePropertyName(symbolName: string) {
@@ -236,7 +236,7 @@ export class ExportPhase {
                     flow.finishLine()
                     flow.push(`public ${isClass ? 'class' : 'interface'} ${type.getSimpleName()}`)
                     if (type.typeParameters && type.typeParameters.length)
-                        flow.push(`<${type.typeParameters.map(tp => javaWriter.importType(tp)).join(', ')}>`)
+                        flow.push(`<${type.typeParameters.map(tp => javaWriter.importType(tp) + (tp.constraint ? ` extends ${javaWriter.importType(tp.constraint) + tp.constraint.getParametrization(null)}` : '')).join(', ')}>`)
                     let theClassBaseType: PreJavaType = null
                     if (type.baseTypes) {
                         let extendsTypes: PreJavaType[] = []
