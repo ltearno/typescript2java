@@ -514,6 +514,9 @@ export class TsToPreJavaTypemap {
             return FAKE_TYPE_INTERSECTION
 
         if (tsType.flags & ts.TypeFlags.TypeParameter) {
+            if (tsType['isThisType'])
+                return this.getOrCreatePreJavaTypeForTsType((tsType as ts.TypeParameter).constraint, false, typeParametersToApplyToAnonymousTypes)
+
             let symbol = (tsType as ts.TypeParameter).getSymbol()
             let preJavaType = new PreJavaTypeParameter(symbol ? symbol.getName() : '?')
             preJavaType.constraint = this.getOrCreatePreJavaTypeForTsType((tsType as ts.TypeParameter).constraint, false, typeParametersToApplyToAnonymousTypes)
