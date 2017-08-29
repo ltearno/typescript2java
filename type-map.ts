@@ -395,6 +395,7 @@ export class TsToPreJavaTypemap {
                                 return d && d.locals && d.locals.length && d.locals.get && d.locals.get('this')
                             }))
                             return null
+
                         let objectType = (parameteryType.flags & ts.TypeFlags.Object) && parameteryType as ts.ObjectType
                         let referenceType = objectType && (objectType.objectFlags & ts.ObjectFlags.Reference) && parameteryType as ts.TypeReference
                         let dotdotdot = false
@@ -410,13 +411,28 @@ export class TsToPreJavaTypemap {
                             }
                         }
 
-                        let preJavaParameterType = this.getOrCreatePreJavaTypeForTsType(parameteryType, false, typeParametersToApplyToAnonymousTypes)
+                        let result: PreJavaTypeFormalParameter = null
 
-                        let result: PreJavaTypeFormalParameter = {
-                            name: p.name,
-                            type: preJavaParameterType,
-                            optional: (de.questionToken) != null || (de.initializer != null),
-                            dotdotdot
+                        // This is to handle the case of "p: typeof SomeClass" where p is not of type SomeClass but of the type of the type of the class...
+                        // TODO for now we use Object, but should be able to do better!
+                        let freeP: any = p
+                        if (freeP.valueDeclaration && freeP.valueDeclaration.type && freeP.valueDeclaration.type.kind == ts.SyntaxKind.TypeQuery) {
+                            result = {
+                                name: p.name,
+                                type: BUILTIN_TYPE_OBJECT,
+                                optional: (de.questionToken) != null || (de.initializer != null),
+                                dotdotdot
+                            }
+                        }
+                        else {
+                            let preJavaParameterType = this.getOrCreatePreJavaTypeForTsType(parameteryType, false, typeParametersToApplyToAnonymousTypes)
+
+                            result = {
+                                name: p.name,
+                                type: preJavaParameterType,
+                                optional: (de.questionToken) != null || (de.initializer != null),
+                                dotdotdot
+                            }
                         }
 
                         return result
