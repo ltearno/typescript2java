@@ -13,6 +13,8 @@ export interface ProcessContext {
 export type TypeReplacer = { (type: PreJavaType): PreJavaType }
 
 export abstract class PreJavaType {
+    abstract getSourceTypes(): Set<ts.Type>
+
     abstract getHierachyDepth(): number
 
     abstract getSimpleName(typeParametersEnv: { [key: string]: PreJavaType }): string

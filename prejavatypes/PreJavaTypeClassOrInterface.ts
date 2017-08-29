@@ -4,6 +4,8 @@ import { PreJavaTypeParameter } from './PreJavaTypeParameter'
 import { PreJavaTypeCallSignature } from './PreJavaTypeCallSignature'
 import { guessName } from '../tools'
 
+let nextTypeId = 1
+
 export interface PreJavaTypeProperty {
     name: string
     type: PreJavaType
@@ -32,6 +34,8 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
     comments: string[]
 
     isClass: boolean
+
+    getSourceTypes(): Set<ts.Type> { return this.sourceTypes }
 
     isClassLike() { return this.isClass }
 
@@ -223,7 +227,7 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
 
         if (this.properties) {
             this.properties = this.properties.map(p => {
-                p.type = replacer(p.type)
+                p.type = p.type.substituteType(replacer, cache, passThroughTypes)
                 if (!p.type)
                     return null
                 return p
@@ -258,7 +262,7 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
             return
 
         if (!this.name)
-            this.name = name
+            this.name = name + '__' + (nextTypeId++)
     }
 
     getSimpleName(): string { return this.name }

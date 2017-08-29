@@ -204,6 +204,39 @@ export class TsToPreJavaTypemap {
         return groups
     }
 
+    checkNoDuplicateTypeNames() {
+        /*let typeFqnCache: Set<string> = new Set()
+        for (let type of this.typeMap.values()) {
+            let typeFqn = type.getFullyQualifiedName(null)
+            while (true) {
+                if (typeFqnCache.has(typeFqn)) {
+                    console.log(`RENAMED TYPE ${typeFqn}`)
+                    typeFqn = typeFqn + 'bis'
+                    type.setPackageName(typeFqn)
+                }
+                else {
+                    typeFqnCache.add(typeFqn)
+                    break
+                }
+            }
+        }*/
+        console.log('FQN list')
+        let names: string[] = []
+        for (let type of this.typeMap.values()) {
+            let tok = type.getFullyQualifiedName(null)
+            if (type.getSourceTypes()) {
+                tok += ' '
+                for (let st of type.getSourceTypes().values()) {
+                    tok += st + ' ' + st['id'] + ' '
+                    if (st.getSymbol() && st.getSymbol().getDeclarations())
+                        tok += st.getSymbol().getDeclarations().map(sf => sf.getSourceFile().fileName + ':' + sf.getStart()).join()
+                }
+            }
+            names.push(tok)
+        }
+        names.sort().forEach(name => console.log(name))
+    }
+
     removeDuplicateOverloads() {
         for (let type of this.typeMap.values()) {
             if (type instanceof PreJavaTypeClassOrInterface && type.methods && type.methods.length) {
@@ -412,8 +445,23 @@ export class TsToPreJavaTypemap {
         if (this.typeMap.has(typeKey))
             return this.typeMap.get(typeKey)
 
+        if (tsType['id'] == 15834 || tsType['id'] == 15839)
+            console.log('yop')
+
         let preJavaType = this.createPreJavaType(typeKey, tsType, preferNothingVoid, typeParametersToApplyToAnonymousTypes)
-        this.typeMap.set(typeKey, preJavaType)
+
+        /*Visit.preJavaTypeVisit(preJavaType, {
+            onVisitBuiltinType: type => this.typeMap.set(typeKey, preJavaType),
+            onVisitClassOrInterfaceType: type => this.typeMap.set(typeKey, preJavaType),
+            onVisitEnumType: type => this.typeMap.set(typeKey, preJavaType),
+            onVisitFakeType: type => this.typeMap.set(typeKey, preJavaType),
+            onVisitTuple: type => this.typeMap.set(typeKey, preJavaType),
+            onVisitUnion: type => this.typeMap.set(typeKey, preJavaType)
+        })*/
+        if (!(preJavaType instanceof PreJavaTypeReference)) {
+            this.typeMap.set(typeKey, preJavaType)
+        }
+
 
         return preJavaType
     }
@@ -468,7 +516,6 @@ export class TsToPreJavaTypemap {
         if (tsType.flags & ts.TypeFlags.TypeParameter) {
             let symbol = (tsType as ts.TypeParameter).getSymbol()
             let preJavaType = new PreJavaTypeParameter(symbol ? symbol.getName() : '?')
-            this.typeMap.set(typeKey, preJavaType)
             preJavaType.constraint = this.getOrCreatePreJavaTypeForTsType((tsType as ts.TypeParameter).constraint, false, typeParametersToApplyToAnonymousTypes)
             return preJavaType
         }
@@ -479,7 +526,6 @@ export class TsToPreJavaTypemap {
             let reference = tsType as ts.TypeReference
             if (reference.target != tsType) {
                 let preJavaType = new PreJavaTypeReference()
-                this.typeMap.set(typeKey, preJavaType)
                 preJavaType.type = this.getOrCreatePreJavaTypeForTsType(reference.target, false, typeParametersToApplyToAnonymousTypes)
                 preJavaType.typeParameters = reference.typeArguments ? reference.typeArguments.map(typeArgument => this.getOrCreatePreJavaTypeForTsType(typeArgument, false, typeParametersToApplyToAnonymousTypes)) : null
                 return preJavaType

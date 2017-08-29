@@ -142,7 +142,13 @@ export class JavaWriter {
 
     importTypeParametrized(type: PreJavaType): string {
         let res = this.importType(type)
-        return res + type.getParametrization(null)
+        let typeParameters = type.getTypeParameters(null)
+        if (typeParameters && typeParameters.length) {
+            res += '<'
+            res += typeParameters.map(tp => this.importTypeParametrized(tp)).join(', ')
+            res += '>'
+        }
+        return res
     }
 
     // package name

@@ -7,6 +7,8 @@ export class PreJavaTypeTPEnvironnement extends PreJavaType {
         super()
     }
 
+    getSourceTypes(): Set<ts.Type> { return null }
+
     dump() {
         console.log(`TypeEnvironment for`)
         this.type.dump()
@@ -40,7 +42,7 @@ export class PreJavaTypeTPEnvironnement extends PreJavaType {
         if (!stay || stay != this)
             return null
 
-        this.type = replacer(this.type)
+        this.type = this.type.substituteType(replacer, cache, passThroughTypes)
         if (!this.type)
             return null
 
@@ -53,6 +55,8 @@ export class PreJavaTypeReference extends PreJavaType {
     typeParameters: PreJavaType[]
 
     dump() { console.log(`TypeReference to ${this.type.getParametrizedSimpleName(null)}`) }
+
+    getSourceTypes(): Set<ts.Type> { return null }
 
     getTypeParameters(typeParametersEnv: { [key: string]: PreJavaType }) {
         return this.typeParameters

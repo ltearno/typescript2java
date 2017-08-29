@@ -4,10 +4,14 @@ import { PreJavaTypeClassOrInterface } from './PreJavaTypeClassOrInterface'
 import { PreJavaTypeReference } from './PreJavaTypeReference'
 import { PreJavaTypeParameter } from './PreJavaTypeParameter'
 
+let currentUnionId = 1
+
 export class PreJavaTypeUnion extends PreJavaType {
     packageName: string
     types: PreJavaType[]
     typeParameters: PreJavaTypeParameter[]
+
+    unionId = currentUnionId++
 
     setTypes(types: PreJavaType[]) {
         this.types = []
@@ -17,6 +21,8 @@ export class PreJavaTypeUnion extends PreJavaType {
         })
     }
 
+    getSourceTypes(): Set<ts.Type> { return null }
+
     dump() {
         console.log(`UnionType ${this.getParametrizedSimpleName(null)}`)
         if (this.types && this.types.length)
@@ -25,13 +31,11 @@ export class PreJavaTypeUnion extends PreJavaType {
 
     getTypeParameters(typeParametersEnv: { [key: string]: PreJavaType }) { return this.typeParameters }
 
-    setSimpleName(name: string) { }
-
     getSimpleName(): string {
         if ((!this.types) || this.types.length == 0)
-            return 'EmptyUnion'
+            return 'EmptyUnion' + '_id_' + this.unionId
 
-        return this.getHumanizedName(null).replace(new RegExp('\\?', 'g'), 'UNKOWNTYPE')
+        return this.getHumanizedName(null).replace(new RegExp('\\?', 'g'), 'UNKOWNTYPE') + '_id_' + this.unionId
     }
 
     getPackageName(): string { return this.packageName }

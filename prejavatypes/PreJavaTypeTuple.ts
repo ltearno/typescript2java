@@ -2,11 +2,14 @@ import * as ts from "typescript"
 import { PreJavaType, ProcessContext, TypeReplacer } from './PreJavaType'
 import { PreJavaTypeParameter } from './PreJavaTypeParameter'
 
+let currentTupleId = 1
+
 export const TUPLE_TYPE_VARIABLE_NAMES = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K']
 
 export class PreJavaTypeTuple extends PreJavaType {
     packageName: string
     typeParameters: PreJavaTypeParameter[]
+    private tupleId = currentTupleId++
 
     constructor(type: ts.TypeReference) {
         super()
@@ -16,6 +19,8 @@ export class PreJavaTypeTuple extends PreJavaType {
         else
             this.typeParameters = null
     }
+
+    getSourceTypes(): Set<ts.Type> { return null }
 
     dump() {
         console.log(`tuple ${this.getParametrizedSimpleName(null)}`)
@@ -27,9 +32,9 @@ export class PreJavaTypeTuple extends PreJavaType {
 
     getSimpleName(): string {
         if (this.typeParameters && this.typeParameters.length == 2)
-            return `Tuple`
+            return `Tuple` + '_id_' + this.tupleId
         else
-            return `TupleOf${this.typeParameters.length}`
+            return `TupleOf${this.typeParameters.length}` + '_id_' + this.tupleId
     }
 
     getPackageName(): string { return this.packageName }
@@ -47,5 +52,8 @@ export class PreJavaTypeTuple extends PreJavaType {
 
     isCompletablePreJavaType() { return null }
 
-    substituteTypeReal(replacer: TypeReplacer, cache: Map<PreJavaType, PreJavaType>): PreJavaType { return replacer(this) }
+    substituteTypeReal(replacer: TypeReplacer, cache: Map<PreJavaType, PreJavaType>, passThroughTypes: Set<PreJavaType>): PreJavaType {
+        let res = replacer(this)
+        return res
+    }
 }

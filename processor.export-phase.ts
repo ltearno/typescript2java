@@ -19,9 +19,19 @@ import { PreJavaTypeCallSignature, PreJavaTypeFormalParameter } from './prejavat
 
 
 export class ExportPhase {
+    private exportedFqns = new Set<string>()
+
     constructor(public gatherPhase: GatherPhase.GatherPhase) { }
 
     exportJavaUnit(type: PreJavaType, javaWriter: JavaWriter, flow: TextFlow, baseDirectory: string) {
+        let fqn = type.getParametrizedFullyQualifiedName(null)
+        console.log(`exporting ${fqn}`)
+
+        if (this.exportedFqns.has(fqn))
+            console.log(`WARNING, already exported !`)
+        else
+            this.exportedFqns.add(fqn)
+
         let content = ''
         content += `package ${type.getPackageName()};\n`
         content += '\n'
@@ -89,7 +99,6 @@ export class ExportPhase {
 
     exportNodes(program: ts.Program, baseDirectory: string) {
         for (let type of this.gatherPhase.typeMap.typeMap.values()) {
-            console.log(`export ${type.getParametrizedFullyQualifiedName(null)}`)
             preJavaTypeVisit(type, {
                 onVisitUnion: (type) => {
                     let javaWriter = new JavaWriter(type.getPackageName())
@@ -274,6 +283,8 @@ export class ExportPhase {
                         // the base constructor if any
                         let theBaseClassConstructorParameters: PreJavaTypeFormalParameter[] = null
                         if (theClassBaseType) {
+                            while (theClassBaseType instanceof PreJavaTypeReference)
+                                theClassBaseType = theClassBaseType.type
                             if (theClassBaseType instanceof PreJavaTypeClassOrInterface) {
                                 theBaseClassConstructorParameters = theClassBaseType.constructorSignatures
                                     && theClassBaseType.constructorSignatures.length

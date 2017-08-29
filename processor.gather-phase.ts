@@ -108,6 +108,9 @@ export class GatherPhase {
         console.log(`(todo) add methods from hierarchy`)
         console.log(`(todo) remove duplicate methods in hierarchy`)
 
+        console.log(`renaming duplicate fqns`)
+        this.typeMap.checkNoDuplicateTypeNames()
+
         console.log(`statistics:`)
         console.log(`${this.globalVariables.length} global variables`)
         console.log(`${this.globalMethods.length} global methods`)

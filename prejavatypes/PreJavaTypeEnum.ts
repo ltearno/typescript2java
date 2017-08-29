@@ -8,17 +8,24 @@ export class PreJavaTypeEnum extends PreJavaType {
         name: string
         value: number
     }[] = []
+    sourceTypes: Set<ts.EnumType>
 
     constructor(name: string) {
         super()
         this.name = name
     }
 
+    getSourceTypes(): Set<ts.EnumType> { return null }
+
     getHierachyDepth() {
         return 1
     }
 
     addSourceType(enumType: ts.EnumType) {
+        if (this.sourceTypes == null)
+            this.sourceTypes = new Set()
+        this.sourceTypes.add(enumType)
+
         let enumDeclaration = enumType.getSymbol().valueDeclaration as ts.EnumDeclaration
         if (enumDeclaration.members && enumDeclaration.members.length) {
             let memberValue = 0

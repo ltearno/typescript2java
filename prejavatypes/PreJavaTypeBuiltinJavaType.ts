@@ -11,6 +11,8 @@ export class PreJavaTypeBuiltinJavaType extends PreJavaType {
         this.name = name
     }
 
+    getSourceTypes(): Set<ts.Type> { return null }
+
     dump() { console.log(`Builtin type ${this.name}`) }
 
     getTypeParameters(typeParametersEnv: { [key: string]: PreJavaType }) { return null }
