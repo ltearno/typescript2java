@@ -292,16 +292,21 @@ export class TsToPreJavaTypemap {
             if (type instanceof PreJavaTypeClassOrInterface && type.baseTypes && type.baseTypes.size) {
                 let implementationSuperTypes: PreJavaTypeClassOrInterface[] = []
                 for (let superType of type.baseTypes.values()) {
+                    while (superType && superType instanceof PreJavaTypeReference)
+                        superType = superType.type
                     if (superType instanceof PreJavaTypeClassOrInterface && superType.isClassLike()) {
                         implementationSuperTypes.push(superType)
                     }
                 }
+
+                console.log(`maybe arrange ${type.getSimpleName(null)}`)
+
                 if ((type.isClassLike() && implementationSuperTypes.length <= 1) || (!type.isClassLike() && implementationSuperTypes.length == 0))
                     continue
 
                 somethingDone = true
 
-                console.log(`arrange from ${type.getSimpleName()} with ${implementationSuperTypes.length} super implementations`)
+                console.log(`arrange from ${type.getSimpleName(null)} with ${implementationSuperTypes.length} super implementations`)
 
                 let nbConstructors = type.constructorSignatures && type.constructorSignatures.length
 

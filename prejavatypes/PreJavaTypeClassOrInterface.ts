@@ -61,7 +61,7 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
 
     removeMethod(method: PreJavaTypeCallSignature) {
         let index = this.methods.indexOf(method)
-        console.log(`remove method ${method.name} in type ${this.getSimpleName()}`)
+        console.log(`remove method ${method.name} in type ${this.getSimpleName(null)}`)
         method && this.methods && this.methods.splice(index, 1)
     }
 
@@ -95,11 +95,15 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
 
             if (symbol.valueDeclaration) {
                 let constructorType = context.getProgram().getTypeChecker().getTypeOfSymbolAtLocation(symbol, symbol.valueDeclaration)
+                //context.getProgram().getTypeChecker().getSignaturesOfType(constructorType, ts.SignatureKind.Construct)
                 let constructors = constructorType.getConstructSignatures()
                 if (constructors) {
                     constructors.forEach(constructorSignature => {
-                        let signature = context.getTypeMap().convertSignature(null, constructorSignature, this.typeParameters)
-                        this.addConstructorSignature(signature)
+                        //if ((!constructorSignature.declaration) || constructorType == context.getProgram().getTypeChecker().getTypeAtLocation(constructorSignature.declaration.parent))
+                        {
+                            let signature = context.getTypeMap().convertSignature(null, constructorSignature, this.typeParameters)
+                            this.addConstructorSignature(signature)
+                        }
                     })
                 }
             }
@@ -265,7 +269,7 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
             this.name = name + '__' + (nextTypeId++)
     }
 
-    getSimpleName(): string { return this.name }
+    getSimpleName(typeParametersEnv: { [key: string]: PreJavaType }): string { return this.name }
 
     private addComments(lines: string[]) {
         if (!this.comments)

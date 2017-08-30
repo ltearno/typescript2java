@@ -243,7 +243,7 @@ export class ExportPhase {
                         javaWriter.importType(this.JS_PACKAGE)
                     flow.push(`@JsType(isNative=true, namespace=${prototypeNamespace ? ('"' + prototypeNamespace + '"') : 'JsPackage.GLOBAL'}, name=${prototypeName ? ('"' + prototypeName + '"') : '"Object"'})`)
                     flow.finishLine()
-                    flow.push(`public ${isClass ? 'class' : 'interface'} ${type.getSimpleName()}`)
+                    flow.push(`public ${isClass ? 'class' : 'interface'} ${type.getSimpleName(null)}`)
                     if (type.typeParameters && type.typeParameters.length)
                         flow.push(`<${type.typeParameters.map(tp => javaWriter.importType(tp) + (tp.constraint ? ` extends ${javaWriter.importType(tp.constraint) + tp.constraint.getParametrization(null)}` : '')).join(', ')}>`)
                     let theClassBaseType: PreJavaType = null
@@ -299,9 +299,9 @@ export class ExportPhase {
                                 flow.endJavaDocComments()
                             }
 
-                            let escapedMethodName = type.getSimpleName()
+                            let escapedMethodName = type.getSimpleName(null)
 
-                            flow.push(`public ${type.getSimpleName()}(`)
+                            flow.push(`public ${type.getSimpleName(null)}(`)
                             if (constructor.parameters)
                                 flow.push(constructor.parameters.map(p => `${javaWriter.importTypeParametrized(p.type)} ${this.escapePropertyName(p.name)}`).join(', ')).push(`)`)
 
