@@ -178,7 +178,7 @@ export class TsToPreJavaTypemap {
                                 else {
                                     let newProperty: PreJavaTypeProperty = {
                                         name: visitedProperty.name,
-                                        type: new PreJavaTypeTPEnvironnement(visitedProperty.type, typeVariableEnv),
+                                        type: typeVariableEnv ? new PreJavaTypeTPEnvironnement(visitedProperty.type, typeVariableEnv) : visitedProperty.type,
                                         writable: visitedProperty.writable,
                                         comments: visitedProperty.comments
                                     }
