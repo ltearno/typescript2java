@@ -144,8 +144,8 @@ export class TsToPreJavaTypemap {
             })
         }
 
-        for (let type of this.typeMap.values()) {
-            Visit.preJavaTypeVisit(type, {
+        for (let pjt of this.typeMap.values()) {
+            Visit.preJavaTypeVisit(pjt, {
                 onVisitClassOrInterfaceType: type => {
                     if (type.isClassLike()) {
                         recBrowseInterfaceHierarchy(type, (visitedInterface, typeVariableEnv) => {
@@ -172,10 +172,19 @@ export class TsToPreJavaTypemap {
                                 // TODO minimal management of property redefinitions : should allow the type to be tightened and not widened
                                 // TODO For the moment, we just keep the super type class
                                 let existingProperty = type.properties && type.properties.find(p => p.name == visitedProperty.name)
-                                if (existingProperty)
-                                    existingProperty.type = visitedProperty.type
-                                else
-                                    type.addProperty(visitedProperty)
+                                if (existingProperty) {
+                                    existingProperty.type = new PreJavaTypeTPEnvironnement(visitedProperty.type, typeVariableEnv)
+                                }
+                                else {
+                                    let newProperty: PreJavaTypeProperty = {
+                                        name: visitedProperty.name,
+                                        type: new PreJavaTypeTPEnvironnement(visitedProperty.type, typeVariableEnv),
+                                        writable: visitedProperty.writable,
+                                        comments: visitedProperty.comments
+                                    }
+
+                                    type.addProperty(newProperty)
+                                }
                                 //if (!type.properties || !type.properties.some(p => p.name == visitedProperty.name))
                                 //    type.addProperty(visitedProperty) // TODO Take care of the concretized type parameters
                             })
