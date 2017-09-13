@@ -469,10 +469,13 @@ export class TsToPreJavaTypemap {
         let typeKey: any = tsType
         if (tsType.flags & ts.TypeFlags.Void)
             typeKey = 'void-' + preferNothingVoid
-        if (objectType && objectType.objectFlags & ts.ObjectFlags.Tuple)
+        else if (objectType && objectType.objectFlags & ts.ObjectFlags.Tuple)
             typeKey = 'tuple-' + referenceType.typeArguments.length
         else if (objectType && objectType.objectFlags & ts.ObjectFlags.Anonymous)
             typeKey = tsType['id'] + ((typeParametersToApplyToAnonymousTypes && typeParametersToApplyToAnonymousTypes.length) ? (typeParametersToApplyToAnonymousTypes.map(tp => '-' + tp.name)) : (''))
+        else if (tsType.flags & ts.TypeFlags.Union) {
+            typeKey = 'union-' + tsType['id'] + ((typeParametersToApplyToAnonymousTypes && typeParametersToApplyToAnonymousTypes.length) ? (typeParametersToApplyToAnonymousTypes.map(tp => '-' + tp.name)) : (''))
+        }
 
         if (this.typeMap.has(typeKey))
             return this.typeMap.get(typeKey)
@@ -482,14 +485,6 @@ export class TsToPreJavaTypemap {
 
         let preJavaType = this.createPreJavaType(typeKey, tsType, preferNothingVoid, typeParametersToApplyToAnonymousTypes)
 
-        /*Visit.preJavaTypeVisit(preJavaType, {
-            onVisitBuiltinType: type => this.typeMap.set(typeKey, preJavaType),
-            onVisitClassOrInterfaceType: type => this.typeMap.set(typeKey, preJavaType),
-            onVisitEnumType: type => this.typeMap.set(typeKey, preJavaType),
-            onVisitFakeType: type => this.typeMap.set(typeKey, preJavaType),
-            onVisitTuple: type => this.typeMap.set(typeKey, preJavaType),
-            onVisitUnion: type => this.typeMap.set(typeKey, preJavaType)
-        })*/
         if (!(preJavaType instanceof PreJavaTypeReference)) {
             this.typeMap.set(typeKey, preJavaType)
         }
