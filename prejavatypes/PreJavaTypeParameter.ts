@@ -8,6 +8,7 @@ export class PreJavaTypeParameter extends PreJavaType {
     constructor(name: string, constraint: PreJavaType = null) {
         super()
         this.name = name
+        this.constraint = constraint
     }
 
     getSourceTypes(): Set<ts.Type> { return null }

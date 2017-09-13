@@ -81,7 +81,16 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
                 let interfaceType = objectType as ts.InterfaceType
 
                 if (interfaceType.typeParameters && interfaceType.typeParameters.length) {
-                    this.setTypeParameters(interfaceType.typeParameters.map(tp => (new PreJavaTypeParameter(tp.symbol.getName(), context.getTypeMap().getOrCreatePreJavaTypeForTsType(tp.constraint, false, null)))))
+                    this.setTypeParameters(interfaceType.typeParameters.map(tp => {
+                        let constraint: PreJavaType = null
+                        if (tp.symbol && tp.symbol.declarations && tp.symbol.declarations[0] && tp.symbol.declarations[0].kind == ts.SyntaxKind.TypeParameter) {
+                            let ss = tp.symbol.declarations[0] as ts.TypeParameterDeclaration
+                            if (ss && ss.constraint) {
+                                constraint = context.getTypeMap().getOrCreatePreJavaTypeForTsType(context.getProgram().getTypeChecker().getTypeAtLocation(ss.constraint), false, null)
+                            }
+                        }
+                        return new PreJavaTypeParameter(tp.symbol.getName(), constraint)
+                    }))
                 }
             }
         }
