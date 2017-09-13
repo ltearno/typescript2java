@@ -135,8 +135,11 @@ export class TsToPreJavaTypemap {
             },
 
             onVisitClassOrInterfaceType: type => {
-                visitor(type, typeVariableEnv)
-                type.baseTypes && type.baseTypes.forEach(baseType => this.browseTypeHierarchy(baseType, visitor))
+                type.baseTypes && type.baseTypes.forEach(baseType => {
+                    if (baseType instanceof PreJavaTypeClassOrInterface)
+                        visitor(baseType, typeVariableEnv)
+                    this.browseTypeHierarchy(baseType, visitor)
+                })
             }
         })
     }
@@ -147,8 +150,11 @@ export class TsToPreJavaTypemap {
             Visit.preJavaTypeVisit(pjt, {
                 onVisitClassOrInterfaceType: type => {
                     if (type.isClassLike()) {
+                        if (type.getSimpleName(null) == 'ViewRef__2008_')
+                            console.log('kjhkjh');
+
                         this.browseTypeHierarchy(type, (visitedInterface, typeVariableEnv) => {
-                            if (type.isClassLike())
+                            if (visitedInterface.isClassLike())
                                 return
 
                             visitedInterface.methods && visitedInterface.methods.forEach(visitedMethod => {
@@ -191,6 +197,9 @@ export class TsToPreJavaTypemap {
                                 //    type.addProperty(visitedProperty) // TODO Take care of the concretized type parameters
                             })
                         })
+
+                        if (type.getSimpleName(null) == 'ViewRef__2008_')
+                            console.log('kjhkjh');
                     }
                 }
             })
