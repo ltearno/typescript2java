@@ -16,9 +16,6 @@ export class PreJavaTypeTPEnvironnement extends PreJavaType {
     }
 
     getTypeParameters(typeParametersEnv: { [key: string]: PreJavaType }) {
-        if (this.environment['T'] && this.environment['T'].getSimpleName(null) == 'String')
-            console.log('yop')
-
         let env = typeParametersEnv || this.environment
         if (typeParametersEnv && this.environment) {
             env = Object.create(typeParametersEnv)

@@ -29,7 +29,16 @@ export class PreJavaTypeUnion extends PreJavaType {
             this.types.forEach(t => console.log(`- ${t.getParametrizedSimpleName(null)}`))
     }
 
-    getTypeParameters(typeParametersEnv: { [key: string]: PreJavaType }) { return this.typeParameters }
+    getTypeParameters(typeParametersEnv: { [key: string]: PreJavaType }) {
+        if (!typeParametersEnv || !this.typeParameters)
+            return this.typeParameters
+
+        return this.typeParameters.map(tp => {
+            if (tp instanceof PreJavaTypeParameter && tp.name in typeParametersEnv)
+                return typeParametersEnv[tp.name]
+            return tp
+        })
+    }
 
     getSimpleName(): string {
         if ((!this.types) || this.types.length == 0)
