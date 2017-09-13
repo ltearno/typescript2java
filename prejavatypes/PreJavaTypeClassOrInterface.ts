@@ -131,27 +131,6 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
                     return result
                 }
 
-                /*type.symbol.getDeclarations().forEach(decl => {
-                    let classLikeDeclaration = decl as ts.ClassLikeDeclaration
-                    if (classLikeDeclaration.heritageClauses && classLikeDeclaration.heritageClauses.length) {
-                        classLikeDeclaration.heritageClauses.forEach(heritageClause => {
-                            if (heritageClause.token == ts.SyntaxKind.ImplementsKeyword) {
-                                console.log(`sdfsdf`)
-                            }
-                        })
-                    }
-                })
-
-                let tc: any = context.getProgram().getTypeChecker()
-                let testConstructors = type.symbol.members.get("__constructor")
-                //testConstructors = constructorType.symbol.members.get("__constructor")
-                let testConstructorSignatures = getSignaturesOfSymbol(testConstructors)
-                if (!testConstructorSignatures.length) {
-                    let baseTypes = type.getBaseTypes()
-                    for (let baseType of baseTypes)
-                        console.log('yop')
-                }*/
-
                 function getConstructorSymbolOfType(type: ts.Type) {
                     if (!type || !type.symbol || !type.symbol.members)
                         return null
@@ -227,14 +206,6 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
                 if (constructor) {
                     this.addConstructorSignature(constructor)
                 }
-
-                /*let constructors = constructorType.getConstructSignatures()
-                if (constructors) {
-                    constructors.forEach(constructorSignature => {
-                        let signature = context.getTypeMap().convertSignature(null, constructorSignature, this.typeParameters)
-                        this.addConstructorSignature(signature)
-                    })
-                }*/
             }
 
             let comments = this.getCommentFromSymbol(symbol)
@@ -267,7 +238,7 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
             this.setStringIndexType(context.getTypeMap().getOrCreatePreJavaTypeForTsType(sit, false, this.typeParameters))
         }
 
-        /* Typescript does not return 'implemented' types, only 'extended'. We merge them in the PreJava tree */
+        /* ts.Type.getBaseTypes() does not return 'implemented' types, only 'extended'. We merge them in the PreJava tree */
         if (type.symbol && type.symbol.getDeclarations()) {
             type.symbol.getDeclarations().forEach(decl => {
                 let classLikeDeclaration = decl as ts.ClassLikeDeclaration
@@ -275,7 +246,7 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
                     classLikeDeclaration.heritageClauses.forEach(heritageClause => {
                         heritageClause.types.forEach(baseTypeNode => {
                             let baseType = context.getProgram().getTypeChecker().getTypeAtLocation(baseTypeNode)
-                            this.addBaseType(context.getTypeMap().getOrCreatePreJavaTypeForTsType(baseType, false, null /*no need*/))
+                            this.addBaseType(context.getTypeMap().getOrCreatePreJavaTypeForTsType(baseType, false, this.typeParameters))
                         })
                     })
                 }
@@ -285,7 +256,7 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
             let baseTypes = type.getBaseTypes()
             if (baseTypes) {
                 baseTypes.forEach(baseType => {
-                    this.addBaseType(context.getTypeMap().getOrCreatePreJavaTypeForTsType(baseType, false, null))
+                    this.addBaseType(context.getTypeMap().getOrCreatePreJavaTypeForTsType(baseType, false, this.typeParameters))
                 })
             }
         }
