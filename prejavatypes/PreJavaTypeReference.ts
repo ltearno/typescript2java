@@ -1,5 +1,6 @@
 import * as ts from "typescript"
 import { PreJavaType, ProcessContext, TypeReplacer } from './PreJavaType'
+import { PreJavaTypeParameter } from './PreJavaTypeParameter'
 
 export class PreJavaTypeTPEnvironnement extends PreJavaType {
     constructor(public type: PreJavaType,
@@ -15,6 +16,9 @@ export class PreJavaTypeTPEnvironnement extends PreJavaType {
     }
 
     getTypeParameters(typeParametersEnv: { [key: string]: PreJavaType }) {
+        if (this.environment['T'] && this.environment['T'].getSimpleName(null) == 'String')
+            console.log('yop')
+
         let env = typeParametersEnv || this.environment
         if (typeParametersEnv && this.environment) {
             env = Object.create(typeParametersEnv)
@@ -61,8 +65,14 @@ export class PreJavaTypeReference extends PreJavaType {
     getSourceTypes(): Set<ts.Type> { return null }
 
     getTypeParameters(typeParametersEnv: { [key: string]: PreJavaType }) {
-        return this.typeParameters
-        //return this.type.getTypeParameters(typeParametersEnv)
+        if (!typeParametersEnv || !this.typeParameters)
+            return this.typeParameters
+
+        return this.typeParameters.map(tp => {
+            if (tp instanceof PreJavaTypeParameter && tp.name in typeParametersEnv)
+                return typeParametersEnv[tp.name]
+            return tp
+        })
     }
 
     getSimpleName(): string { return this.type.getSimpleName(null) }

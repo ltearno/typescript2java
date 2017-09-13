@@ -153,6 +153,8 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
                 }*/
 
                 function getConstructorSymbolOfType(type: ts.Type) {
+                    if (!type || !type.symbol || !type.symbol.members)
+                        return null
                     let constructorSymbol = type.symbol.members.get("__constructor")
                     let signatures = getSignaturesOfSymbol(constructorSymbol)
                     if (signatures && signatures.length)
@@ -266,23 +268,27 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
         }
 
         /* Typescript does not return 'implemented' types, only 'extended'. We merge them in the PreJava tree */
-        type.symbol.getDeclarations().forEach(decl => {
-            let classLikeDeclaration = decl as ts.ClassLikeDeclaration
-            if (classLikeDeclaration.heritageClauses && classLikeDeclaration.heritageClauses.length) {
-                classLikeDeclaration.heritageClauses.forEach(heritageClause => {
-                    heritageClause.types.forEach(baseTypeNode => {
-                        let baseType = context.getProgram().getTypeChecker().getTypeAtLocation(baseTypeNode)
-                        this.addBaseType(context.getTypeMap().getOrCreatePreJavaTypeForTsType(baseType, false, null /*no need*/))
+        if (type.symbol && type.symbol.getDeclarations()) {
+            type.symbol.getDeclarations().forEach(decl => {
+                let classLikeDeclaration = decl as ts.ClassLikeDeclaration
+                if (classLikeDeclaration.heritageClauses && classLikeDeclaration.heritageClauses.length) {
+                    classLikeDeclaration.heritageClauses.forEach(heritageClause => {
+                        heritageClause.types.forEach(baseTypeNode => {
+                            let baseType = context.getProgram().getTypeChecker().getTypeAtLocation(baseTypeNode)
+                            this.addBaseType(context.getTypeMap().getOrCreatePreJavaTypeForTsType(baseType, false, null /*no need*/))
+                        })
                     })
+                }
+            })
+        }
+        else {
+            let baseTypes = type.getBaseTypes()
+            if (baseTypes) {
+                baseTypes.forEach(baseType => {
+                    this.addBaseType(context.getTypeMap().getOrCreatePreJavaTypeForTsType(baseType, false, null))
                 })
             }
-        })
-        /*let baseTypes = type.getBaseTypes()
-        if (baseTypes) {
-            baseTypes.forEach(baseType => {
-                this.addBaseType(context.getTypeMap().getOrCreatePreJavaTypeForTsType(baseType, false, null))
-            })
-        }*/
+        }
 
         let properties = (type as ts.InterfaceTypeWithDeclaredMembers).declaredProperties// type.getProperties()
         if (properties && properties.length) {
