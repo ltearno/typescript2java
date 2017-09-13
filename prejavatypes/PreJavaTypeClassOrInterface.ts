@@ -71,6 +71,44 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
         if (!type)
             return
 
+        if (type.flags & ts.TypeFlags.Object) {
+            let objectType = type as ts.ObjectType
+
+            if (objectType.objectFlags & ts.ObjectFlags.Anonymous) {
+                this.setTypeParameters((typeParametersToApplyToAnonymousTypes && typeParametersToApplyToAnonymousTypes.length) ? typeParametersToApplyToAnonymousTypes.slice() : null)
+            }
+            else if (objectType.objectFlags & ts.ObjectFlags.Class || objectType.objectFlags & ts.ObjectFlags.Interface) {
+                let interfaceType = objectType as ts.InterfaceType
+
+                if (interfaceType.typeParameters && interfaceType.typeParameters.length) {
+                    this.setTypeParameters(interfaceType.typeParameters.map(tp => (new PreJavaTypeParameter(tp.symbol.getName(), context.getTypeMap().getOrCreatePreJavaTypeForTsType(tp.constraint, false, null)))))
+                }
+            }
+        }
+
+        /* ts.Type.getBaseTypes() does not return 'implemented' types, only 'extended'. We merge them in the PreJava tree */
+        if (type.symbol && type.symbol.getDeclarations()) {
+            type.symbol.getDeclarations().forEach(decl => {
+                let classLikeDeclaration = decl as ts.ClassLikeDeclaration
+                if (classLikeDeclaration.heritageClauses && classLikeDeclaration.heritageClauses.length) {
+                    classLikeDeclaration.heritageClauses.forEach(heritageClause => {
+                        heritageClause.types.forEach(baseTypeNode => {
+                            let baseType = context.getProgram().getTypeChecker().getTypeAtLocation(baseTypeNode)
+                            this.addBaseType(context.getTypeMap().getOrCreatePreJavaTypeForTsType(baseType, false, this.typeParameters))
+                        })
+                    })
+                }
+            })
+        }
+        else {
+            let baseTypes = type.getBaseTypes()
+            if (baseTypes) {
+                baseTypes.forEach(baseType => {
+                    this.addBaseType(context.getTypeMap().getOrCreatePreJavaTypeForTsType(baseType, false, this.typeParameters))
+                })
+            }
+        }
+
         let symbol = type.getSymbol()
         if (symbol) {
             if ((symbol.flags & ts.SymbolFlags.Class) || (symbol.flags & ts.SymbolFlags.Interface))
@@ -213,21 +251,6 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
                 this.addComments(comments)
         }
 
-        if (type.flags & ts.TypeFlags.Object) {
-            let objectType = type as ts.ObjectType
-
-            if (objectType.objectFlags & ts.ObjectFlags.Anonymous) {
-                this.setTypeParameters((typeParametersToApplyToAnonymousTypes && typeParametersToApplyToAnonymousTypes.length) ? typeParametersToApplyToAnonymousTypes.slice() : null)
-            }
-            else if (objectType.objectFlags & ts.ObjectFlags.Class || objectType.objectFlags & ts.ObjectFlags.Interface) {
-                let interfaceType = objectType as ts.InterfaceType
-
-                if (interfaceType.typeParameters && interfaceType.typeParameters.length) {
-                    this.setTypeParameters(interfaceType.typeParameters.map(tp => (new PreJavaTypeParameter(tp.symbol.getName(), context.getTypeMap().getOrCreatePreJavaTypeForTsType(tp.constraint, false, null)))))
-                }
-            }
-        }
-
         let nit = type.getNumberIndexType()
         if (nit) {
             this.setNumberIndexType(context.getTypeMap().getOrCreatePreJavaTypeForTsType(nit, false, this.typeParameters))
@@ -236,29 +259,6 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
         let sit = type.getStringIndexType()
         if (sit) {
             this.setStringIndexType(context.getTypeMap().getOrCreatePreJavaTypeForTsType(sit, false, this.typeParameters))
-        }
-
-        /* ts.Type.getBaseTypes() does not return 'implemented' types, only 'extended'. We merge them in the PreJava tree */
-        if (type.symbol && type.symbol.getDeclarations()) {
-            type.symbol.getDeclarations().forEach(decl => {
-                let classLikeDeclaration = decl as ts.ClassLikeDeclaration
-                if (classLikeDeclaration.heritageClauses && classLikeDeclaration.heritageClauses.length) {
-                    classLikeDeclaration.heritageClauses.forEach(heritageClause => {
-                        heritageClause.types.forEach(baseTypeNode => {
-                            let baseType = context.getProgram().getTypeChecker().getTypeAtLocation(baseTypeNode)
-                            this.addBaseType(context.getTypeMap().getOrCreatePreJavaTypeForTsType(baseType, false, this.typeParameters))
-                        })
-                    })
-                }
-            })
-        }
-        else {
-            let baseTypes = type.getBaseTypes()
-            if (baseTypes) {
-                baseTypes.forEach(baseType => {
-                    this.addBaseType(context.getTypeMap().getOrCreatePreJavaTypeForTsType(baseType, false, this.typeParameters))
-                })
-            }
         }
 
         let properties = (type as ts.InterfaceTypeWithDeclaredMembers).declaredProperties// type.getProperties()
