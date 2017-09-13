@@ -50,6 +50,8 @@ export class PreJavaTypeTPEnvironnement extends PreJavaType {
     }
 }
 
+export type TypeEnvironment = { [key: string]: PreJavaType }
+
 export class PreJavaTypeReference extends PreJavaType {
     type: PreJavaType
     typeParameters: PreJavaType[]

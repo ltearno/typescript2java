@@ -7,30 +7,33 @@ import { PreJavaTypeReference } from './PreJavaTypeReference'
 import { PreJavaTypeTuple } from './PreJavaTypeTuple'
 import { PreJavaTypeUnion } from './PreJavaTypeUnion'
 
-export interface PreJavaTypeVisitor {
-    onVisitBuiltinType?(type: PreJavaTypeBuiltinJavaType): any
-    onVisitClassOrInterfaceType?(type: PreJavaTypeClassOrInterface): any
-    onVisitEnumType?(type: PreJavaTypeEnum): any
-    onVisitFakeType?(type: PreJavaTypeFakeType): any
-    onVisitReferenceType?(type: PreJavaTypeReference): any
-    onVisitTuple?(type: PreJavaTypeTuple): any
-    onVisitUnion?(type: PreJavaTypeUnion): any
+export interface PreJavaTypeVisitor<T> {
+    onVisitBuiltinType?(type: PreJavaTypeBuiltinJavaType): T
+    onVisitClassOrInterfaceType?(type: PreJavaTypeClassOrInterface): T
+    onVisitEnumType?(type: PreJavaTypeEnum): T
+    onVisitFakeType?(type: PreJavaTypeFakeType): T
+    onVisitReferenceType?(type: PreJavaTypeReference): T
+    onVisitTuple?(type: PreJavaTypeTuple): T
+    onVisitUnion?(type: PreJavaTypeUnion): T
+    onVisitOther?(type: PreJavaType): T
 }
 
-export function preJavaTypeVisit(type: PreJavaType, visitor: PreJavaTypeVisitor) {
+export function preJavaTypeVisit<T>(type: PreJavaType, visitor: PreJavaTypeVisitor<T>) {
     if (type instanceof PreJavaTypeBuiltinJavaType)
         return visitor.onVisitBuiltinType && visitor.onVisitBuiltinType(type)
-    else if (type instanceof PreJavaTypeFakeType)
-        return visitor.onVisitFakeType && visitor.onVisitFakeType(type)
-    else if (type instanceof PreJavaTypeClassOrInterface)
-        return visitor.onVisitClassOrInterfaceType && visitor.onVisitClassOrInterfaceType(type)
-    else if (type instanceof PreJavaTypeEnum)
-        return visitor.onVisitEnumType && visitor.onVisitEnumType(type)
-    else if (type instanceof PreJavaTypeReference)
-        return visitor.onVisitReferenceType && visitor.onVisitReferenceType(type)
-    else if (type instanceof PreJavaTypeTuple)
-        return visitor.onVisitTuple && visitor.onVisitTuple(type)
-    else if (type instanceof PreJavaTypeUnion)
-        return visitor.onVisitUnion && visitor.onVisitUnion(type)
+    else if (visitor.onVisitFakeType && type instanceof PreJavaTypeFakeType)
+        return visitor.onVisitFakeType(type)
+    else if (visitor.onVisitClassOrInterfaceType && type instanceof PreJavaTypeClassOrInterface)
+        return visitor.onVisitClassOrInterfaceType(type)
+    else if (visitor.onVisitEnumType && type instanceof PreJavaTypeEnum)
+        return visitor.onVisitEnumType(type)
+    else if (visitor.onVisitReferenceType && type instanceof PreJavaTypeReference)
+        return visitor.onVisitReferenceType(type)
+    else if (visitor.onVisitTuple && type instanceof PreJavaTypeTuple)
+        return visitor.onVisitTuple(type)
+    else if (visitor.onVisitUnion && type instanceof PreJavaTypeUnion)
+        return visitor.onVisitUnion(type)
+    else if (visitor.onVisitOther)
+        return visitor.onVisitOther(type)
     return null
 }

@@ -26,8 +26,11 @@ export class PreJavaTypeParameter extends PreJavaType {
     }
 
     getSimpleName(typeParametersEnv: { [key: string]: PreJavaType }): string {
-        if (typeParametersEnv && typeParametersEnv[this.name])
-            return typeParametersEnv[this.name].getSimpleName(typeParametersEnv)
+        if (typeParametersEnv && typeParametersEnv[this.name]) {
+            //let newEnv = Object.assign({}, typeParametersEnv)
+            //delete newEnv[this.name]
+            return typeParametersEnv[this.name].getSimpleName(null) // TODO maybe should not use null
+        }
         return this.name
     }
 

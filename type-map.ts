@@ -123,32 +123,34 @@ export class TsToPreJavaTypemap {
         this.substituteType((type) => type.getSimpleName(null) == '' ? null : type)
     }
 
+    browseTypeHierarchy(type: PreJavaType, visitor: { (visitedInterface: PreJavaTypeClassOrInterface, typeVariableEnv: { [key: string]: PreJavaType }) }, typeVariableEnv: { [key: string]: PreJavaType } = null) {
+        Visit.preJavaTypeVisit(type, {
+            onVisitReferenceType: type => {
+                let env: { [key: string]: PreJavaType } = Object.create(typeVariableEnv)
+                let typeParameters = type.type.getTypeParameters(typeVariableEnv)
+                for (let tpi = 0; tpi < type.typeParameters.length; tpi++)
+                    env[typeParameters[tpi].getSimpleName(typeVariableEnv)] = type.typeParameters[tpi]
+
+                this.browseTypeHierarchy(type.type, visitor, env)
+            },
+
+            onVisitClassOrInterfaceType: type => {
+                visitor(type, typeVariableEnv)
+                type.baseTypes && type.baseTypes.forEach(baseType => this.browseTypeHierarchy(baseType, visitor))
+            }
+        })
+    }
+
     // TODO : for classes : add methods from interface hierarchy which are not in the method list
     addMethodsFromInterfaceHierarchy() {
-        let recBrowseInterfaceHierarchy = (type: PreJavaType, visitor: { (visitedInterface: PreJavaTypeClassOrInterface, typeVariableEnv: { [key: string]: PreJavaType }) }, typeVariableEnv: { [key: string]: PreJavaType } = null) => {
-            Visit.preJavaTypeVisit(type, {
-                onVisitReferenceType: type => {
-                    let env: { [key: string]: PreJavaType } = Object.create(typeVariableEnv)
-                    let typeParameters = type.type.getTypeParameters(typeVariableEnv)
-                    for (let tpi = 0; tpi < type.typeParameters.length; tpi++)
-                        env[typeParameters[tpi].getSimpleName(typeVariableEnv)] = type.typeParameters[tpi]
-
-                    recBrowseInterfaceHierarchy(type.type, visitor, env)
-                },
-
-                onVisitClassOrInterfaceType: type => {
-                    if (!type.isClassLike())
-                        visitor(type, typeVariableEnv)
-                    type.baseTypes && type.baseTypes.forEach(baseType => recBrowseInterfaceHierarchy(baseType, visitor))
-                }
-            })
-        }
-
         for (let pjt of this.typeMap.values()) {
             Visit.preJavaTypeVisit(pjt, {
                 onVisitClassOrInterfaceType: type => {
                     if (type.isClassLike()) {
-                        recBrowseInterfaceHierarchy(type, (visitedInterface, typeVariableEnv) => {
+                        this.browseTypeHierarchy(type, (visitedInterface, typeVariableEnv) => {
+                            if (type.isClassLike())
+                                return
+
                             visitedInterface.methods && visitedInterface.methods.forEach(visitedMethod => {
                                 if (!type.methods || !type.methods.some(m => {
                                     // vérifie que deux méthodes ne sont pas identiques du point de vue de leur noms et des type erasure de leurs paramètres.
