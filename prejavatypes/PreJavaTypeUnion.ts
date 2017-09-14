@@ -12,11 +12,41 @@ export class PreJavaTypeUnion extends PreJavaType {
     types: PreJavaType[]
     typeParameters: PreJavaTypeParameter[]
     baseTypes: Set<PreJavaType>
+    aliasName: string = null
 
     unionId = currentUnionId++
 
     processSourceType(type: ts.Type, typeParametersToApplyToAnonymousTypes: PreJavaTypeParameter[], context: ProcessContext) {
-        this.typeParameters = typeParametersToApplyToAnonymousTypes
+        if (type.aliasSymbol && type.aliasSymbol.name) {
+            this.aliasName = type.aliasSymbol.name
+
+            if (type.aliasSymbol.declarations && type.aliasSymbol.declarations.length) {
+                let declaration = type.aliasSymbol.declarations[0] as ts.TypeAliasDeclaration
+                if (declaration.kind == ts.SyntaxKind.TypeAliasDeclaration && declaration.typeParameters && declaration.typeParameters.length) {
+                    this.typeParameters = []
+                    for (let typeParameter of declaration.typeParameters) {
+                        if (typeParameter.kind == ts.SyntaxKind.TypeParameter && 'symbol' in typeParameter) {
+                            this.typeParameters.push(new PreJavaTypeParameter(typeParameter['symbol'].name))
+                        }
+                    }
+                }
+
+            }
+
+            /*this.typeParameters = type.aliasTypeArguments && type.aliasTypeArguments.map(t => {
+                let typeArgJavaType = context.getTypeMap().getOrCreatePreJavaTypeForTsType(t, false, null)
+                if (typeArgJavaType instanceof PreJavaTypeParameter)
+                    return typeArgJavaType
+                else {
+                    console.log("BIG ERROR, AT LEAST NOT REALLY THOUGHT ABOUT, WILL FAIL SOMEWHERE SOMEHOW");
+
+                    return null
+                }
+            }).filter(t => t)*/
+        }
+        else {
+            this.typeParameters = typeParametersToApplyToAnonymousTypes
+        }
 
         let unionType = type as ts.UnionType
         this.setTypes(unionType.types.map(t => context.getTypeMap().getOrCreatePreJavaTypeForTsType(t, false, typeParametersToApplyToAnonymousTypes)))
