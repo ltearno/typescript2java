@@ -138,6 +138,15 @@ export class TsToPreJavaTypemap {
 
             let replacedTypes = list.slice(1, list.length - 1)
 
+            let replacementType = list[0] as PreJavaTypeClassOrInterface
+            replacedTypes
+                .filter(t => t instanceof PreJavaTypeClassOrInterface && t.comments && t.comments.length)
+                .forEach(t => {
+                    if (!replacementType.comments)
+                        replacementType.comments = []
+                    replacementType.comments.concat((t as PreJavaTypeClassOrInterface).comments)
+                })
+
             this.substituteType((type: PreJavaType): PreJavaType => {
                 if (replacedTypes.some(replacedType => replacedType === type))
                     return list[0]
@@ -174,12 +183,12 @@ export class TsToPreJavaTypemap {
     private substituteType(replacer: TypeReplacer) {
         let cache = new Map<PreJavaType, PreJavaType>()
 
-        for (let [tsType, type] of this.typeMap.entries()) {
+        for (let [typeKey, type] of this.typeMap.entries()) {
             let substitute = type.substituteType(replacer, cache, new Set())
             if (!substitute)
-                this.typeMap.delete(tsType)
+                this.typeMap.delete(typeKey)
             else if (substitute != type)
-                this.typeMap.set(tsType, substitute)
+                this.typeMap.set(typeKey, substitute)
         }
     }
 
@@ -201,6 +210,8 @@ export class TsToPreJavaTypemap {
                 if (!type.types || !type.types.length)
                     typesToSimplifyToObject.push(type)
                 else if (type.types.length == 1)
+                    typesToSimplifyToOnlyType.push(type)
+                else if (!type.types.some(t => (type as PreJavaTypeUnion).types[0] != t))
                     typesToSimplifyToOnlyType.push(type)
             }
         }
@@ -247,9 +258,6 @@ export class TsToPreJavaTypemap {
             Visit.preJavaTypeVisit(pjt, {
                 onVisitClassOrInterfaceType: type => {
                     if (type.isClassLike()) {
-                        if (type.getSimpleName(null) == 'ViewRef__2008_')
-                            console.log('kjhkjh');
-
                         this.browseTypeHierarchy(type, (visitedInterface, typeVariableEnv) => {
                             if (visitedInterface.isClassLike())
                                 return
@@ -294,9 +302,6 @@ export class TsToPreJavaTypemap {
                                 //    type.addProperty(visitedProperty) // TODO Take care of the concretized type parameters
                             })
                         })
-
-                        if (type.getSimpleName(null) == 'ViewRef__2008_')
-                            console.log('kjhkjh');
                     }
                 }
             })
@@ -587,7 +592,7 @@ export class TsToPreJavaTypemap {
         let interfaceType = (objectType.objectFlags & ts.ObjectFlags.ClassOrInterface) && type as ts.InterfaceType
         let referenceType = (objectType.objectFlags & ts.ObjectFlags.Reference) && type as ts.TypeReference
 
-        let typeKey = null
+        let typeKey: any = type
         if (type.flags & ts.TypeFlags.Void)
             typeKey = 'void-' + preferNothingVoid
         else if (objectType && objectType.objectFlags & ts.ObjectFlags.Tuple)
@@ -598,7 +603,7 @@ export class TsToPreJavaTypemap {
             typeKey = 'union-' + type['id'] + ((typeParametersToApplyToAnonymousTypes && typeParametersToApplyToAnonymousTypes.length) ? (typeParametersToApplyToAnonymousTypes.map(tp => '-' + tp.name)) : (''))
         }
 
-        return type
+        return typeKey
     }
 
     private instantiatePreJavaType(type: ts.Type, preferNothingVoid: boolean, typeParametersToApplyToAnonymousTypes: PreJavaTypeParameter[]): PreJavaType {
@@ -628,7 +633,7 @@ export class TsToPreJavaTypemap {
         if (type.flags & ts.TypeFlags.Void)
             return preferNothingVoid ? BUILTIN_TYPE_UNIT : BUILTIN_TYPE_VOID
         if (type.flags & ts.TypeFlags.Undefined)
-            return BUILTIN_TYPE_UNIT
+            return preferNothingVoid ? BUILTIN_TYPE_UNIT : BUILTIN_TYPE_VOID
         if (type.flags & ts.TypeFlags.Null)
             return BUILTIN_TYPE_VOID
         if (type.flags & ts.TypeFlags.Never)

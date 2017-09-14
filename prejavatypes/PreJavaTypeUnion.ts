@@ -3,6 +3,7 @@ import { PreJavaType, ProcessContext, TypeReplacer } from './PreJavaType'
 import { PreJavaTypeClassOrInterface } from './PreJavaTypeClassOrInterface'
 import { PreJavaTypeReference } from './PreJavaTypeReference'
 import { PreJavaTypeParameter } from './PreJavaTypeParameter'
+import * as Visit from './PreJavaTypeVisit'
 
 let currentUnionId = 1
 
@@ -10,6 +11,7 @@ export class PreJavaTypeUnion extends PreJavaType {
     packageName: string
     types: PreJavaType[]
     typeParameters: PreJavaTypeParameter[]
+    baseType: PreJavaType
 
     unionId = currentUnionId++
 
@@ -70,13 +72,33 @@ export class PreJavaTypeUnion extends PreJavaType {
         if (!stay || stay != this)
             return stay
 
-        if (this.types)
-            this.types = this.types.map(t => t.substituteType(replacer, cache, passThroughTypes)).filter(t => t != null)
+        if (this.types) {
+            let oldTypes = this.types
+            this.types = []
+            oldTypes.forEach(t => {
+                let nt = t.substituteType(replacer, cache, passThroughTypes)
+                if (nt && this.types.indexOf(nt) < 0)
+                    this.types.push(nt)
+            })
+        }
 
         return this
     }
 
     getHierachyDepth() {
         return 1
+    }
+
+    private getBaseTypeOf(type: PreJavaType): Set<PreJavaType> {
+        return Visit.preJavaTypeVisit(type, {
+            onVisitOther: type => null,
+            onVisitClassOrInterfaceType: type => type.baseTypes,
+            onVisitReferenceType: type => this.getBaseTypeOf(type.type),
+            onVisitTypeParameter: type => type.constraint,
+            onVisitUnion: type => type.findBaseTypes()
+        })
+    }
+
+    findBaseTypes() {
     }
 }

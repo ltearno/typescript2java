@@ -98,7 +98,7 @@ export class ExportPhase {
     JS = new PreJavaTypeBuiltinJavaType('jsinterop.base', 'Js')
 
     exportNodes(program: ts.Program, baseDirectory: string) {
-        for (let type of this.gatherPhase.typeMap.typeMap.values()) {
+        for (let type of this.gatherPhase.typeMap.typeSet()) {
             preJavaTypeVisit(type, {
                 onVisitUnion: (type) => {
                     let javaWriter = new JavaWriter(type.getPackageName())
@@ -112,7 +112,7 @@ export class ExportPhase {
                     flow.endJavaDocComments()
                     javaWriter.importType(this.JS_PACKAGE)
                     flow.push(`@JsType(isNative=true, namespace=JsPackage.GLOBAL, name="?")`).finishLine()
-                    flow.push(`public class ${type.getParametrizedSimpleName(null)} {`).finishLine()
+                    flow.push(`public abstract class ${type.getParametrizedSimpleName(null)} {`).finishLine()
                     flow.pushLineStart('    ')
                     for (let unionedType of type.types) {
                         javaWriter.importType(this.JS_OVERLAY)
