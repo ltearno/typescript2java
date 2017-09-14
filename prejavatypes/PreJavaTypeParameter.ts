@@ -5,10 +5,10 @@ export class PreJavaTypeParameter extends PreJavaType {
     name: string
     constraint: PreJavaType
 
-    constructor(name: string, constraint: PreJavaType = null) {
-        super()
-        this.name = name
-        this.constraint = constraint
+    processSourceType(type: ts.Type, typeParametersToApplyToAnonymousTypes: PreJavaTypeParameter[], context: ProcessContext) {
+        let symbol = type.getSymbol()
+        this.name = symbol ? symbol.getName() : '?'
+        this.constraint = context.getTypeMap().getOrCreatePreJavaTypeForTsType((type as ts.TypeParameter).constraint, false, typeParametersToApplyToAnonymousTypes)
     }
 
     getSourceTypes(): Set<ts.Type> { return null }

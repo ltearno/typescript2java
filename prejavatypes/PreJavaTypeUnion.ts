@@ -13,6 +13,13 @@ export class PreJavaTypeUnion extends PreJavaType {
 
     unionId = currentUnionId++
 
+    processSourceType(type: ts.Type, typeParametersToApplyToAnonymousTypes: PreJavaTypeParameter[], context: ProcessContext) {
+        this.typeParameters = typeParametersToApplyToAnonymousTypes
+
+        let unionType = type as ts.UnionType
+        this.setTypes(unionType.types.map(t => context.getTypeMap().getOrCreatePreJavaTypeForTsType(t, false, typeParametersToApplyToAnonymousTypes)))
+    }
+
     setTypes(types: PreJavaType[]) {
         this.types = []
         types.forEach(type => {

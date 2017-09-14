@@ -20,6 +20,9 @@ export class PreJavaTypeTuple extends PreJavaType {
             this.typeParameters = null
     }
 
+    processSourceType(type: ts.Type, typeParametersToApplyToAnonymousTypes: PreJavaTypeParameter[], context: ProcessContext) {
+    }
+
     getSourceTypes(): Set<ts.Type> { return null }
 
     dump() {

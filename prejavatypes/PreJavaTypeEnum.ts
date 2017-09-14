@@ -1,5 +1,6 @@
 import * as ts from "typescript"
 import { PreJavaType, ProcessContext, TypeReplacer } from './PreJavaType'
+import { PreJavaTypeParameter } from './PreJavaTypeParameter'
 
 export class PreJavaTypeEnum extends PreJavaType {
     packageName: string
@@ -10,18 +11,17 @@ export class PreJavaTypeEnum extends PreJavaType {
     }[] = []
     sourceTypes: Set<ts.EnumType>
 
-    constructor(name: string) {
-        super()
-        this.name = name
-    }
-
     getSourceTypes(): Set<ts.EnumType> { return null }
 
     getHierachyDepth() {
         return 1
     }
 
-    addSourceType(enumType: ts.EnumType) {
+    processSourceType(type: ts.Type, typeParametersToApplyToAnonymousTypes: PreJavaTypeParameter[], context: ProcessContext) {
+        let enumType = type as ts.EnumType
+
+        this.name = type.getSymbol().getName()
+
         if (this.sourceTypes == null)
             this.sourceTypes = new Set()
         this.sourceTypes.add(enumType)

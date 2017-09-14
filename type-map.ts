@@ -467,154 +467,130 @@ export class TsToPreJavaTypemap {
         )
     }
 
-    getOrCreatePreJavaTypeForTsType(tsType: ts.Type, preferNothingVoid: boolean = false, typeParametersToApplyToAnonymousTypes: PreJavaTypeParameter[] = null): PreJavaType {
-        if (!tsType)
-            return null
+    private findTypeKey(type: ts.Type, preferNothingVoid: boolean, typeParametersToApplyToAnonymousTypes: PreJavaTypeParameter[]) {
+        let objectType = (type.flags & ts.TypeFlags.Object) && type as ts.ObjectType
+        let interfaceType = (objectType.objectFlags & ts.ObjectFlags.ClassOrInterface) && type as ts.InterfaceType
+        let referenceType = (objectType.objectFlags & ts.ObjectFlags.Reference) && type as ts.TypeReference
 
-        let objectType = (tsType.flags & ts.TypeFlags.Object) && tsType as ts.ObjectType
-        let interfaceType = (objectType.objectFlags & ts.ObjectFlags.ClassOrInterface) && tsType as ts.InterfaceType
-        let referenceType = (objectType.objectFlags & ts.ObjectFlags.Reference) && tsType as ts.TypeReference
-
-        let typeKey: any = tsType
-        if (tsType.flags & ts.TypeFlags.Void)
+        let typeKey = null
+        if (type.flags & ts.TypeFlags.Void)
             typeKey = 'void-' + preferNothingVoid
         else if (objectType && objectType.objectFlags & ts.ObjectFlags.Tuple)
             typeKey = 'tuple-' + referenceType.typeArguments.length
         else if (objectType && objectType.objectFlags & ts.ObjectFlags.Anonymous)
-            typeKey = tsType['id'] + ((typeParametersToApplyToAnonymousTypes && typeParametersToApplyToAnonymousTypes.length) ? (typeParametersToApplyToAnonymousTypes.map(tp => '-' + tp.name)) : (''))
-        else if (tsType.flags & ts.TypeFlags.Union) {
-            typeKey = 'union-' + tsType['id'] + ((typeParametersToApplyToAnonymousTypes && typeParametersToApplyToAnonymousTypes.length) ? (typeParametersToApplyToAnonymousTypes.map(tp => '-' + tp.name)) : (''))
+            typeKey = type['id'] + ((typeParametersToApplyToAnonymousTypes && typeParametersToApplyToAnonymousTypes.length) ? (typeParametersToApplyToAnonymousTypes.map(tp => '-' + tp.name)) : (''))
+        else if (type.flags & ts.TypeFlags.Union) {
+            typeKey = 'union-' + type['id'] + ((typeParametersToApplyToAnonymousTypes && typeParametersToApplyToAnonymousTypes.length) ? (typeParametersToApplyToAnonymousTypes.map(tp => '-' + tp.name)) : (''))
         }
+
+        return type
+    }
+
+    getOrCreatePreJavaTypeForTsType(tsType: ts.Type, preferNothingVoid: boolean = false, typeParametersToApplyToAnonymousTypes: PreJavaTypeParameter[] = null): PreJavaType {
+        if (!tsType)
+            return null
+
+        let typeKey = this.findTypeKey(tsType, preferNothingVoid, typeParametersToApplyToAnonymousTypes)
 
         if (this.typeMap.has(typeKey))
             return this.typeMap.get(typeKey)
 
-        if (tsType['id'] == 15834 || tsType['id'] == 15839)
-            console.log('yop')
+        let preJavaType = this.instantiatePreJavaType(tsType, preferNothingVoid, typeParametersToApplyToAnonymousTypes)
 
-        let preJavaType = this.createPreJavaType(typeKey, tsType, preferNothingVoid, typeParametersToApplyToAnonymousTypes)
+        this.typeMap.set(typeKey, preJavaType)
 
-        if (!(preJavaType instanceof PreJavaTypeReference)) {
-            this.typeMap.set(typeKey, preJavaType)
-        }
-
+        preJavaType.processSourceType(tsType, typeParametersToApplyToAnonymousTypes, this.processContext)
 
         return preJavaType
     }
 
-    private createPreJavaType(typeKey: any, tsType: ts.Type, preferNothingVoid: boolean, typeParametersToApplyToAnonymousTypes: PreJavaTypeParameter[]) {
-        if (!tsType)
+    private instantiatePreJavaType(type: ts.Type, preferNothingVoid: boolean, typeParametersToApplyToAnonymousTypes: PreJavaTypeParameter[]): PreJavaType {
+        if (!type)
             return null
 
-        if (tsType.flags & ts.TypeFlags.Any)
+        if (type.flags & ts.TypeFlags.Any)
             return BUILTIN_TYPE_OBJECT
-        if (tsType.flags & ts.TypeFlags.NonPrimitive)
+        if (type.flags & ts.TypeFlags.NonPrimitive)
             return BUILTIN_TYPE_OBJECT
-        if (tsType.flags & ts.TypeFlags.StringLiteral)
+
+        if (type.flags & ts.TypeFlags.StringLiteral)
             return BUILTIN_TYPE_STRING
-        if (tsType.flags & ts.TypeFlags.Number)
+
+        if (type.flags & ts.TypeFlags.Number)
             return BUILTIN_TYPE_NUMBER
-        if (tsType.flags & ts.TypeFlags.NumberLiteral)
+        if (type.flags & ts.TypeFlags.NumberLiteral)
             return BUILTIN_TYPE_NUMBER
-        if (tsType.flags & ts.TypeFlags.Boolean)
+
+        if (type.flags & ts.TypeFlags.Boolean)
             return BUILTIN_TYPE_BOOLEAN
-        if (tsType.flags & ts.TypeFlags.BooleanLiteral)
+        if (type.flags & ts.TypeFlags.BooleanLiteral)
             return BUILTIN_TYPE_BOOLEAN
-        if (tsType.getSymbol() && tsType.getSymbol().getName() == 'Boolean')
+        if (type.getSymbol() && type.getSymbol().getName() == 'Boolean')
             return BUILTIN_TYPE_BOOLEAN
-        if (tsType.flags & ts.TypeFlags.Void)
+
+        if (type.flags & ts.TypeFlags.Void)
             return preferNothingVoid ? BUILTIN_TYPE_UNIT : BUILTIN_TYPE_VOID
-        if (tsType.flags & ts.TypeFlags.Undefined)
+        if (type.flags & ts.TypeFlags.Undefined)
             return BUILTIN_TYPE_UNIT
-        if (tsType.flags & ts.TypeFlags.Null)
+        if (type.flags & ts.TypeFlags.Null)
             return BUILTIN_TYPE_VOID
-        if (tsType.flags & ts.TypeFlags.Never)
+        if (type.flags & ts.TypeFlags.Never)
             return BUILTIN_TYPE_VOID
 
-        if (tsType.getSymbol() && tsType.getSymbol().getName() == 'String')
+        if (type.getSymbol() && type.getSymbol().getName() == 'String')
             return BUILTIN_TYPE_STRING
 
-        if (tsType.getSymbol() && tsType.getSymbol().getName() == 'Object')
+        if (type.getSymbol() && type.getSymbol().getName() == 'Object')
             return BUILTIN_TYPE_OBJECT
 
-        if (tsType.getSymbol() && tsType.getSymbol().getName() == 'Number')
+        if (type.getSymbol() && type.getSymbol().getName() == 'Number')
             return BUILTIN_TYPE_NUMBER
 
-        if (tsType.flags & ts.TypeFlags.ESSymbol)
+        if (type.flags & ts.TypeFlags.ESSymbol)
             return FAKE_TYPE_ESSYMBOL
 
-        if (tsType.flags & ts.TypeFlags.IndexedAccess)
+        if (type.flags & ts.TypeFlags.IndexedAccess)
             return FAKE_TYPE_INDEXEDACCESS
 
-        if (tsType.flags & ts.TypeFlags.Intersection)
+        if (type.flags & ts.TypeFlags.Intersection)
             return FAKE_TYPE_INTERSECTION
 
-        if (tsType.flags & ts.TypeFlags.TypeParameter) {
-            if (tsType['isThisType'])
-                return this.getOrCreatePreJavaTypeForTsType((tsType as ts.TypeParameter).constraint, false, typeParametersToApplyToAnonymousTypes)
+        if (type.flags & ts.TypeFlags.TypeParameter) {
+            if (type['isThisType'])
+                return this.getOrCreatePreJavaTypeForTsType((type as ts.TypeParameter).constraint, false, typeParametersToApplyToAnonymousTypes)
 
-            let symbol = (tsType as ts.TypeParameter).getSymbol()
-            let preJavaType = new PreJavaTypeParameter(symbol ? symbol.getName() : '?')
-            preJavaType.constraint = this.getOrCreatePreJavaTypeForTsType((tsType as ts.TypeParameter).constraint, false, typeParametersToApplyToAnonymousTypes)
-            return preJavaType
+            return new PreJavaTypeParameter()
         }
 
-        let objectType = (tsType.flags & ts.TypeFlags.Object) && tsType as ts.ObjectType
+        let objectType = (type.flags & ts.TypeFlags.Object) && type as ts.ObjectType
 
         if (objectType && objectType.objectFlags & ts.ObjectFlags.Reference) {
-            let reference = tsType as ts.TypeReference
-            if (reference.target != tsType) {
-                let preJavaType = new PreJavaTypeReference()
-                preJavaType.type = this.getOrCreatePreJavaTypeForTsType(reference.target, false, typeParametersToApplyToAnonymousTypes)
-                preJavaType.typeParameters = reference.typeArguments ? reference.typeArguments.map(typeArgument => this.getOrCreatePreJavaTypeForTsType(typeArgument, false, typeParametersToApplyToAnonymousTypes)) : null
-                return preJavaType
-            }
+            let reference = type as ts.TypeReference
+            if (reference.target != type)
+                return new PreJavaTypeReference()
         }
 
-        if (tsType.flags & ts.TypeFlags.Union) {
-            let unionType = tsType as ts.UnionType
-
-            let res = new PreJavaTypeUnion()
-            this.typeMap.set(typeKey, res)
-            res.typeParameters = typeParametersToApplyToAnonymousTypes
-            res.setTypes(unionType.types.map(t => this.getOrCreatePreJavaTypeForTsType(t, false, typeParametersToApplyToAnonymousTypes)))
-
-            return res
-        }
+        if (type.flags & ts.TypeFlags.Union)
+            return new PreJavaTypeUnion()
 
         if (objectType) {
-            if (objectType.objectFlags & ts.ObjectFlags.Tuple) {
-                let preJavaType = new PreJavaTypeTuple(objectType as ts.TypeReference)
-                this.typeMap.set(typeKey, preJavaType)
-
-                return preJavaType
-            }
-            else {
-                let preJavaType = new PreJavaTypeClassOrInterface()
-                this.typeMap.set(typeKey, preJavaType)
-
-                preJavaType.addSourceType(objectType, typeParametersToApplyToAnonymousTypes, this.processContext)
-
-                return preJavaType
-            }
+            if (objectType.objectFlags & ts.ObjectFlags.Tuple)
+                return new PreJavaTypeTuple(objectType as ts.TypeReference)
+            else
+                return new PreJavaTypeClassOrInterface()
         }
 
-        if (tsType.flags & ts.TypeFlags.Enum && tsType.getSymbol()) {
-            let preJavaEnum = new PreJavaTypeEnum(tsType.getSymbol().getName())
-            this.typeMap.set(typeKey, preJavaEnum)
-            preJavaEnum.addSourceType(tsType as ts.EnumType)
+        if (type.flags & ts.TypeFlags.Enum && type.getSymbol())
+            return new PreJavaTypeEnum()
 
-            return preJavaEnum
-        }
-
-        if (tsType.flags & ts.TypeFlags.StringLike)
+        if (type.flags & ts.TypeFlags.StringLike)
             return BUILTIN_TYPE_STRING
-        if (tsType.flags & ts.TypeFlags.NumberLike)
+        if (type.flags & ts.TypeFlags.NumberLike)
             return BUILTIN_TYPE_NUMBER
-        if (tsType.flags & ts.TypeFlags.BooleanLike)
+        if (type.flags & ts.TypeFlags.BooleanLike)
             return BUILTIN_TYPE_BOOLEAN
 
-        console.warn(`no mapping for ts type ${tsType} `)
+        console.warn(`no mapping for ts type ${type} `)
         return BUILTIN_TYPE_OBJECT
     }
 }

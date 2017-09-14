@@ -57,6 +57,12 @@ export class PreJavaTypeReference extends PreJavaType {
     type: PreJavaType
     typeParameters: PreJavaType[]
 
+    processSourceType(type: ts.Type, typeParametersToApplyToAnonymousTypes: PreJavaTypeParameter[], context: ProcessContext) {
+        let reference = type as ts.TypeReference
+        this.type = context.getTypeMap().getOrCreatePreJavaTypeForTsType(reference.target, false, typeParametersToApplyToAnonymousTypes)
+        this.typeParameters = reference.typeArguments ? reference.typeArguments.map(typeArgument => context.getTypeMap().getOrCreatePreJavaTypeForTsType(typeArgument, false, typeParametersToApplyToAnonymousTypes)) : null
+    }
+
     dump() { console.log(`TypeReference to ${this.type.getParametrizedSimpleName(null)}`) }
 
     getSourceTypes(): Set<ts.Type> { return null }

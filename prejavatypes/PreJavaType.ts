@@ -24,6 +24,8 @@ export abstract class PreJavaType {
 
     abstract getTypeParameters(typeParametersEnv: { [key: string]: PreJavaType }): PreJavaType[]
 
+    abstract processSourceType(type: ts.Type, typeParametersToApplyToAnonymousTypes: PreJavaTypeParameter[], context: ProcessContext)
+
     getParametrization(typeParametersEnv: { [key: string]: PreJavaType }): string {
         let typeParameters = this.getTypeParameters(typeParametersEnv)
         if (typeParameters && typeParameters.length)

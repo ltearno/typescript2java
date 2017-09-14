@@ -41,14 +41,6 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
 
     isClassLike() { return this.isClass }
 
-    addSourceType(type: ts.ObjectType, typeParametersToApplyToAnonymousTypes: PreJavaTypeParameter[], context: ProcessContext) {
-        if (!this.sourceTypes)
-            this.sourceTypes = new Set()
-        this.sourceTypes.add(type)
-
-        this.processSourceType(type, typeParametersToApplyToAnonymousTypes, context)
-    }
-
     getHierachyDepth() {
         let level = 1
         if (this.baseTypes) {
@@ -67,9 +59,13 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
         method && this.methods && this.methods.splice(index, 1)
     }
 
-    private processSourceType(type: ts.Type, typeParametersToApplyToAnonymousTypes: PreJavaTypeParameter[], context: ProcessContext) {
+    processSourceType(type: ts.Type, typeParametersToApplyToAnonymousTypes: PreJavaTypeParameter[], context: ProcessContext) {
         if (!type)
             return
+
+        if (!this.sourceTypes)
+            this.sourceTypes = new Set()
+        this.sourceTypes.add(type)
 
         if (type.flags & ts.TypeFlags.Object) {
             let objectType = type as ts.ObjectType
@@ -89,7 +85,11 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
                                 constraint = context.getTypeMap().getOrCreatePreJavaTypeForTsType(context.getProgram().getTypeChecker().getTypeAtLocation(ss.constraint), false, null)
                             }
                         }
-                        return new PreJavaTypeParameter(tp.symbol.getName(), constraint)
+
+                        let typeParameter = new PreJavaTypeParameter()
+                        typeParameter.name = tp.symbol.getName()
+                        typeParameter.constraint = constraint
+                        return typeParameter
                     }))
                 }
             }
