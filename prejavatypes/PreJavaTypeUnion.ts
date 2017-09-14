@@ -11,7 +11,7 @@ export class PreJavaTypeUnion extends PreJavaType {
     packageName: string
     types: PreJavaType[]
     typeParameters: PreJavaTypeParameter[]
-    baseType: PreJavaType
+    baseTypes: Set<PreJavaType>
 
     unionId = currentUnionId++
 
@@ -28,6 +28,8 @@ export class PreJavaTypeUnion extends PreJavaType {
             if (this.types.indexOf(type) < 0)
                 this.types.push(type)
         })
+
+        this.baseTypes = undefined
     }
 
     getSourceTypes(): Set<ts.Type> { return null }
@@ -80,6 +82,8 @@ export class PreJavaTypeUnion extends PreJavaType {
                 if (nt && this.types.indexOf(nt) < 0)
                     this.types.push(nt)
             })
+
+            this.baseTypes = undefined
         }
 
         return this
@@ -89,16 +93,63 @@ export class PreJavaTypeUnion extends PreJavaType {
         return 1
     }
 
-    private getBaseTypeOf(type: PreJavaType): Set<PreJavaType> {
-        return Visit.preJavaTypeVisit(type, {
-            onVisitOther: type => null,
-            onVisitClassOrInterfaceType: type => type.baseTypes,
-            onVisitReferenceType: type => this.getBaseTypeOf(type.type),
-            onVisitTypeParameter: type => type.constraint,
-            onVisitUnion: type => type.findBaseTypes()
+    private addBaseTypesOf(type: PreJavaType, set: Set<PreJavaType>) {
+        Visit.visitPreJavaType(type, {
+            onOther: type => null,
+
+            caseReferenceType: type => this.addBaseTypesOf(type.type, set),
+
+            caseClassOrInterfaceType: type => type.baseTypes && type.baseTypes.forEach(baseType => {
+                set.add(baseType)
+                this.addBaseTypesOf(baseType, set)
+            }),
+
+            caseTypeParameter: type => {
+                if (type.constraint) {
+                    set.add(type.constraint)
+                    this.addBaseTypesOf(type.constraint, set)
+                }
+            },
+
+            caseUnion: type => type.getBaseTypes() && type.getBaseTypes().forEach(baseType => {
+                set.add(baseType)
+                this.addBaseTypesOf(baseType, set)
+            })
         })
     }
 
-    findBaseTypes() {
+    private getBaseTypesOf(type: PreJavaType): Set<PreJavaType> {
+        let res = new Set()
+        this.addBaseTypesOf(type, res)
+        return res
+    }
+
+    getBaseTypes(): Set<PreJavaType> {
+        if (this.baseTypes)
+            return this.baseTypes
+
+        let baseTypes: Set<PreJavaType> = null
+        for (let type of this.types) {
+            if (!baseTypes) {
+                baseTypes = this.getBaseTypesOf(type)
+            }
+            else {
+                let unionedBaseTypes = this.getBaseTypesOf(type)
+                let typesToRemove: PreJavaType[] = []
+                baseTypes.forEach(baseType => unionedBaseTypes.has(baseType) || typesToRemove.push(baseType))
+                typesToRemove.forEach(t => baseTypes.delete(t))
+            }
+        }
+
+        if (baseTypes.size == 0)
+            return null
+
+        let toRemove = new Set<PreJavaType>()
+        baseTypes.forEach(type => this.getBaseTypesOf(type).forEach(t => toRemove.add(t)))
+        toRemove.forEach(type => baseTypes.delete(type))
+
+        this.baseTypes = baseTypes
+
+        return baseTypes
     }
 }

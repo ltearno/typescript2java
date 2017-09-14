@@ -1,6 +1,6 @@
 import * as ts from "typescript"
 import { TsToPreJavaTypemap } from '../type-map'
-import { preJavaTypeVisit } from './PreJavaTypeVisit'
+import { visitPreJavaType } from './PreJavaTypeVisit'
 import { PreJavaTypeParameter } from './PreJavaTypeParameter'
 
 export interface ProcessContext {
@@ -51,14 +51,14 @@ export abstract class PreJavaType {
     }
 
     getHumanizedName(typeParametersEnv: { [key: string]: PreJavaType }): string {
-        let result = preJavaTypeVisit(this, {
-            onVisitReferenceType: type => {
+        let result = visitPreJavaType(this, {
+            caseReferenceType: type => {
                 let res = type.type.getHumanizedName(typeParametersEnv)
                 if (type.typeParameters && type.typeParameters.length)
                     res += `Of${type.typeParameters.map(t => t.getHumanizedName(typeParametersEnv)).join('And')}`
                 return res
             },
-            onVisitUnion: type => `UnionOf${type.types.map(t => t.getHumanizedName(typeParametersEnv)).join('And')}`
+            caseUnion: type => `UnionOf${type.types.map(t => t.getHumanizedName(typeParametersEnv)).join('And')}`
         })
 
         return result || this.getSimpleName(typeParametersEnv)

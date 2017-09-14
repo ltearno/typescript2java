@@ -4,7 +4,7 @@ import * as ts from "typescript"
 import * as TypeMap from './type-map'
 import * as GatherPhase from './processor.gather-phase'
 import { mkdirRec } from './tools';
-import { preJavaTypeVisit } from './prejavatypes/PreJavaTypeVisit'
+import { visitPreJavaType } from './prejavatypes/PreJavaTypeVisit'
 import { TextFlow, JavaWriter } from './TextFlow'
 
 import { PreJavaType } from './prejavatypes/PreJavaType'
@@ -99,10 +99,15 @@ export class ExportPhase {
 
     exportNodes(program: ts.Program, baseDirectory: string) {
         for (let type of this.gatherPhase.typeMap.typeSet()) {
-            preJavaTypeVisit(type, {
-                onVisitUnion: (type) => {
+            visitPreJavaType(type, {
+                caseUnion: (type) => {
                     let javaWriter = new JavaWriter(type.getPackageName())
                     let flow = new TextFlow()
+
+                    let baseTypes: PreJavaType[] = []
+                    type.getBaseTypes() && type.getBaseTypes().forEach(baseType => baseTypes.push(baseType))
+                    let implementedBaseTypes = baseTypes.filter(bt => !bt.isClassLike())
+                    let extendedBaseTypes = baseTypes.filter(bt => bt.isClassLike())
 
                     javaWriter.importType(this.JS_TYPE)
                     javaWriter.importType(this.JS)
@@ -112,7 +117,7 @@ export class ExportPhase {
                     flow.endJavaDocComments()
                     javaWriter.importType(this.JS_PACKAGE)
                     flow.push(`@JsType(isNative=true, namespace=JsPackage.GLOBAL, name="?")`).finishLine()
-                    flow.push(`public abstract class ${type.getParametrizedSimpleName(null)} {`).finishLine()
+                    flow.push(`public abstract class ${type.getParametrizedSimpleName(null)} ${extendedBaseTypes.length ? `extends ${extendedBaseTypes.map(t => javaWriter.importTypeParametrized(t)).join()} ` : ''}${implementedBaseTypes.length ? `implements ${implementedBaseTypes.map(t => javaWriter.importTypeParametrized(t)).join()} ` : ''} {`).finishLine()
                     flow.pushLineStart('    ')
                     for (let unionedType of type.types) {
                         javaWriter.importType(this.JS_OVERLAY)
@@ -135,7 +140,7 @@ export class ExportPhase {
 
                     this.exportJavaUnit(type, javaWriter, flow, baseDirectory)
                 },
-                onVisitTuple: (type) => {
+                caseTuple: (type) => {
                     let javaWriter = new JavaWriter(type.getPackageName())
                     let flow = new TextFlow()
 
@@ -181,7 +186,7 @@ export class ExportPhase {
 
                     this.exportJavaUnit(type, javaWriter, flow, baseDirectory)
                 },
-                onVisitEnumType: (type) => {
+                caseEnumType: (type) => {
                     let javaWriter = new JavaWriter(type.getPackageName())
                     let flow = new TextFlow()
 
@@ -199,7 +204,7 @@ export class ExportPhase {
 
                     this.exportJavaUnit(type, javaWriter, flow, baseDirectory)
                 },
-                onVisitClassOrInterfaceType: (type) => {
+                caseClassOrInterfaceType: (type) => {
                     let javaWriter = new JavaWriter(type.getPackageName())
                     let flow = new TextFlow()
 

@@ -83,8 +83,8 @@ export class TsToPreJavaTypemap {
 
         selfReflect.set(type, `${selfReflect.size + 1}`)
 
-        let footprint = Visit.preJavaTypeVisit(type, {
-            onVisitClassOrInterfaceType: (type) => {
+        let footprint = Visit.visitPreJavaType(type, {
+            caseClassOrInterfaceType: (type) => {
                 let res =
                     type.isClass ? 'C(' : 'I('
                         + ((type.typeParameters && type.typeParameters.length) ? type.typeParameters.map(tp => this.getAnonymousClassFootprint(tp, selfReflect)).join() : '-')
@@ -97,9 +97,9 @@ export class TsToPreJavaTypemap {
                 return res
             },
 
-            onVisitTypeParameter: (type) => type.getSimpleName(null),
+            caseTypeParameter: (type) => type.getSimpleName(null),
 
-            onVisitOther: (type) => type.getFullyQualifiedName(null)
+            onOther: (type) => type.getFullyQualifiedName(null)
         })
 
         return footprint
@@ -111,8 +111,8 @@ export class TsToPreJavaTypemap {
         let typeDuplicates = new Map<string, PreJavaType[]>()
 
         types.forEach(type => {
-            Visit.preJavaTypeVisit(type, {
-                onVisitClassOrInterfaceType: (classType) => {
+            Visit.visitPreJavaType(type, {
+                caseClassOrInterfaceType: (classType) => {
                     if (!classType.isAnonymousSourceType)
                         return
 
@@ -232,8 +232,8 @@ export class TsToPreJavaTypemap {
     }
 
     browseTypeHierarchy(type: PreJavaType, visitor: { (visitedInterface: PreJavaTypeClassOrInterface, typeVariableEnv: { [key: string]: PreJavaType }) }, typeVariableEnv: { [key: string]: PreJavaType } = null) {
-        Visit.preJavaTypeVisit(type, {
-            onVisitReferenceType: type => {
+        Visit.visitPreJavaType(type, {
+            caseReferenceType: type => {
                 let env: { [key: string]: PreJavaType } = Object.create(typeVariableEnv)
                 let typeParameters = type.type.getTypeParameters(typeVariableEnv)
                 for (let tpi = 0; tpi < type.typeParameters.length; tpi++)
@@ -242,7 +242,7 @@ export class TsToPreJavaTypemap {
                 this.browseTypeHierarchy(type.type, visitor, env)
             },
 
-            onVisitClassOrInterfaceType: type => {
+            caseClassOrInterfaceType: type => {
                 type.baseTypes && type.baseTypes.forEach(baseType => {
                     if (baseType instanceof PreJavaTypeClassOrInterface)
                         visitor(baseType, typeVariableEnv)
@@ -255,8 +255,8 @@ export class TsToPreJavaTypemap {
     // TODO : for classes : add methods from interface hierarchy which are not in the method list
     addMethodsFromInterfaceHierarchy() {
         for (let pjt of this.typeMap.values()) {
-            Visit.preJavaTypeVisit(pjt, {
-                onVisitClassOrInterfaceType: type => {
+            Visit.visitPreJavaType(pjt, {
+                caseClassOrInterfaceType: type => {
                     if (type.isClassLike()) {
                         this.browseTypeHierarchy(type, (visitedInterface, typeVariableEnv) => {
                             if (visitedInterface.isClassLike())

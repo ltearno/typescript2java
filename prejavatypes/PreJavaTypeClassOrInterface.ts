@@ -62,8 +62,10 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
     }
 
     processSourceType(type: ts.Type, typeParametersToApplyToAnonymousTypes: PreJavaTypeParameter[], context: ProcessContext) {
-        if (!type)
+        if (!type || this.sourceTypes.has(type))
             return
+
+        this.sourceTypes.add(type)
 
         this.extractTypeParameters(type as ts.ObjectType, typeParametersToApplyToAnonymousTypes, context)
         this.extractBaseTypes(type, typeParametersToApplyToAnonymousTypes, context)
@@ -165,8 +167,8 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
             for (let baseType of baseTypes) {
                 let preJavaType = context.getTypeMap().getOrCreatePreJavaTypeForTsType(baseType, false, this.typeParameters)
 
-                Visit.preJavaTypeVisit(preJavaType, {
-                    onVisitReferenceType: (refType) => {
+                Visit.visitPreJavaType(preJavaType, {
+                    caseReferenceType: (refType) => {
                         let oldTypeEnv = typeEnv
                         typeEnv = {}
                         let referencedType = refType.type as PreJavaTypeClassOrInterface
@@ -179,7 +181,7 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
                             typeEnv[referencedType.typeParameters[i].name] = value
                         }
                     },
-                    onVisitOther: t => typeEnv = null
+                    onOther: t => typeEnv = null
                 })
 
                 if (baseType.flags & ts.TypeFlags.Object) {
