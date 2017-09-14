@@ -5,6 +5,7 @@ import { PreJavaTypeTPEnvironnement, PreJavaTypeReference } from './PreJavaTypeR
 import { PreJavaTypeCallSignature, PreJavaTypeFormalParameter } from './PreJavaTypeCallSignature'
 import { guessName } from '../tools'
 import * as Visit from './PreJavaTypeVisit'
+import * as tsTools from '../ts-tools'
 
 let nextTypeId = 1
 
@@ -16,7 +17,7 @@ export interface PreJavaTypeProperty {
 }
 
 export class PreJavaTypeClassOrInterface extends PreJavaType {
-    sourceTypes: Set<ts.Type>
+    sourceTypes: Set<ts.Type> = new Set()
 
     name: string = null
     packageName: string
@@ -63,38 +64,44 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
         if (!type)
             return
 
-        if (!this.sourceTypes)
-            this.sourceTypes = new Set()
-        this.sourceTypes.add(type)
+        this.extractTypeParameters(type as ts.ObjectType, typeParametersToApplyToAnonymousTypes, context)
+        this.extractBaseTypes(type, typeParametersToApplyToAnonymousTypes, context)
+        this.extractName(type, context)
+        this.extractPrototypeAndNamespace(type, context)
+        this.extractConstructor(type, context)
+        this.extractComments(type)
+        this.extractIndexTypes(type, context)
+        this.extractPropertiesAndMethods(type, context)
+    }
 
-        if (type.flags & ts.TypeFlags.Object) {
-            let objectType = type as ts.ObjectType
+    private extractTypeParameters(type: ts.Type, typeParametersToApplyToAnonymousTypes: PreJavaTypeParameter[], context: ProcessContext) {
+        if (!(type.flags & ts.TypeFlags.Object))
+            return
 
-            if (objectType.objectFlags & ts.ObjectFlags.Anonymous) {
-                this.setTypeParameters((typeParametersToApplyToAnonymousTypes && typeParametersToApplyToAnonymousTypes.length) ? typeParametersToApplyToAnonymousTypes.slice() : null)
-            }
-            else if (objectType.objectFlags & ts.ObjectFlags.Class || objectType.objectFlags & ts.ObjectFlags.Interface) {
-                let interfaceType = objectType as ts.InterfaceType
+        let objectType = type as ts.ObjectType
 
-                if (interfaceType.typeParameters && interfaceType.typeParameters.length) {
-                    this.setTypeParameters(interfaceType.typeParameters.map(tp => {
-                        let constraint: PreJavaType = null
-                        if (tp.symbol && tp.symbol.declarations && tp.symbol.declarations[0] && tp.symbol.declarations[0].kind == ts.SyntaxKind.TypeParameter) {
-                            let ss = tp.symbol.declarations[0] as ts.TypeParameterDeclaration
-                            if (ss && ss.constraint) {
-                                constraint = context.getTypeMap().getOrCreatePreJavaTypeForTsType(context.getProgram().getTypeChecker().getTypeAtLocation(ss.constraint), false, null)
-                            }
-                        }
+        if (objectType.objectFlags & ts.ObjectFlags.Anonymous) {
+            this.setTypeParameters((typeParametersToApplyToAnonymousTypes && typeParametersToApplyToAnonymousTypes.length) ? typeParametersToApplyToAnonymousTypes.slice() : null)
+        }
+        else if (objectType.objectFlags & ts.ObjectFlags.Class || objectType.objectFlags & ts.ObjectFlags.Interface) {
+            let interfaceType = objectType as ts.InterfaceType
 
-                        let typeParameter = new PreJavaTypeParameter()
-                        typeParameter.name = tp.symbol.getName()
-                        typeParameter.constraint = constraint
-                        return typeParameter
-                    }))
-                }
+            if (interfaceType.typeParameters && interfaceType.typeParameters.length) {
+                this.setTypeParameters(interfaceType.typeParameters.map(tp => {
+                    let constraint: PreJavaType = null
+                    if (tp.symbol && tp.symbol.declarations && tp.symbol.declarations[0] && tp.symbol.declarations[0].kind == ts.SyntaxKind.TypeParameter) {
+                        let ss = tp.symbol.declarations[0] as ts.TypeParameterDeclaration
+                        if (ss && ss.constraint)
+                            constraint = context.getTypeMap().getOrCreatePreJavaTypeForTsType(context.getProgram().getTypeChecker().getTypeAtLocation(ss.constraint), false, null)
+                    }
+
+                    return new PreJavaTypeParameter(tp.symbol.getName(), constraint)
+                }))
             }
         }
+    }
 
+    private extractBaseTypes(type: ts.Type, typeParametersToApplyToAnonymousTypes: PreJavaTypeParameter[], context: ProcessContext) {
         /* ts.Type.getBaseTypes() does not return 'implemented' types, only 'extended'. We merge them in the PreJava tree */
         if (type.symbol && type.symbol.getDeclarations()) {
             type.symbol.getDeclarations().forEach(decl => {
@@ -117,149 +124,118 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
                 })
             }
         }
+    }
 
+    private extractName(type: ts.Type, context: ProcessContext) {
         let symbol = type.getSymbol()
-        if (symbol) {
-            if ((symbol.flags & ts.SymbolFlags.Class) || (symbol.flags & ts.SymbolFlags.Interface))
-                this.setSimpleName(symbol.getName())
-            else if (symbol.flags & ts.SymbolFlags.TypeLiteral)
-                this.setSimpleName(context.createAnonymousTypeName())
+        if (!symbol)
+            return
 
-            if (symbol.getDeclarations()) {
-                symbol.getDeclarations()
-                    .filter(d => d.kind == ts.SyntaxKind.ClassDeclaration)
-                    .forEach((declaration: ts.ClassDeclaration) => {
-                        let jsNamespace = null
-                        let jsName = guessName(declaration.name)
+        if ((symbol.flags & ts.SymbolFlags.Class) || (symbol.flags & ts.SymbolFlags.Interface))
+            this.setSimpleName(symbol.getName())
+        else if (symbol.flags & ts.SymbolFlags.TypeLiteral)
+            this.setSimpleName(context.createAnonymousTypeName())
+    }
 
-                        if (jsName) {
-                            jsNamespace = context.getJavaPackage(declaration.getSourceFile())
-                            this.addPrototypeName(jsNamespace, jsName)
-                        }
+    private findConstructorOfType(type: ts.Type, typeEnv: { [key: string]: PreJavaType }, context: ProcessContext): PreJavaTypeCallSignature {
+        let constructorSymbol = tsTools.getConstructorSymbolOfType(type, context.getProgram().getTypeChecker())
+        if (constructorSymbol) {
+            let signature = context.getTypeMap().convertSignature(null, constructorSymbol, this.typeParameters)
 
-                        if (jsNamespace)
-                            this.setPackageName(jsNamespace)
-                    })
+            if (typeEnv) {
+                signature.parameters = signature.parameters.map(parameter => {
+                    return {
+                        name: parameter.name,
+                        dotdotdot: parameter.dotdotdot,
+                        optional: parameter.optional,
+                        type: new PreJavaTypeTPEnvironnement(parameter.type, typeEnv)
+                    }
+                })
+                signature.returnType = new PreJavaTypeTPEnvironnement(signature.returnType, typeEnv)
             }
 
-            if (symbol.valueDeclaration) {
-                let constructorType = context.getProgram().getTypeChecker().getTypeOfSymbolAtLocation(symbol, symbol.valueDeclaration)
-
-                // this comes from the typescript compiler itself
-                function getSignaturesOfSymbol(symbol: ts.Symbol): ts.Signature[] {
-                    if (!symbol)
-                        return []
-                    let result = []
-                    for (let i = 0; i < symbol.declarations.length; i++) {
-                        let node = symbol.declarations[i]
-                        switch (node.kind) {
-                            case ts.SyntaxKind.FunctionType:
-                            case ts.SyntaxKind.ConstructorType:
-                            case ts.SyntaxKind.FunctionDeclaration:
-                            case ts.SyntaxKind.MethodDeclaration:
-                            case ts.SyntaxKind.MethodSignature:
-                            case ts.SyntaxKind.Constructor:
-                            case ts.SyntaxKind.CallSignature:
-                            case ts.SyntaxKind.ConstructSignature:
-                            case ts.SyntaxKind.IndexSignature:
-                            case ts.SyntaxKind.GetAccessor:
-                            case ts.SyntaxKind.SetAccessor:
-                            case ts.SyntaxKind.FunctionExpression:
-                            case ts.SyntaxKind.ArrowFunction:
-                            case ts.SyntaxKind.JSDocFunctionType:
-                                if (i > 0 && node['body']) {
-                                    let previous = symbol.declarations[i - 1];
-                                    if (node.parent === previous.parent && node.kind === previous.kind && node.pos === previous.end)
-                                        break
-                                }
-                                result.push(context.getProgram().getTypeChecker().getSignatureFromDeclaration(node as ts.SignatureDeclaration))
-                        }
-                    }
-                    return result
-                }
-
-                function getConstructorSymbolOfType(type: ts.Type) {
-                    if (!type || !type.symbol || !type.symbol.members)
-                        return null
-                    let constructorSymbol = type.symbol.members.get("__constructor")
-                    let signatures = getSignaturesOfSymbol(constructorSymbol)
-                    if (signatures && signatures.length)
-                        return signatures[0]
-                    return null
-                }
-
-                // BE CAREFUL ABOUT THAT !
-                let thisTypeParameters = this.typeParameters
-                function findConstructorOfType(type: ts.Type, typeEnv: { [key: string]: PreJavaType }): PreJavaTypeCallSignature {
-                    let constructorSymbol = getConstructorSymbolOfType(type)
-                    if (constructorSymbol) {
-                        let signature = context.getTypeMap().convertSignature(null, constructorSymbol, thisTypeParameters)
-
-                        if (typeEnv) {
-                            signature.parameters = signature.parameters.map(parameter => {
-                                return {
-                                    name: parameter.name,
-                                    dotdotdot: parameter.dotdotdot,
-                                    optional: parameter.optional,
-                                    type: new PreJavaTypeTPEnvironnement(parameter.type, typeEnv)
-                                }
-                            })
-                            signature.returnType = new PreJavaTypeTPEnvironnement(signature.returnType, typeEnv)
-                        }
-
-                        return signature
-                    }
-
-                    let baseTypes = type.getBaseTypes()
-                    if (baseTypes) {
-                        for (let baseType of baseTypes) {
-                            let preJavaType = context.getTypeMap().getOrCreatePreJavaTypeForTsType(baseType, false, thisTypeParameters)
-
-                            Visit.preJavaTypeVisit(preJavaType, {
-                                onVisitReferenceType: (refType) => {
-                                    let oldTypeEnv = typeEnv
-                                    typeEnv = {}
-                                    let referencedType = refType.type as PreJavaTypeClassOrInterface
-                                    for (let i = 0; i < referencedType.typeParameters.length; i++) {
-                                        // take into account previous environment
-                                        let value = refType.typeParameters[i]
-                                        if (value instanceof PreJavaTypeParameter && oldTypeEnv && value.name in oldTypeEnv) {
-                                            value = oldTypeEnv[value.name]
-                                        }
-                                        typeEnv[referencedType.typeParameters[i].name] = value
-                                    }
-                                },
-                                onVisitOther: t => typeEnv = null
-                            })
-
-                            if (baseType.flags & ts.TypeFlags.Object) {
-                                let objectType = baseType as ts.ObjectType
-                                if (objectType.objectFlags & ts.ObjectFlags.Reference) {
-                                    let referenceType = objectType as ts.TypeReference
-                                    if (referenceType.target != baseType)
-                                        baseType = referenceType.target
-                                }
-                            }
-
-                            let baseTypeConstructor = findConstructorOfType(baseType, typeEnv)
-                            if (baseTypeConstructor)
-                                return baseTypeConstructor
-                        }
-                    }
-                    return null
-                }
-
-                let constructor = findConstructorOfType(type, null)
-                if (constructor) {
-                    this.addConstructorSignature(constructor)
-                }
-            }
-
-            let comments = this.getCommentFromSymbol(symbol)
-            if (comments && comments.length > 0)
-                this.addComments(comments)
+            return signature
         }
 
+        let baseTypes = type.getBaseTypes()
+        if (baseTypes) {
+            for (let baseType of baseTypes) {
+                let preJavaType = context.getTypeMap().getOrCreatePreJavaTypeForTsType(baseType, false, this.typeParameters)
+
+                Visit.preJavaTypeVisit(preJavaType, {
+                    onVisitReferenceType: (refType) => {
+                        let oldTypeEnv = typeEnv
+                        typeEnv = {}
+                        let referencedType = refType.type as PreJavaTypeClassOrInterface
+                        for (let i = 0; i < referencedType.typeParameters.length; i++) {
+                            // take into account previous environment
+                            let value = refType.typeParameters[i]
+                            if (value instanceof PreJavaTypeParameter && oldTypeEnv && value.name in oldTypeEnv) {
+                                value = oldTypeEnv[value.name]
+                            }
+                            typeEnv[referencedType.typeParameters[i].name] = value
+                        }
+                    },
+                    onVisitOther: t => typeEnv = null
+                })
+
+                if (baseType.flags & ts.TypeFlags.Object) {
+                    let objectType = baseType as ts.ObjectType
+                    if (objectType.objectFlags & ts.ObjectFlags.Reference) {
+                        let referenceType = objectType as ts.TypeReference
+                        if (referenceType.target != baseType)
+                            baseType = referenceType.target
+                    }
+                }
+
+                let baseTypeConstructor = this.findConstructorOfType(baseType, typeEnv, context)
+                if (baseTypeConstructor)
+                    return baseTypeConstructor
+            }
+        }
+        return null
+    }
+
+    private extractComments(type: ts.Type) {
+        let symbol = type.getSymbol()
+        if (!symbol)
+            return
+
+        let comments = this.getCommentFromSymbol(symbol)
+        if (comments && comments.length > 0)
+            this.addComments(comments)
+    }
+
+    private extractPrototypeAndNamespace(type: ts.Type, context: ProcessContext) {
+        let symbol = type.getSymbol()
+        if (!symbol)
+            return
+
+        if (symbol.getDeclarations()) {
+            symbol.getDeclarations()
+                .filter(d => d.kind == ts.SyntaxKind.ClassDeclaration)
+                .forEach((declaration: ts.ClassDeclaration) => {
+                    let jsNamespace = null
+                    let jsName = guessName(declaration.name)
+
+                    if (jsName) {
+                        jsNamespace = context.getJavaPackage(declaration.getSourceFile())
+                        this.addPrototypeName(jsNamespace, jsName)
+                    }
+
+                    if (jsNamespace)
+                        this.setPackageName(jsNamespace)
+                })
+        }
+    }
+
+    private extractConstructor(type: ts.Type, context: ProcessContext) {
+        let constructor = this.findConstructorOfType(type, null, context)
+        if (constructor)
+            this.addConstructorSignature(constructor)
+    }
+
+    private extractIndexTypes(type: ts.Type, context: ProcessContext) {
         let nit = type.getNumberIndexType()
         if (nit) {
             this.setNumberIndexType(context.getTypeMap().getOrCreatePreJavaTypeForTsType(nit, false, this.typeParameters))
@@ -269,7 +245,9 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
         if (sit) {
             this.setStringIndexType(context.getTypeMap().getOrCreatePreJavaTypeForTsType(sit, false, this.typeParameters))
         }
+    }
 
+    private extractPropertiesAndMethods(type: ts.Type, context: ProcessContext) {
         let properties = (type as ts.InterfaceTypeWithDeclaredMembers).declaredProperties// type.getProperties()
         if (properties && properties.length) {
             properties.forEach(property => {

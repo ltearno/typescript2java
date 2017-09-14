@@ -1,5 +1,6 @@
 import * as ts from "typescript"
 import { PreJavaType, ProcessContext, TypeReplacer } from './PreJavaType'
+import { PreJavaTypeParameter } from './PreJavaTypeParameter'
 
 export class PreJavaTypeBuiltinJavaType extends PreJavaType {
     packageName: string
@@ -9,6 +10,9 @@ export class PreJavaTypeBuiltinJavaType extends PreJavaType {
         super()
         this.packageName = packageName
         this.name = name
+    }
+
+    processSourceType(type: ts.Type, typeParametersToApplyToAnonymousTypes: PreJavaTypeParameter[], context: ProcessContext) {
     }
 
     getSourceTypes(): Set<ts.Type> { return null }

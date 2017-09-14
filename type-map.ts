@@ -467,6 +467,24 @@ export class TsToPreJavaTypemap {
         )
     }
 
+    getOrCreatePreJavaTypeForTsType(tsType: ts.Type, preferNothingVoid: boolean = false, typeParametersToApplyToAnonymousTypes: PreJavaTypeParameter[] = null): PreJavaType {
+        if (!tsType)
+            return null
+
+        let typeKey = this.findTypeKey(tsType, preferNothingVoid, typeParametersToApplyToAnonymousTypes)
+
+        if (this.typeMap.has(typeKey))
+            return this.typeMap.get(typeKey)
+
+        let preJavaType = this.instantiatePreJavaType(tsType, preferNothingVoid, typeParametersToApplyToAnonymousTypes)
+
+        this.typeMap.set(typeKey, preJavaType)
+
+        preJavaType.processSourceType(tsType, typeParametersToApplyToAnonymousTypes, this.processContext)
+
+        return preJavaType
+    }
+
     private findTypeKey(type: ts.Type, preferNothingVoid: boolean, typeParametersToApplyToAnonymousTypes: PreJavaTypeParameter[]) {
         let objectType = (type.flags & ts.TypeFlags.Object) && type as ts.ObjectType
         let interfaceType = (objectType.objectFlags & ts.ObjectFlags.ClassOrInterface) && type as ts.InterfaceType
@@ -484,24 +502,6 @@ export class TsToPreJavaTypemap {
         }
 
         return type
-    }
-
-    getOrCreatePreJavaTypeForTsType(tsType: ts.Type, preferNothingVoid: boolean = false, typeParametersToApplyToAnonymousTypes: PreJavaTypeParameter[] = null): PreJavaType {
-        if (!tsType)
-            return null
-
-        let typeKey = this.findTypeKey(tsType, preferNothingVoid, typeParametersToApplyToAnonymousTypes)
-
-        if (this.typeMap.has(typeKey))
-            return this.typeMap.get(typeKey)
-
-        let preJavaType = this.instantiatePreJavaType(tsType, preferNothingVoid, typeParametersToApplyToAnonymousTypes)
-
-        this.typeMap.set(typeKey, preJavaType)
-
-        preJavaType.processSourceType(tsType, typeParametersToApplyToAnonymousTypes, this.processContext)
-
-        return preJavaType
     }
 
     private instantiatePreJavaType(type: ts.Type, preferNothingVoid: boolean, typeParametersToApplyToAnonymousTypes: PreJavaTypeParameter[]): PreJavaType {

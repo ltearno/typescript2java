@@ -8,6 +8,9 @@ export class PreJavaTypeTPEnvironnement extends PreJavaType {
         super()
     }
 
+    processSourceType(type: ts.Type, typeParametersToApplyToAnonymousTypes: PreJavaTypeParameter[], context: ProcessContext) {
+    }
+
     getSourceTypes(): Set<ts.Type> { return null }
 
     dump() {
