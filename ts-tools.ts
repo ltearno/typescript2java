@@ -41,3 +41,12 @@ export function getConstructorSymbolOfType(type: ts.Type, typeChecker: ts.TypeCh
         return signatures[0]
     return null
 }
+
+export function isTypeAliasDefinitionType(type: ts.Type, typeChecker: ts.TypeChecker) {
+    if (!type.aliasSymbol)
+        return false
+
+    let aliasedSymbolType = typeChecker.getDeclaredTypeOfSymbol(type.aliasSymbol)
+
+    return aliasedSymbolType == type
+}

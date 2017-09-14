@@ -4,6 +4,7 @@ import { PreJavaTypeClassOrInterface } from './PreJavaTypeClassOrInterface'
 import { PreJavaTypeReference } from './PreJavaTypeReference'
 import { PreJavaTypeParameter } from './PreJavaTypeParameter'
 import * as Visit from './PreJavaTypeVisit'
+import * as tsTools from '../ts-tools'
 
 let currentUnionId = 1
 
@@ -16,9 +17,50 @@ export class PreJavaTypeUnion extends PreJavaType {
 
     unionId = currentUnionId++
 
+    private getAliasSymbolDeclarationTypeParametersList(type: ts.Type): string[] {
+        let res = []
+
+        if (!type.aliasSymbol)
+            return res
+
+        if (type.aliasSymbol.declarations && type.aliasSymbol.declarations.length) {
+            let declaration = type.aliasSymbol.declarations[0] as ts.TypeAliasDeclaration
+            if (declaration.kind == ts.SyntaxKind.TypeAliasDeclaration && declaration.typeParameters && declaration.typeParameters.length) {
+                for (let typeParameter of declaration.typeParameters) {
+                    if (typeParameter.kind == ts.SyntaxKind.TypeParameter && 'symbol' in typeParameter)
+                        res.push(typeParameter['symbol'].name)
+                    else
+                        res.push('ERROR')
+                }
+            }
+
+        }
+        return res
+    }
+
+    private getAliasTypeArgumentsDeclarationTypeParametersList(type: ts.Type, context: ProcessContext): string[] {
+        return type.aliasTypeArguments && type.aliasTypeArguments.map(t => {
+            let typeArgJavaType = context.getTypeMap().getOrCreatePreJavaTypeForTsType(t, false, null)
+            return Visit.visitPreJavaType(typeArgJavaType, {
+                caseClassOrInterfaceType: type => type.name,
+                onOther: type => type.getSimpleName(null)
+            })
+        })
+    }
+
     processSourceType(type: ts.Type, typeParametersToApplyToAnonymousTypes: PreJavaTypeParameter[], context: ProcessContext) {
         if (type.aliasSymbol && type.aliasSymbol.name) {
             this.aliasName = type.aliasSymbol.name
+            let aliasedSymbolType = context.getProgram().getTypeChecker().getDeclaredTypeOfSymbol(type.aliasSymbol)
+
+            let formalTypeParameters = this.getAliasSymbolDeclarationTypeParametersList(type)
+            let typeArguments = this.getAliasTypeArgumentsDeclarationTypeParametersList(type, context)
+
+            let idss = tsTools.isTypeAliasDefinitionType(type, context.getProgram().getTypeChecker())
+            let iddddss = tsTools.isTypeAliasDefinitionType(aliasedSymbolType, context.getProgram().getTypeChecker())
+
+            let test2 = formalTypeParameters.length == typeArguments.length && typeArguments.every((value, index) => formalTypeParameters[index] == value)
+            let test = formalTypeParameters == typeArguments
 
             if (type.aliasSymbol.declarations && type.aliasSymbol.declarations.length) {
                 let declaration = type.aliasSymbol.declarations[0] as ts.TypeAliasDeclaration

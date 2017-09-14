@@ -3,6 +3,7 @@ import * as path from "path";
 import { PreJavaType, TypeReplacer, ProcessContext } from './prejavatypes/PreJavaType'
 import { guessName } from './tools'
 import * as Visit from './prejavatypes/PreJavaTypeVisit'
+import * as tsTools from './ts-tools'
 
 import { PreJavaTypeFakeType } from './prejavatypes/PreJavaTypeFakeType'
 import { PreJavaTypeBuiltinJavaType } from './prejavatypes/PreJavaTypeBuiltinJavaType'
@@ -599,8 +600,8 @@ export class TsToPreJavaTypemap {
             typeKey = 'tuple-' + referenceType.typeArguments.length
         else if (objectType && objectType.objectFlags & ts.ObjectFlags.Anonymous)
             typeKey = type['id'] + ((typeParametersToApplyToAnonymousTypes && typeParametersToApplyToAnonymousTypes.length) ? (typeParametersToApplyToAnonymousTypes.map(tp => '-' + tp.name)) : (''))
-        else if (type.flags & ts.TypeFlags.Union) {
-            typeKey = 'union-' + type['id'] + ((typeParametersToApplyToAnonymousTypes && typeParametersToApplyToAnonymousTypes.length) ? (typeParametersToApplyToAnonymousTypes.map(tp => '-' + tp.name)) : (''))
+        else if (type.flags & ts.TypeFlags.Union && tsTools.isTypeAliasDefinitionType(type, this.program.getTypeChecker())) {
+            typeKey = 'union-' + type['id']
         }
 
         return typeKey
