@@ -39,7 +39,7 @@ export class TsToPreJavaTypemap {
         getTypeMap: () => this
     }
 
-    ensureAllTypesHaveName(defaultPackageName: string) {
+    ensureAllTypesHaveNameAndPackage(defaultPackageName: string) {
         for (let type of this.typeMap.values()) {
             if (type instanceof PreJavaTypeClassOrInterface) {
                 if (type.getParametrizedSimpleName(null) == null)
@@ -48,6 +48,103 @@ export class TsToPreJavaTypemap {
             if (defaultPackageName && !type.getPackageName())
                 type.setPackageName(defaultPackageName)
         }
+    }
+
+    typeSet() {
+        let result = new Set<PreJavaType>()
+        for (let type of this.typeMap.values())
+            result.add(type)
+        return result
+    }
+
+    private mapSignature(signature: PreJavaTypeCallSignature, selfReflect: Map<PreJavaType, string>) {
+        return 'S('
+            + signature.name
+            + ',' + this.getAnonymousClassFootprint(signature.returnType, selfReflect)
+            + ',' + ((signature.typeParameters && signature.typeParameters.length) ? signature.typeParameters.map(tp => this.getAnonymousClassFootprint(tp, selfReflect)).join() : '')
+            + ',' + ((signature.parameters && signature.parameters.length) ? signature.parameters.map(param => this.mapParameter(param, selfReflect)).join() : '')
+            + ')'
+    }
+
+    private mapParameter(parameter: PreJavaTypeFormalParameter, selfReflect: Map<PreJavaType, string>) {
+        return `P(${parameter.dotdotdot ? 'D' : 'd'}${parameter.optional ? 'O' : 'o'}${this.getAnonymousClassFootprint(parameter.type, selfReflect)})`
+    }
+
+    private mapProperty(property: PreJavaTypeProperty, selfReflect: Map<PreJavaType, string>) {
+        return `p(${property.name}|${this.getAnonymousClassFootprint(property.type, selfReflect)})`
+    }
+
+    private getAnonymousClassFootprint(type: PreJavaType, selfReflect: Map<PreJavaType, string>): string {
+        if (selfReflect == null)
+            selfReflect = new Map()
+
+        if (selfReflect.has(type))
+            return selfReflect.get(type)
+
+        selfReflect.set(type, `${selfReflect.size + 1}`)
+
+        let footprint = Visit.preJavaTypeVisit(type, {
+            onVisitClassOrInterfaceType: (type) => {
+                let res =
+                    type.isClass ? 'C(' : 'I('
+                        + ((type.typeParameters && type.typeParameters.length) ? type.typeParameters.map(tp => this.getAnonymousClassFootprint(tp, selfReflect)).join() : '-')
+                        + ((type.constructorSignatures && type.constructorSignatures.length) ? type.constructorSignatures.map(sig => this.mapSignature(sig, selfReflect)).join() : '-')
+                        + ((type.numberIndexType) ? this.getAnonymousClassFootprint(type.numberIndexType, selfReflect) : '-')
+                        + ((type.stringIndexType) ? this.getAnonymousClassFootprint(type.stringIndexType, selfReflect) : '-')
+                        + ((type.methods && type.methods.length) ? type.methods.map(sig => this.mapSignature(sig, selfReflect)).join() : '-')
+                        + ((type.properties && type.properties.length) ? type.properties.map(ppty => this.mapProperty(ppty, selfReflect)).join() : '-')
+                        + ')'
+                return res
+            },
+
+            onVisitTypeParameter: (type) => type.getSimpleName(null),
+
+            onVisitOther: (type) => type.getFullyQualifiedName(null)
+        })
+
+        return footprint
+    }
+
+    reduceAnonymousTypes() {
+        let types = this.typeSet()
+
+        let typeDuplicates = new Map<string, PreJavaType[]>()
+
+        types.forEach(type => {
+            Visit.preJavaTypeVisit(type, {
+                onVisitClassOrInterfaceType: (classType) => {
+                    if (!classType.isAnonymousSourceType)
+                        return
+
+                    let footprint = this.getAnonymousClassFootprint(classType, null)
+                    let list = typeDuplicates.get(footprint)
+                    if (list == null) {
+                        list = []
+                        typeDuplicates.set(footprint, list)
+                    }
+                    list.push(classType)
+                }
+            })
+        })
+
+        let totalDuplicates = 0
+        typeDuplicates.forEach((list, footprint) => {
+            if (list.length < 2)
+                return
+
+            totalDuplicates += list.length - 1
+
+            console.log(`type duplicates : ${list.length} for footprint ${footprint}`)
+
+            let replacedTypes = list.slice(1, list.length - 1)
+
+            this.substituteType((type: PreJavaType): PreJavaType => {
+                if (replacedTypes.some(replacedType => replacedType === type))
+                    return list[0]
+                return type
+            })
+        })
+        console.log(`total duplicates removed : ${totalDuplicates}`)
     }
 
     private doesTypeUsesType(type: PreJavaType, usedType: PreJavaType) {
@@ -240,7 +337,7 @@ export class TsToPreJavaTypemap {
                 }
             }
         }*/
-        console.log('FQN list')
+        /*console.log('FQN list')
         let names: string[] = []
         for (let type of this.typeMap.values()) {
             let tok = type.getFullyQualifiedName(null)
@@ -254,7 +351,7 @@ export class TsToPreJavaTypemap {
             }
             names.push(tok)
         }
-        names.sort().forEach(name => console.log(name))
+        names.sort().forEach(name => console.log(name))*/
     }
 
     removeDuplicateOverloads() {

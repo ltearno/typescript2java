@@ -18,6 +18,7 @@ export interface PreJavaTypeProperty {
 
 export class PreJavaTypeClassOrInterface extends PreJavaType {
     sourceTypes: Set<ts.Type> = new Set()
+    isAnonymousSourceType = true
 
     name: string = null
     packageName: string
@@ -128,13 +129,15 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
 
     private extractName(type: ts.Type, context: ProcessContext) {
         let symbol = type.getSymbol()
-        if (!symbol)
-            return
 
-        if ((symbol.flags & ts.SymbolFlags.Class) || (symbol.flags & ts.SymbolFlags.Interface))
+        if (symbol && ((symbol.flags & ts.SymbolFlags.Class) || (symbol.flags & ts.SymbolFlags.Interface))) {
             this.setSimpleName(symbol.getName())
-        else if (symbol.flags & ts.SymbolFlags.TypeLiteral)
+            this.isAnonymousSourceType = false
+        }
+        else {
             this.setSimpleName(context.createAnonymousTypeName())
+            this.isAnonymousSourceType = true
+        }
     }
 
     private findConstructorOfType(type: ts.Type, typeEnv: { [key: string]: PreJavaType }, context: ProcessContext): PreJavaTypeCallSignature {

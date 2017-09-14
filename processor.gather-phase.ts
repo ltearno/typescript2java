@@ -79,8 +79,11 @@ export class GatherPhase {
         console.log(`removing unsupported types`)
         this.typeMap.removeNotSupportedTypes()
 
+        console.log(`reducing anonymous types`)
+        this.typeMap.reduceAnonymousTypes()
+
         console.log(`unanonymising types`)
-        this.typeMap.ensureAllTypesHaveName(this.baseJavaPackage)
+        this.typeMap.ensureAllTypesHaveNameAndPackage(this.baseJavaPackage)
 
         console.log(`simplify unions`)
         this.typeMap.simplifyUnions()

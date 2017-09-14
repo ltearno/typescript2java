@@ -6,6 +6,7 @@ import { PreJavaTypeFakeType } from './PreJavaTypeFakeType'
 import { PreJavaTypeReference } from './PreJavaTypeReference'
 import { PreJavaTypeTuple } from './PreJavaTypeTuple'
 import { PreJavaTypeUnion } from './PreJavaTypeUnion'
+import { PreJavaTypeParameter } from './PreJavaTypeParameter'
 
 export interface PreJavaTypeVisitor<T> {
     onVisitBuiltinType?(type: PreJavaTypeBuiltinJavaType): T
@@ -15,12 +16,13 @@ export interface PreJavaTypeVisitor<T> {
     onVisitReferenceType?(type: PreJavaTypeReference): T
     onVisitTuple?(type: PreJavaTypeTuple): T
     onVisitUnion?(type: PreJavaTypeUnion): T
+    onVisitTypeParameter?(type: PreJavaTypeParameter): T
     onVisitOther?(type: PreJavaType): T
 }
 
 export function preJavaTypeVisit<T>(type: PreJavaType, visitor: PreJavaTypeVisitor<T>) {
-    if (type instanceof PreJavaTypeBuiltinJavaType)
-        return visitor.onVisitBuiltinType && visitor.onVisitBuiltinType(type)
+    if (visitor.onVisitBuiltinType && type instanceof PreJavaTypeBuiltinJavaType)
+        return visitor.onVisitBuiltinType(type)
     else if (visitor.onVisitFakeType && type instanceof PreJavaTypeFakeType)
         return visitor.onVisitFakeType(type)
     else if (visitor.onVisitClassOrInterfaceType && type instanceof PreJavaTypeClassOrInterface)
@@ -33,6 +35,8 @@ export function preJavaTypeVisit<T>(type: PreJavaType, visitor: PreJavaTypeVisit
         return visitor.onVisitTuple(type)
     else if (visitor.onVisitUnion && type instanceof PreJavaTypeUnion)
         return visitor.onVisitUnion(type)
+    else if (visitor.onVisitTypeParameter && type instanceof PreJavaTypeParameter)
+        return visitor.onVisitTypeParameter(type)
     else if (visitor.onVisitOther)
         return visitor.onVisitOther(type)
     return null
