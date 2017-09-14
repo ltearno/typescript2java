@@ -51,7 +51,8 @@ export class PreJavaTypeUnion extends PreJavaType {
     processSourceType(type: ts.Type, typeParametersToApplyToAnonymousTypes: PreJavaTypeParameter[], context: ProcessContext) {
         if (type.aliasSymbol && type.aliasSymbol.name) {
             this.aliasName = type.aliasSymbol.name
-            let aliasedSymbolType = context.getProgram().getTypeChecker().getDeclaredTypeOfSymbol(type.aliasSymbol)
+
+            /*let aliasedSymbolType = context.getProgram().getTypeChecker().getDeclaredTypeOfSymbol(type.aliasSymbol)
 
             let formalTypeParameters = this.getAliasSymbolDeclarationTypeParametersList(type)
             let typeArguments = this.getAliasTypeArgumentsDeclarationTypeParametersList(type, context)
@@ -60,7 +61,7 @@ export class PreJavaTypeUnion extends PreJavaType {
             let iddddss = tsTools.isTypeAliasDefinitionType(aliasedSymbolType, context.getProgram().getTypeChecker())
 
             let test2 = formalTypeParameters.length == typeArguments.length && typeArguments.every((value, index) => formalTypeParameters[index] == value)
-            let test = formalTypeParameters == typeArguments
+            let test = formalTypeParameters == typeArguments*/
 
             if (type.aliasSymbol.declarations && type.aliasSymbol.declarations.length) {
                 let declaration = type.aliasSymbol.declarations[0] as ts.TypeAliasDeclaration
