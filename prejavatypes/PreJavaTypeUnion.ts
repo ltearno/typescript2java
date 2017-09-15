@@ -55,24 +55,34 @@ export class PreJavaTypeUnion extends PreJavaType {
         let unionType = type as ts.UnionType
 
         let typeParameters: string[] = []
-        unionType.types.forEach(t => this.fetchTypeParameters(t, typeParameters))
+        unionType.types.forEach(t => this.fetchTypeParameters(t, typeParametersToApplyToAnonymousTypes, typeParameters))
         if (typeParameters.length)
             this.typeParameters = typeParameters.map(name => new PreJavaTypeParameter(name))
 
         this.setTypes(unionType.types.map(t => context.getTypeMap().getOrCreatePreJavaTypeForTsType(t, false, this.typeParameters)))
     }
 
-    private fetchTypeParameters(type: ts.Type, typeParameters: string[]) {
+    private fetchTypeParameters(type: ts.Type, typeParametersToApplyToAnonymousTypes: PreJavaTypeParameter[], typeParameters: string[]) {
         if (type.flags == ts.TypeFlags.TypeParameter) {
             if (typeParameters.indexOf(type.symbol.name) < 0)
                 typeParameters.push(type.symbol.name)
         }
-        else if (type.flags == ts.TypeFlags.Object && (type as ts.ObjectType).objectFlags & ts.ObjectFlags.Reference) {
-            let typeReference = type as ts.TypeReference
-            if (typeReference.target != typeReference) {
-                this.fetchTypeParameters(typeReference.target, typeParameters)
-                if (typeReference.typeArguments)
-                    typeReference.typeArguments.forEach(typeArgument => this.fetchTypeParameters(typeArgument, typeParameters))
+        else if (type.flags == ts.TypeFlags.Object) {
+            let objectType = type as ts.ObjectType
+            if (objectType.objectFlags & ts.ObjectFlags.Reference) {
+                let typeReference = type as ts.TypeReference
+                if (typeReference.target != typeReference) {
+                    this.fetchTypeParameters(typeReference.target, typeParametersToApplyToAnonymousTypes, typeParameters)
+                    if (typeReference.typeArguments)
+                        typeReference.typeArguments.forEach(typeArgument => this.fetchTypeParameters(typeArgument, typeParametersToApplyToAnonymousTypes, typeParameters))
+                }
+            }
+            else if (objectType.objectFlags & ts.ObjectFlags.Anonymous) {
+                if (typeParametersToApplyToAnonymousTypes)
+                    typeParametersToApplyToAnonymousTypes.forEach(t => {
+                        if (typeParameters.indexOf(t.name) < 0)
+                            typeParameters.push(t.name)
+                    })
             }
         }
     }

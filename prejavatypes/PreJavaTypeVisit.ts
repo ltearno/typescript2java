@@ -3,7 +3,7 @@ import { PreJavaTypeBuiltinJavaType } from './PreJavaTypeBuiltinJavaType'
 import { PreJavaTypeClassOrInterface } from './PreJavaTypeClassOrInterface'
 import { PreJavaTypeEnum } from './PreJavaTypeEnum'
 import { PreJavaTypeFakeType } from './PreJavaTypeFakeType'
-import { PreJavaTypeReference } from './PreJavaTypeReference'
+import { PreJavaTypeReference, PreJavaTypeTPEnvironnement } from './PreJavaTypeReference'
 import { PreJavaTypeTuple } from './PreJavaTypeTuple'
 import { PreJavaTypeUnion } from './PreJavaTypeUnion'
 import { PreJavaTypeParameter } from './PreJavaTypeParameter'
@@ -17,6 +17,7 @@ export interface PreJavaTypeVisitor<T> {
     caseTuple?(type: PreJavaTypeTuple): T
     caseUnion?(type: PreJavaTypeUnion): T
     caseTypeParameter?(type: PreJavaTypeParameter): T
+    caseTPEnvironnement?(type: PreJavaTypeTPEnvironnement): T
     onOther?(type: PreJavaType): T
 }
 
@@ -37,6 +38,8 @@ export function visitPreJavaType<T>(type: PreJavaType, visitor: PreJavaTypeVisit
         return visitor.caseUnion(type)
     else if (visitor.caseTypeParameter && type instanceof PreJavaTypeParameter)
         return visitor.caseTypeParameter(type)
+    else if (visitor.caseTPEnvironnement && type instanceof PreJavaTypeTPEnvironnement)
+        return visitor.caseTPEnvironnement(type)
     else if (visitor.onOther)
         return visitor.onOther(type)
     return null

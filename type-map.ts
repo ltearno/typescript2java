@@ -24,7 +24,7 @@ export const BUILTIN_TYPE_VOID = new PreJavaTypeBuiltinJavaType('java.lang', 'Vo
 
 export const FAKE_TYPE_INTERSECTION = new PreJavaTypeFakeType('gwt.ext', 'FakeIntersection')
 export const FAKE_TYPE_ESSYMBOL = new PreJavaTypeFakeType('gwt.ext', 'FakeEsSymbol')
-export const FAKE_TYPE_INDEXEDACCESS = new PreJavaTypeFakeType('gwt.ext', 'FakeIndexedAccess')
+export const FAKE_TYPE_INDEXEDACCESS = new PreJavaTypeFakeType('gwt.ext', 'FakeIndexedAccess');
 
 export class TsToPreJavaTypemap {
     private currentIdAnonymousTypes = 1
@@ -52,13 +52,34 @@ export class TsToPreJavaTypemap {
     }
 
     removeOverridingProperties() {
+        let nextObjectId = 1
+        let objectMap = new WeakMap<any, number>()
+        function getObjectId(o) {
+            if (objectMap.has(o))
+                return objectMap.get(o)
+
+            let id = nextObjectId++
+            objectMap.set(o, id)
+            return id
+        }
+        function getTypeFootprint(type: PreJavaType) {
+            Visit.visitPreJavaType(type, {
+                caseReferenceType: type => getTypeFootprint(type.type),
+                caseTPEnvironnement: type => getTypeFootprint(type.type),
+                caseTypeParameter: type => type.name + (type.constraint ? getTypeFootprint(type.constraint) : ''),
+                onOther: type => getObjectId(type)
+            })
+        }
+        function getMethodFootprint(method: PreJavaTypeCallSignature) {
+            let res = method.name
+            if (method.parameters && method.parameters.length)
+                res += '-' + method.parameters.map(p => getTypeFootprint(p.type)).join('-')
+            return res
+        }
         this.typeSet().forEach(type => {
             Visit.visitPreJavaType(type, {
                 caseClassOrInterfaceType: type => {
                     if (type.properties && type.properties.length) {
-                        if (type.getSimpleName(null) == 'ConnectableObservable__1944')
-                            console.log(`deleting property jhkjh`)
-
                         let propertiesByName = new Map<string, PreJavaTypeProperty>()
                         type.properties.forEach(p => propertiesByName.set(p.name, p))
 
@@ -68,12 +89,20 @@ export class TsToPreJavaTypemap {
                         })
 
                         type.properties = []
-                        propertiesByName.forEach(p => {
-                            if (p.name == 'source' && type.getSimpleName(null) == 'ConnectableObservable__1944')
-                                console.log(`deleting property ${p.name}`)
+                        propertiesByName.forEach(p => type.properties.push(p))
+                    }
 
-                            type.properties.push(p)
+                    if (type.methods && type.methods.length) {
+                        let methodsByFootprint = new Map<string, PreJavaTypeCallSignature>()
+                        type.methods.forEach(m => methodsByFootprint.set(getMethodFootprint(m), m))
+
+                        this.browseTypeHierarchy(type, visitedType => {
+                            visitedType.methods && visitedType.methods
+                                .forEach(m => methodsByFootprint.delete(getMethodFootprint(m)))
                         })
+
+                        type.methods = []
+                        methodsByFootprint.forEach(m => type.methods.push(m))
                     }
                 }
             })
