@@ -367,7 +367,19 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
             this.packageName = packageName
     }
 
-    getTypeParameters(typeParametersEnv: { [key: string]: PreJavaType }) { return this.typeParameters }
+    getTypeParameters(typeParametersEnv: { [key: string]: PreJavaType }) {
+        if (!this.typeParameters || !typeParametersEnv)
+            return this.typeParameters
+
+        let res = []
+        this.typeParameters.forEach(p => {
+            if (typeParametersEnv && p.name in typeParametersEnv)
+                res.push(typeParametersEnv[p.name])
+            else
+                res.push(p)
+        })
+        return res
+    }
 
     setSimpleName(name: string) {
         if (name == '__type')

@@ -35,8 +35,12 @@ export class ExportPhase {
         let content = ''
         content += `package ${type.getPackageName()};\n`
         content += '\n'
-        for (let importedType of javaWriter.imports.keys())
-            content += `import ${importedType.getFullyQualifiedName(null)};\n`
+        let importedNames = new Set<string>()
+        javaWriter.imports.forEach((value, type) => importedNames.add(type.getFullyQualifiedName(null)))
+        let sortedImportedNames: string[] = []
+        importedNames.forEach(name => sortedImportedNames.push(name))
+        sortedImportedNames = sortedImportedNames.sort()
+        sortedImportedNames.forEach(name => content += `import ${name};\n`)
         content += '\n'
         content += flow.content()
 

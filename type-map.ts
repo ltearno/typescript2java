@@ -368,7 +368,7 @@ export class TsToPreJavaTypemap {
                                         writable: visitedProperty.writable,
                                         comments: visitedProperty.comments
                                     }
-
+                                    
                                     type.addProperty(newProperty)
                                 }
                                 //if (!type.properties || !type.properties.some(p => p.name == visitedProperty.name))
@@ -564,6 +564,10 @@ export class TsToPreJavaTypemap {
         if (hasKeyOfInTypeParameters)
             return null
 
+        if (name == 'audit')
+            console.log(`sdfsdf`);
+
+
         let signatureTypeParameters = tsSignature.getTypeParameters() ? tsSignature.getTypeParameters().map(t => {
             let res = this.getOrCreatePreJavaTypeForTsType(t, false, typeParametersToApplyToAnonymousTypes) as PreJavaTypeParameter
             if (!(res instanceof PreJavaTypeParameter))
@@ -572,8 +576,9 @@ export class TsToPreJavaTypemap {
         }) : null
 
         typeParametersToApplyToAnonymousTypes = (typeParametersToApplyToAnonymousTypes && typeParametersToApplyToAnonymousTypes.slice()) || []
-        signatureTypeParameters && signatureTypeParameters
+        signatureTypeParameters = signatureTypeParameters && signatureTypeParameters
             .filter(tp => !typeParametersToApplyToAnonymousTypes.some(tpIn => tpIn.name == tp.name))
+        signatureTypeParameters && signatureTypeParameters
             .forEach(tp => typeParametersToApplyToAnonymousTypes.push(tp))
 
         let signatureReturnType = tsSignature.getReturnType()
