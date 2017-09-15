@@ -69,9 +69,11 @@ export class PreJavaTypeUnion extends PreJavaType {
         }
         else if (type.flags == ts.TypeFlags.Object && (type as ts.ObjectType).objectFlags & ts.ObjectFlags.Reference) {
             let typeReference = type as ts.TypeReference
-            this.fetchTypeParameters(typeReference.target, typeParameters)
-            if (typeReference.typeArguments)
-                typeReference.typeArguments.forEach(typeArgument => this.fetchTypeParameters(typeArgument, typeParameters))
+            if (typeReference.target != typeReference) {
+                this.fetchTypeParameters(typeReference.target, typeParameters)
+                if (typeReference.typeArguments)
+                    typeReference.typeArguments.forEach(typeArgument => this.fetchTypeParameters(typeArgument, typeParameters))
+            }
         }
     }
 
