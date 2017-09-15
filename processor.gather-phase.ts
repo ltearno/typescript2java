@@ -79,19 +79,22 @@ export class GatherPhase {
         console.log(`removing unsupported types`)
         this.typeMap.removeNotSupportedTypes()
 
+        console.log(`removing OverridingProperties`)
+        this.typeMap.removeOverridingProperties()
+
         console.log(`reducing anonymous types`)
         this.typeMap.reduceAnonymousTypes()
 
         console.log(`unanonymising types`)
         this.typeMap.ensureAllTypesHaveNameAndPackage(this.baseJavaPackage)
 
-        console.log(`simplify unions`)
+        console.log(`simplifying unions`)
         this.typeMap.simplifyUnions()
 
-        console.log(`remove duplicate overloads (with same type erasure)`)
+        console.log(`removing duplicate overloads (with same type erasure)`)
         this.typeMap.removeDuplicateOverloads()
 
-        console.log(`change DTO interfaces into classes`)
+        console.log(`changing DTO interfaces into classes`)
         this.typeMap.changeDtoInterfacesIntoClasses()
 
         while (true) {

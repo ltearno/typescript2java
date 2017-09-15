@@ -51,6 +51,35 @@ export class TsToPreJavaTypemap {
         }
     }
 
+    removeOverridingProperties() {
+        this.typeSet().forEach(type => {
+            Visit.visitPreJavaType(type, {
+                caseClassOrInterfaceType: type => {
+                    if (type.properties && type.properties.length) {
+                        if (type.getSimpleName(null) == 'ConnectableObservable__1944')
+                            console.log(`deleting property jhkjh`)
+
+                        let propertiesByName = new Map<string, PreJavaTypeProperty>()
+                        type.properties.forEach(p => propertiesByName.set(p.name, p))
+
+                        this.browseTypeHierarchy(type, visitedType => {
+                            visitedType.properties && visitedType.properties
+                                .forEach(p => propertiesByName.delete(p.name))
+                        })
+
+                        type.properties = []
+                        propertiesByName.forEach(p => {
+                            if (p.name == 'source' && type.getSimpleName(null) == 'ConnectableObservable__1944')
+                                console.log(`deleting property ${p.name}`)
+
+                            type.properties.push(p)
+                        })
+                    }
+                }
+            })
+        })
+    }
+
     typeSet() {
         let result = new Set<PreJavaType>()
         for (let type of this.typeMap.values())
@@ -203,27 +232,20 @@ export class TsToPreJavaTypemap {
     }
 
     simplifyUnions() {
-        let typesToSimplifyToObject: PreJavaType[] = []
-        let typesToSimplifyToOnlyType: PreJavaType[] = []
+        let typesToSimplifyToObject: PreJavaTypeUnion[] = []
+        let typesToSimplifyToOnlyType: PreJavaTypeUnion[] = []
 
         for (let type of this.typeMap.values()) {
             if (type instanceof PreJavaTypeUnion) {
                 if (!type.types || !type.types.length)
                     typesToSimplifyToObject.push(type)
-                else if (type.types.length == 1)
-                    typesToSimplifyToOnlyType.push(type)
                 else if (type.types.every(t => (type as PreJavaTypeUnion).types[0] == t))
                     typesToSimplifyToOnlyType.push(type)
             }
         }
 
         typesToSimplifyToObject.forEach(type => this.substituteType(t => t != type ? t : BUILTIN_TYPE_OBJECT))
-        typesToSimplifyToOnlyType.forEach(type => this.substituteType(t => {
-            if (t != type)
-                return t
-            else
-                return (type as PreJavaTypeUnion).types[0]
-        }))
+        typesToSimplifyToOnlyType.forEach(type => this.substituteType(t => (t != type) ? t : type.types[0]))
     }
 
     removeNotSupportedTypes() {
@@ -232,22 +254,23 @@ export class TsToPreJavaTypemap {
         this.substituteType((type) => type.getSimpleName(null) == '' ? null : type)
     }
 
-    browseTypeHierarchy(type: PreJavaType, visitor: { (visitedInterface: PreJavaTypeClassOrInterface, typeVariableEnv: { [key: string]: PreJavaType }) }, typeVariableEnv: { [key: string]: PreJavaType } = null) {
+    browseTypeHierarchy(type: PreJavaType, visitor: { (visitedInterface: PreJavaTypeClassOrInterface, typeVariableEnv: { [key: string]: PreJavaType }) }, typeVariableEnv: { [key: string]: PreJavaType } = null, visitSelf: boolean = false) {
         Visit.visitPreJavaType(type, {
             caseReferenceType: type => {
+                // TODO no need for that shit, only have to transfer type arguments to new type parameters...
                 let env: { [key: string]: PreJavaType } = Object.create(typeVariableEnv)
                 let typeParameters = type.type.getTypeParameters(typeVariableEnv)
                 for (let tpi = 0; tpi < type.typeParameters.length; tpi++)
                     env[typeParameters[tpi].getSimpleName(typeVariableEnv)] = type.typeParameters[tpi]
 
-                this.browseTypeHierarchy(type.type, visitor, env)
+                this.browseTypeHierarchy(type.type, visitor, env, true)
             },
 
             caseClassOrInterfaceType: type => {
+                if (visitSelf)
+                    visitor(type, typeVariableEnv)
                 type.baseTypes && type.baseTypes.forEach(baseType => {
-                    if (baseType instanceof PreJavaTypeClassOrInterface)
-                        visitor(baseType, typeVariableEnv)
-                    this.browseTypeHierarchy(baseType, visitor)
+                    this.browseTypeHierarchy(baseType, visitor, typeVariableEnv, true)
                 })
             }
         })
