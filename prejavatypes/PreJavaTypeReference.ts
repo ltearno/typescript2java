@@ -61,17 +61,9 @@ export class PreJavaTypeReference extends PreJavaType {
     typeParameters: PreJavaType[]
 
     processSourceType(type: ts.Type, typeParametersToApplyToAnonymousTypes: PreJavaTypeParameter[], context: ProcessContext) {
-        if (type.flags & ts.TypeFlags.Union) {
-            let aliasedSymbolType = context.getProgram().getTypeChecker().getDeclaredTypeOfSymbol(type.aliasSymbol)
-            this.type = context.getTypeMap().getOrCreatePreJavaTypeForTsType(aliasedSymbolType, false, null)
-            if (type.aliasTypeArguments && type.aliasTypeArguments.length)
-                this.typeParameters = type.aliasTypeArguments.map(typeArgument => context.getTypeMap().getOrCreatePreJavaTypeForTsType(typeArgument, false, typeParametersToApplyToAnonymousTypes))
-        }
-        else {
-            let reference = type as ts.TypeReference
-            this.type = context.getTypeMap().getOrCreatePreJavaTypeForTsType(reference.target, false, typeParametersToApplyToAnonymousTypes)
-            this.typeParameters = reference.typeArguments ? reference.typeArguments.map(typeArgument => context.getTypeMap().getOrCreatePreJavaTypeForTsType(typeArgument, false, typeParametersToApplyToAnonymousTypes)) : null
-        }
+        let reference = type as ts.TypeReference
+        this.type = context.getTypeMap().getOrCreatePreJavaTypeForTsType(reference.target, false, typeParametersToApplyToAnonymousTypes)
+        this.typeParameters = reference.typeArguments ? reference.typeArguments.map(typeArgument => context.getTypeMap().getOrCreatePreJavaTypeForTsType(typeArgument, false, typeParametersToApplyToAnonymousTypes)) : null
     }
 
     dump() { console.log(`TypeReference to ${this.type.getParametrizedSimpleName(null)}`) }

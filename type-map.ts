@@ -602,10 +602,6 @@ export class TsToPreJavaTypemap {
             typeKey = type['id'] + ((typeParametersToApplyToAnonymousTypes && typeParametersToApplyToAnonymousTypes.length) ? (typeParametersToApplyToAnonymousTypes.map(tp => '-' + tp.name)) : (''))
         } else if (type.flags & ts.TypeFlags.Union) {
             typeKey = `union-${type['id']}`
-            /*if (type.aliasSymbol && tsTools.isTypeAliasDefinitionType(type, this.program.getTypeChecker()))
-                typeKey = 'union-' + type['id'] + '-' + (type.aliasTypeArguments ? type.aliasTypeArguments.length : '0')
-            else
-                typeKey = 'union-' + type['id'] + '-' + ((typeParametersToApplyToAnonymousTypes && typeParametersToApplyToAnonymousTypes.length) ? (typeParametersToApplyToAnonymousTypes.map(tp => '-' + tp.name)) : (''))*/
         }
 
         return typeKey
@@ -677,13 +673,8 @@ export class TsToPreJavaTypemap {
                 return new PreJavaTypeReference()
         }
 
-        if (type.flags & ts.TypeFlags.Union) {
-            /*if ((!type.aliasSymbol) || tsTools.isTypeAliasDefinitionType(type, this.program.getTypeChecker()))
-                return new PreJavaTypeUnion()
-            else
-                return new PreJavaTypeReference()*/
+        if (type.flags & ts.TypeFlags.Union)
             return new PreJavaTypeUnion()
-        }
 
         if (objectType) {
             if (objectType.objectFlags & ts.ObjectFlags.Tuple)

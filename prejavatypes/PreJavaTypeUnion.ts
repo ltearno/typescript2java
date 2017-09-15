@@ -49,47 +49,8 @@ export class PreJavaTypeUnion extends PreJavaType {
     }
 
     processSourceType(type: ts.Type, typeParametersToApplyToAnonymousTypes: PreJavaTypeParameter[], context: ProcessContext) {
-        if (type.aliasSymbol) {
+        if (type.aliasSymbol)
             this.aliasName = type.aliasSymbol.name
-
-            /*let aliasedSymbolType = context.getProgram().getTypeChecker().getDeclaredTypeOfSymbol(type.aliasSymbol)
-
-            let formalTypeParameters = this.getAliasSymbolDeclarationTypeParametersList(type)
-            let typeArguments = this.getAliasTypeArgumentsDeclarationTypeParametersList(type, context)
-
-            let idss = tsTools.isTypeAliasDefinitionType(type, context.getProgram().getTypeChecker())
-            let iddddss = tsTools.isTypeAliasDefinitionType(aliasedSymbolType, context.getProgram().getTypeChecker())
-
-            let test2 = formalTypeParameters.length == typeArguments.length && typeArguments.every((value, index) => formalTypeParameters[index] == value)
-            let test = formalTypeParameters == typeArguments*/
-
-            /*if (type.aliasSymbol.declarations && type.aliasSymbol.declarations.length) {
-                let declaration = type.aliasSymbol.declarations[0] as ts.TypeAliasDeclaration
-                if (declaration.kind == ts.SyntaxKind.TypeAliasDeclaration && declaration.typeParameters && declaration.typeParameters.length) {
-                    this.typeParameters = []
-                    for (let typeParameter of declaration.typeParameters) {
-                        if (typeParameter.kind == ts.SyntaxKind.TypeParameter && 'symbol' in typeParameter) {
-                            this.typeParameters.push(new PreJavaTypeParameter(typeParameter['symbol'].name))
-                        }
-                    }
-                }
-
-            }*/
-
-            /*this.typeParameters = type.aliasTypeArguments && type.aliasTypeArguments.map(t => {
-                let typeArgJavaType = context.getTypeMap().getOrCreatePreJavaTypeForTsType(t, false, null)
-                if (typeArgJavaType instanceof PreJavaTypeParameter)
-                    return typeArgJavaType
-                else {
-                    console.log("BIG ERROR, AT LEAST NOT REALLY THOUGHT ABOUT, WILL FAIL SOMEWHERE SOMEHOW");
-
-                    return null
-                }
-            }).filter(t => t)*/
-        }
-        /*else {
-            this.typeParameters = typeParametersToApplyToAnonymousTypes
-        }*/
 
         let unionType = type as ts.UnionType
 
