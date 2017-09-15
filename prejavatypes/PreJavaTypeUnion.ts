@@ -49,7 +49,7 @@ export class PreJavaTypeUnion extends PreJavaType {
     }
 
     processSourceType(type: ts.Type, typeParametersToApplyToAnonymousTypes: PreJavaTypeParameter[], context: ProcessContext) {
-        if (type.aliasSymbol && type.aliasSymbol.name) {
+        if (type.aliasSymbol) {
             this.aliasName = type.aliasSymbol.name
 
             /*let aliasedSymbolType = context.getProgram().getTypeChecker().getDeclaredTypeOfSymbol(type.aliasSymbol)
@@ -63,7 +63,7 @@ export class PreJavaTypeUnion extends PreJavaType {
             let test2 = formalTypeParameters.length == typeArguments.length && typeArguments.every((value, index) => formalTypeParameters[index] == value)
             let test = formalTypeParameters == typeArguments*/
 
-            if (type.aliasSymbol.declarations && type.aliasSymbol.declarations.length) {
+            /*if (type.aliasSymbol.declarations && type.aliasSymbol.declarations.length) {
                 let declaration = type.aliasSymbol.declarations[0] as ts.TypeAliasDeclaration
                 if (declaration.kind == ts.SyntaxKind.TypeAliasDeclaration && declaration.typeParameters && declaration.typeParameters.length) {
                     this.typeParameters = []
@@ -74,7 +74,7 @@ export class PreJavaTypeUnion extends PreJavaType {
                     }
                 }
 
-            }
+            }*/
 
             /*this.typeParameters = type.aliasTypeArguments && type.aliasTypeArguments.map(t => {
                 let typeArgJavaType = context.getTypeMap().getOrCreatePreJavaTypeForTsType(t, false, null)
@@ -87,12 +87,31 @@ export class PreJavaTypeUnion extends PreJavaType {
                 }
             }).filter(t => t)*/
         }
-        else {
+        /*else {
             this.typeParameters = typeParametersToApplyToAnonymousTypes
-        }
+        }*/
 
         let unionType = type as ts.UnionType
-        this.setTypes(unionType.types.map(t => context.getTypeMap().getOrCreatePreJavaTypeForTsType(t, false, typeParametersToApplyToAnonymousTypes)))
+
+        let typeParameters: string[] = []
+        unionType.types.forEach(t => this.fetchTypeParameters(t, typeParameters))
+        if (typeParameters.length)
+            this.typeParameters = typeParameters.map(name => new PreJavaTypeParameter(name))
+
+        this.setTypes(unionType.types.map(t => context.getTypeMap().getOrCreatePreJavaTypeForTsType(t, false, this.typeParameters)))
+    }
+
+    private fetchTypeParameters(type: ts.Type, typeParameters: string[]) {
+        if (type.flags == ts.TypeFlags.TypeParameter) {
+            if (typeParameters.indexOf(type.symbol.name) < 0)
+                typeParameters.push(type.symbol.name)
+        }
+        else if (type.flags == ts.TypeFlags.Object && (type as ts.ObjectType).objectFlags & ts.ObjectFlags.Reference) {
+            let typeReference = type as ts.TypeReference
+            this.fetchTypeParameters(typeReference.target, typeParameters)
+            if (typeReference.typeArguments)
+                typeReference.typeArguments.forEach(typeArgument => this.fetchTypeParameters(typeArgument, typeParameters))
+        }
     }
 
     setTypes(types: PreJavaType[]) {
@@ -128,7 +147,7 @@ export class PreJavaTypeUnion extends PreJavaType {
         if ((!this.types) || this.types.length == 0)
             return 'EmptyUnion' + '_id_' + this.unionId
 
-        return this.getHumanizedName(null).replace(new RegExp('\\?', 'g'), 'UNKOWNTYPE') + '_id_' + this.unionId
+        return this.getHumanizedName(null).replace(new RegExp('\\?', 'g'), 'UNKOWNTYPE') + (this.aliasName ? `_${this.aliasName}_` : '') + '_id_' + this.unionId
     }
 
     getPackageName(): string { return this.packageName }

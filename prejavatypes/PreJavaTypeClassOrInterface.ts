@@ -264,6 +264,8 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
 
                 let propertyType = context.getProgram().getTypeChecker().getTypeAtLocation(property.valueDeclaration)
 
+                let test = tsTools.isTypeAliasDefinitionType(propertyType, context.getProgram().getTypeChecker())
+
                 // TODO : generating property accessors for callable types should be configurable
                 let callSignatures = propertyType.getCallSignatures()
                 if (callSignatures && callSignatures.length && !(propertyName.startsWith('on'))) {
