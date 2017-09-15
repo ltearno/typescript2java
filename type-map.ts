@@ -286,13 +286,26 @@ export class TsToPreJavaTypemap {
     browseTypeHierarchy(type: PreJavaType, visitor: { (visitedInterface: PreJavaTypeClassOrInterface, typeVariableEnv: { [key: string]: PreJavaType }) }, typeVariableEnv: { [key: string]: PreJavaType } = null, visitSelf: boolean = false) {
         Visit.visitPreJavaType(type, {
             caseReferenceType: type => {
+                let newEnv = {}
+                let targetTypeParameters = type.type.getTypeParameters(null)
+                for (let tpi = 0; tpi < type.typeParameters.length; tpi++) {
+                    let value = type.typeParameters[tpi]
+                    Visit.visitPreJavaType(value, {
+                        caseTypeParameter: t => {
+                            if (typeVariableEnv && t.name in typeVariableEnv)
+                                value = typeVariableEnv[t.name]
+                        }
+                    })
+                    newEnv[targetTypeParameters[tpi].getSimpleName(null)] = value
+                }
+                this.browseTypeHierarchy(type.type, visitor, newEnv, true)
+
                 // TODO no need for that shit, only have to transfer type arguments to new type parameters...
-                let env: { [key: string]: PreJavaType } = Object.create(typeVariableEnv)
+                /*let env: { [key: string]: PreJavaType } = Object.create(typeVariableEnv)
                 let typeParameters = type.type.getTypeParameters(typeVariableEnv)
                 for (let tpi = 0; tpi < type.typeParameters.length; tpi++)
                     env[typeParameters[tpi].getSimpleName(typeVariableEnv)] = type.typeParameters[tpi]
-
-                this.browseTypeHierarchy(type.type, visitor, env, true)
+                this.browseTypeHierarchy(type.type, visitor, env, true)*/
             },
 
             caseClassOrInterfaceType: type => {
@@ -330,7 +343,14 @@ export class TsToPreJavaTypemap {
                                 })) {
                                     let method = new PreJavaTypeCallSignature(visitedMethod.typeParameters, visitedMethod.returnType, visitedMethod.name, visitedMethod.parameters)
                                     method.returnType = new PreJavaTypeTPEnvironnement(visitedMethod.returnType, typeVariableEnv)
-                                    type.addMethod(method) // TODO Take care of the concretized type parameters
+                                    if (method.parameters)
+                                        method.parameters = method.parameters.map(p => ({
+                                            name: p.name,
+                                            type: new PreJavaTypeTPEnvironnement(p.type, typeVariableEnv),
+                                            optional: p.optional,
+                                            dotdotdot: p.dotdotdot
+                                        }))
+                                    type.addMethod(method)
                                 }
                             })
 
