@@ -12,12 +12,27 @@ export interface ProcessContext {
 
 export type TypeReplacer = { (type: PreJavaType): PreJavaType }
 
+export type TypeEnvironment = { [key: string]: PreJavaType }
+
+export function getTypeFromEnvironment(type: PreJavaType, environment: TypeEnvironment) {
+    let value = type
+    if (environment) {
+        visitPreJavaType(type, {
+            caseTypeParameter: type => {
+                if (type.name in environment)
+                    value = environment[type.name]
+            }
+        })
+    }
+    return value
+}
+
 export abstract class PreJavaType {
     abstract getSourceTypes(): Set<ts.Type>
 
     abstract getHierachyDepth(): number
 
-    abstract getSimpleName(typeParametersEnv: { [key: string]: PreJavaType }): string
+    abstract getSimpleName(typeParametersEnv: TypeEnvironment): string
 
     abstract getPackageName(): string
     abstract setPackageName(name: string)
@@ -58,7 +73,7 @@ export abstract class PreJavaType {
                     res += `Of${type.typeParameters.map(t => t.getHumanizedName(typeParametersEnv)).join('And')}`
                 return res
             },
-            caseUnion: type => `UnionOf${type.types.map(t => t.getHumanizedName(typeParametersEnv)).join('And')}`
+            caseUnion: type => `Union${type.aliasName ? `_${type.aliasName}_` : ''}Of${type.types.map(t => t.getHumanizedName(typeParametersEnv)).join('And')}`
         })
 
         return result || this.getSimpleName(typeParametersEnv)

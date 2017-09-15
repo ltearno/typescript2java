@@ -1,5 +1,5 @@
 import * as ts from "typescript"
-import { PreJavaType, ProcessContext, TypeReplacer } from './PreJavaType'
+import { PreJavaType, ProcessContext, TypeReplacer, getTypeFromEnvironment, TypeEnvironment } from './PreJavaType'
 import { PreJavaTypeParameter } from './PreJavaTypeParameter'
 
 export class PreJavaTypeTPEnvironnement extends PreJavaType {
@@ -32,7 +32,9 @@ export class PreJavaTypeTPEnvironnement extends PreJavaType {
         return this.type.getHierachyDepth()
     }
 
-    getSimpleName(): string { return this.type.getSimpleName(this.environment) }
+    getSimpleName(typeParametersEnv: TypeEnvironment): string {
+        return this.type.getSimpleName(this.environment)
+    }
 
     getPackageName(): string { return this.type.getPackageName() }
     setPackageName(name: string) { this.type.setPackageName(name) }
@@ -54,8 +56,6 @@ export class PreJavaTypeTPEnvironnement extends PreJavaType {
     }
 }
 
-export type TypeEnvironment = { [key: string]: PreJavaType }
-
 export class PreJavaTypeReference extends PreJavaType {
     type: PreJavaType
     typeParameters: PreJavaType[]
@@ -74,14 +74,10 @@ export class PreJavaTypeReference extends PreJavaType {
         if (!typeParametersEnv || !this.typeParameters)
             return this.typeParameters
 
-        return this.typeParameters.map(tp => {
-            if (tp instanceof PreJavaTypeParameter && tp.name in typeParametersEnv)
-                return typeParametersEnv[tp.name]
-            return tp
-        })
+        return this.typeParameters.map(tp => new PreJavaTypeTPEnvironnement(getTypeFromEnvironment(tp, typeParametersEnv), typeParametersEnv))
     }
 
-    getSimpleName(): string { return this.type.getSimpleName(null) }
+    getSimpleName(typeParametersEnv: TypeEnvironment): string { return this.type.getSimpleName(typeParametersEnv) }
 
     getPackageName(): string { return this.type.getPackageName() }
 

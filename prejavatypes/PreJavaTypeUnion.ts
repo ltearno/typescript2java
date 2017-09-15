@@ -120,7 +120,7 @@ export class PreJavaTypeUnion extends PreJavaType {
         if ((!this.types) || this.types.length == 0)
             return 'EmptyUnion' + '_id_' + this.unionId
 
-        return this.getHumanizedName(null).replace(new RegExp('\\?', 'g'), 'UNKOWNTYPE') + (this.aliasName ? `_${this.aliasName}_` : '') + '_id_' + this.unionId
+        return this.getHumanizedName(null).replace(new RegExp('\\?', 'g'), 'UNKOWNTYPE') + '_id_' + this.unionId
     }
 
     getPackageName(): string { return this.packageName }
