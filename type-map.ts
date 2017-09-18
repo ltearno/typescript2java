@@ -365,36 +365,27 @@ export class TsToPreJavaTypemap {
     }
 
     checkNoDuplicateTypeNames() {
-        /*let typeFqnCache: Set<string> = new Set()
-        for (let type of this.typeMap.values()) {
-            let typeFqn = type.getFullyQualifiedName(null)
-            while (true) {
-                if (typeFqnCache.has(typeFqn)) {
-                    console.log(`RENAMED TYPE ${typeFqn}`)
-                    typeFqn = typeFqn + 'bis'
-                    type.setPackageName(typeFqn)
+        let typeFqnCache: Map<string, PreJavaType> = new Map()
+        let hasDuplicate = false
+        for (let type of this.typeSet()) {
+            hasDuplicate = hasDuplicate || Visit.visitPreJavaType(type, {
+                caseReferenceType: type => false,
+                caseTPEnvironnement: type => false,
+                caseTypeParameter: type => false,
+                onOther: type => {
+                    let typeFqn = type.getFullyQualifiedName(null)
+                    if (typeFqnCache.has(typeFqn)) {
+                        let alreadyType = typeFqnCache.get(typeFqn)
+                        console.log(`WARNING : duplicate fqn ${typeFqn}`)
+                        return true
+                    }
+                    typeFqnCache.set(typeFqn, type)
+                    return false
                 }
-                else {
-                    typeFqnCache.add(typeFqn)
-                    break
-                }
-            }
-        }*/
-        /*console.log('FQN list')
-        let names: string[] = []
-        for (let type of this.typeMap.values()) {
-            let tok = type.getFullyQualifiedName(null)
-            if (type.getSourceTypes()) {
-                tok += ' '
-                for (let st of type.getSourceTypes().values()) {
-                    tok += st + ' ' + st['id'] + ' '
-                    if (st.getSymbol() && st.getSymbol().getDeclarations())
-                        tok += st.getSymbol().getDeclarations().map(sf => sf.getSourceFile().fileName + ':' + sf.getStart()).join()
-                }
-            }
-            names.push(tok)
+            })
         }
-        names.sort().forEach(name => console.log(name))*/
+        if (hasDuplicate)
+            console.log(`ERROR : duplicates found`)
     }
 
     removeDuplicateOverloads() {

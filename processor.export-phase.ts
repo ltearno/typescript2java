@@ -26,7 +26,6 @@ export class ExportPhase {
 
     exportJavaUnit(type: PreJavaType, javaWriter: JavaWriter, flow: TextFlow, baseDirectory: string) {
         let fqn = type.getParametrizedFullyQualifiedName(null)
-        console.log(`exporting ${fqn}`)
 
         if (this.exportedFqns.has(fqn))
             console.log(`WARNING, already exported !`)
@@ -104,6 +103,9 @@ export class ExportPhase {
 
     exportNodes(program: ts.Program, baseDirectory: string) {
         for (let type of this.gatherPhase.typeMap.typeSet()) {
+            let fqn = type.getParametrizedFullyQualifiedName(null)
+            console.log(`exporting ${fqn}`)
+
             visitPreJavaType(type, {
                 caseUnion: (type) => {
                     let javaWriter = new JavaWriter(type.getPackageName())

@@ -37,9 +37,9 @@ export class PreJavaTypeTuple extends PreJavaType {
 
     getSimpleName(): string {
         if (this.typeParameters && this.typeParameters.length == 2)
-            return `Tuple` + '_id_' + this.tupleId
+            return `Tuple`// + '_id_' + this.tupleId
         else
-            return `TupleOf${this.typeParameters.length}` + '_id_' + this.tupleId
+            return `TupleOf${this.typeParameters.length}`// + '_id_' + this.tupleId
     }
 
     getPackageName(): string { return this.packageName }

@@ -384,7 +384,7 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
             return
 
         if (!this.name)
-            this.name = name + '__' + (nextTypeId++)
+            this.name = name// + '__' + (nextTypeId++)
     }
 
     getSimpleName(typeParametersEnv: { [key: string]: PreJavaType }): string { return this.name }
