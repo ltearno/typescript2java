@@ -215,20 +215,18 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
         if (!symbol)
             return
 
-        if (symbol.valueDeclaration) {
-            let declaration = symbol.valueDeclaration
-
+        let declaration = symbol.valueDeclaration || (symbol.declarations && symbol.declarations.length && symbol.declarations[0])
+        if (declaration) {
             let jsName = null
             if (declaration.kind & ts.SyntaxKind.ClassDeclaration)
                 jsName = tsTools.guessName((declaration as ts.ClassDeclaration).name)
 
             let jsNamespace = context.getJavaPackage(declaration.getSourceFile())
+            if (jsNamespace)
+                this.setPackageName(jsNamespace)
 
             if (jsName)
                 this.addPrototypeName(jsNamespace, jsName)
-
-            if (jsNamespace)
-                this.setPackageName(jsNamespace)
         }
     }
 

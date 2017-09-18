@@ -26,6 +26,8 @@ export const FAKE_TYPE_INTERSECTION = new PreJavaTypeFakeType('gwt.ext', 'FakeIn
 export const FAKE_TYPE_ESSYMBOL = new PreJavaTypeFakeType('gwt.ext', 'FakeEsSymbol')
 export const FAKE_TYPE_INDEXEDACCESS = new PreJavaTypeFakeType('gwt.ext', 'FakeIndexedAccess');
 
+const CONFIGURATION_IMPLEMENTATION_SUFFIX = 'Impl'
+
 export class TsToPreJavaTypemap {
     private currentIdAnonymousTypes = 1
 
@@ -367,11 +369,13 @@ export class TsToPreJavaTypemap {
     checkNoDuplicateTypeNames() {
         let typeFqnCache: Map<string, PreJavaType> = new Map()
         let hasDuplicate = false
+        console.log(`duplicate types :`)
         for (let type of this.typeSet()) {
-            hasDuplicate = hasDuplicate || Visit.visitPreJavaType(type, {
+            if (Visit.visitPreJavaType(type, {
                 caseReferenceType: type => false,
                 caseTPEnvironnement: type => false,
                 caseTypeParameter: type => false,
+
                 onOther: type => {
                     let typeFqn = type.getFullyQualifiedName(null)
                     if (typeFqnCache.has(typeFqn)) {
@@ -382,10 +386,11 @@ export class TsToPreJavaTypemap {
                     typeFqnCache.set(typeFqn, type)
                     return false
                 }
-            })
+            }))
+                hasDuplicate = true
         }
-        if (hasDuplicate)
-            console.log(`ERROR : duplicates found`)
+        if (!hasDuplicate)
+            console.log(`no duplicate found`)
     }
 
     removeDuplicateOverloads() {
@@ -469,7 +474,7 @@ export class TsToPreJavaTypemap {
                     newType.comments = superType.comments && superType.comments.slice()
                     newType.constructorSignatures = superType.constructorSignatures
                     newType.methods = superType.methods && superType.methods.slice()
-                    newType.name = superType.name + '_'
+                    newType.name = superType.name + CONFIGURATION_IMPLEMENTATION_SUFFIX
                     newType.numberIndexType = superType.numberIndexType
                     newType.stringIndexType = superType.stringIndexType
                     newType.packageName = superType.packageName
