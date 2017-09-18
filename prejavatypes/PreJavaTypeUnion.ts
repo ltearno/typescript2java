@@ -1,7 +1,7 @@
 import * as ts from "typescript"
 import { PreJavaType, ProcessContext, TypeReplacer } from './PreJavaType'
 import { PreJavaTypeClassOrInterface } from './PreJavaTypeClassOrInterface'
-import { PreJavaTypeReference } from './PreJavaTypeReference'
+import { PreJavaTypeReference, PreJavaTypeTPEnvironnement } from './PreJavaTypeReference'
 import { PreJavaTypeParameter } from './PreJavaTypeParameter'
 import * as Visit from './PreJavaTypeVisit'
 import * as tsTools from '../ts-tools'
@@ -109,13 +109,15 @@ export class PreJavaTypeUnion extends PreJavaType {
     }
 
     getTypeParameters(typeParametersEnv: { [key: string]: PreJavaType }) {
+        // TODO SHOULD REFACTO WITH SAME CODE IN TYPE_REFERENCE
         if (!typeParametersEnv || !this.typeParameters)
             return this.typeParameters
 
         return this.typeParameters.map(tp => {
-            if (tp instanceof PreJavaTypeParameter && tp.name in typeParametersEnv)
-                return typeParametersEnv[tp.name]
-            return tp
+            return Visit.visitPreJavaType(tp, {
+                caseTypeParameter: type => type.name in typeParametersEnv ? typeParametersEnv[type.name] : type,
+                onOther: type => new PreJavaTypeTPEnvironnement(type, typeParametersEnv)
+            })
         })
     }
 

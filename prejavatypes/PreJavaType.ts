@@ -14,19 +14,6 @@ export type TypeReplacer = { (type: PreJavaType): PreJavaType }
 
 export type TypeEnvironment = { [key: string]: PreJavaType }
 
-export function getTypeFromEnvironment(type: PreJavaType, environment: TypeEnvironment) {
-    let value = type
-    if (environment) {
-        visitPreJavaType(type, {
-            caseTypeParameter: type => {
-                if (type.name in environment)
-                    value = environment[type.name]
-            }
-        })
-    }
-    return value
-}
-
 export abstract class PreJavaType {
     abstract getSourceTypes(): Set<ts.Type>
 

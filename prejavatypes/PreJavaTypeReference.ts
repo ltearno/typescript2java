@@ -1,6 +1,7 @@
 import * as ts from "typescript"
-import { PreJavaType, ProcessContext, TypeReplacer, getTypeFromEnvironment, TypeEnvironment } from './PreJavaType'
+import { PreJavaType, ProcessContext, TypeReplacer, TypeEnvironment } from './PreJavaType'
 import { PreJavaTypeParameter } from './PreJavaTypeParameter'
+import { visitPreJavaType } from './PreJavaTypeVisit'
 
 export class PreJavaTypeTPEnvironnement extends PreJavaType {
     constructor(public type: PreJavaType,
@@ -71,10 +72,16 @@ export class PreJavaTypeReference extends PreJavaType {
     getSourceTypes(): Set<ts.Type> { return null }
 
     getTypeParameters(typeParametersEnv: { [key: string]: PreJavaType }) {
+        // TODO SHOULD REFACTO WITH SAME CODE IN UNION
         if (!typeParametersEnv || !this.typeParameters)
             return this.typeParameters
 
-        return this.typeParameters.map(tp => new PreJavaTypeTPEnvironnement(getTypeFromEnvironment(tp, typeParametersEnv), typeParametersEnv))
+        return this.typeParameters.map(tp => {
+            return visitPreJavaType(tp, {
+                caseTypeParameter: type => type.name in typeParametersEnv ? typeParametersEnv[type.name] : type,
+                onOther: type => new PreJavaTypeTPEnvironnement(type, typeParametersEnv)
+            })
+        })
     }
 
     getSimpleName(typeParametersEnv: TypeEnvironment): string { return this.type.getSimpleName(typeParametersEnv) }
