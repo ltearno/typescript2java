@@ -114,25 +114,16 @@ export class JavaWriter {
         if (type.getPackageName() == null || type.getPackageName() == this.unitPackageName || type.getPackageName() == 'java.lang')
             return type.getSimpleName(null)
 
-        if (type instanceof PreJavaTypeParameter) {
-            type.constraint && this.importType(type.constraint)
-            return type.getSimpleName(null)
-        }
-
-        if (type instanceof PreJavaTypeReference) {
-            // TODO one day it will happen that the generated imports conflict with some other imported class...
-            type.typeParameters && type.typeParameters.forEach(tp => this.importType(tp))
-        }
-
         if (this.imports.has(type))
             return this.imports.get(type)
 
+        let importedFqn = type.getFullyQualifiedName(null)
         let name = type.getSimpleName(null)
-        for (let simpleName of this.imports.values()) {
-            if (simpleName == name) {
-                let fqn = type.getFullyQualifiedName(null)
-                this.imports.set(type, fqn)
-                return fqn
+
+        for (let [alreadyImportedType, alreadyImportedName] of this.imports) {
+            if (alreadyImportedName == name && alreadyImportedType.getFullyQualifiedName(null) != importedFqn) {
+                name = importedFqn
+                return importedFqn
             }
         }
 
@@ -143,11 +134,8 @@ export class JavaWriter {
     importTypeParametrized(type: PreJavaType): string {
         let res = this.importType(type)
         let typeParameters = type.getTypeParameters(null)
-        if (typeParameters && typeParameters.length) {
-            res += '<'
-            res += typeParameters.map(tp => this.importTypeParametrized(tp)).join(', ')
-            res += '>'
-        }
+        if (typeParameters && typeParameters.length)
+            res += `<${typeParameters.map(tp => this.importTypeParametrized(tp)).join(', ')}>`
         return res
     }
 
