@@ -114,6 +114,9 @@ export class GatherPhase {
         console.log(`(todo) add methods from hierarchy`)
         console.log(`(todo) remove duplicate methods in hierarchy`)
 
+        console.log(`replacing anonymous types`)
+        this.typeMap.replaceAnonymousTypes()
+
         console.log(`renaming duplicate fqns`)
         this.typeMap.checkNoDuplicateTypeNames()
 

@@ -366,6 +366,50 @@ export class TsToPreJavaTypemap {
         return groups
     }
 
+    replaceAnonymousTypes() {
+        let PARAMETER_NAMES = ['T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'A']
+        let NB_PARAMS = PARAMETER_NAMES.length
+        let LAMBDAS: PreJavaTypeClassOrInterface[] = []
+        for (let i = 0; i < NB_PARAMS; i++) {
+            let LAMBDA = new PreJavaTypeClassOrInterface()
+            LAMBDA.setSimpleName(`Function${i}`)
+            LAMBDA.setPackageName('fr.lteconsulting.prebuilt')
+            let typeParameters = [new PreJavaTypeParameter('R')]
+            for (let j = 0; j < i; j++)
+                typeParameters.push(new PreJavaTypeParameter(PARAMETER_NAMES[j]))
+            LAMBDA.setTypeParameters(typeParameters)
+            this.typeMap.set(`prebuilt-function-${i}`, LAMBDA)
+
+            LAMBDAS.push(LAMBDA)
+        }
+
+        this.substituteType(type => {
+            return Visit.visitPreJavaType(type, {
+                caseClassOrInterfaceType: type => {
+                    if (type.isAnonymousSourceType) {
+                        if (type.methods && type.methods.length == 1) {
+                            let functionalMethod = type.methods[0]
+                            if (functionalMethod.returnType != BUILTIN_TYPE_UNIT && (!functionalMethod.parameters || functionalMethod.parameters.length < NB_PARAMS)) {
+                                let returnType = functionalMethod.returnType
+                                let nbParameters = functionalMethod.parameters && functionalMethod.parameters.length
+
+                                let ref = new PreJavaTypeReference()
+                                ref.type = LAMBDAS[nbParameters]
+                                ref.typeParameters = [returnType]
+                                for (let i = 0; i < nbParameters; i++)
+                                    ref.typeParameters.push(functionalMethod.parameters[i].type)
+                                return ref
+                            }
+                        }
+                    }
+                    return type as PreJavaType
+                },
+
+                onOther: type => type as PreJavaType
+            })
+        })
+    }
+
     checkNoDuplicateTypeNames() {
         let typeFqnCache: Map<string, PreJavaType> = new Map()
         let hasDuplicate = false
