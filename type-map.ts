@@ -3,6 +3,7 @@ import * as path from "path";
 import { PreJavaType, TypeReplacer, ProcessContext } from './prejavatypes/PreJavaType'
 import * as Visit from './prejavatypes/PreJavaTypeVisit'
 import * as tsTools from './ts-tools'
+import * as typeTools from './type-tools'
 
 import { PreJavaTypeFakeType } from './prejavatypes/PreJavaTypeFakeType'
 import { PreJavaTypeBuiltinJavaType } from './prejavatypes/PreJavaTypeBuiltinJavaType'
@@ -82,7 +83,7 @@ export class TsToPreJavaTypemap {
                         let propertiesByName = new Map<string, PreJavaTypeProperty>()
                         type.properties.forEach(p => propertiesByName.set(p.name, p))
 
-                        this.browseTypeHierarchy(type, visitedType => {
+                        typeTools.browseTypeHierarchy(type, visitedType => {
                             visitedType.properties && visitedType.properties
                                 .forEach(p => propertiesByName.delete(p.name))
                         })
@@ -95,7 +96,7 @@ export class TsToPreJavaTypemap {
                         let methodsByFootprint = new Map<string, PreJavaTypeCallSignature>()
                         type.methods.forEach(m => methodsByFootprint.set(getMethodFootprint(m), m))
 
-                        this.browseTypeHierarchy(type, visitedType => {
+                        typeTools.browseTypeHierarchy(type, visitedType => {
                             visitedType.methods && visitedType.methods
                                 .forEach(m => methodsByFootprint.delete(getMethodFootprint(m)))
                         })
@@ -282,41 +283,13 @@ export class TsToPreJavaTypemap {
         this.substituteType((type) => type.getSimpleName(null) == '' ? null : type)
     }
 
-    browseTypeHierarchy(type: PreJavaType, visitor: { (visitedInterface: PreJavaTypeClassOrInterface, typeVariableEnv: { [key: string]: PreJavaType }) }, typeVariableEnv: { [key: string]: PreJavaType } = null, visitSelf: boolean = false) {
-        Visit.visitPreJavaType(type, {
-            caseReferenceType: type => {
-                let newEnv = {}
-                let targetTypeParameters = type.type.getTypeParameters(null)
-                for (let tpi = 0; tpi < type.typeParameters.length; tpi++) {
-                    let value = type.typeParameters[tpi]
-                    Visit.visitPreJavaType(value, {
-                        caseTypeParameter: t => {
-                            if (typeVariableEnv && t.name in typeVariableEnv)
-                                value = typeVariableEnv[t.name]
-                        }
-                    })
-                    newEnv[targetTypeParameters[tpi].getSimpleName(null)] = value
-                }
-                this.browseTypeHierarchy(type.type, visitor, newEnv, true)
-            },
-
-            caseClassOrInterfaceType: type => {
-                if (visitSelf)
-                    visitor(type, typeVariableEnv)
-                type.baseTypes && type.baseTypes.forEach(baseType => {
-                    this.browseTypeHierarchy(baseType, visitor, typeVariableEnv, true)
-                })
-            }
-        })
-    }
-
     // TODO : for classes : add methods from interface hierarchy which are not in the method list
     addMethodsFromInterfaceHierarchy() {
         for (let pjt of this.typeMap.values()) {
             Visit.visitPreJavaType(pjt, {
                 caseClassOrInterfaceType: type => {
                     if (type.isClassLike()) {
-                        this.browseTypeHierarchy(type, (visitedInterface, typeVariableEnv) => {
+                        typeTools.browseTypeHierarchy(type, (visitedInterface, typeVariableEnv) => {
                             if (visitedInterface.isClassLike())
                                 return
 

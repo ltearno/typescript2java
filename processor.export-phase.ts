@@ -3,6 +3,7 @@ import * as path from "path"
 import * as ts from "typescript"
 import * as TypeMap from './type-map'
 import * as GatherPhase from './processor.gather-phase'
+import * as typeTools from './type-tools';
 import { mkdirRec } from './tools';
 import { visitPreJavaType } from './prejavatypes/PreJavaTypeVisit'
 import { TextFlow, JavaWriter } from './TextFlow'
@@ -123,6 +124,16 @@ export class ExportPhase {
                     flow.push(`@JsType(isNative=true, namespace=JsPackage.GLOBAL, name="?")`).finishLine()
                     flow.push(`public abstract class ${type.getParametrizedSimpleName(null)} ${extendedBaseTypes.length ? `extends ${extendedBaseTypes.map(t => javaWriter.importTypeParametrized(t)).join()} ` : ''}${implementedBaseTypes.length ? `implements ${implementedBaseTypes.map(t => javaWriter.importTypeParametrized(t)).join()} ` : ''} {`).finishLine()
                     flow.pushLineStart('    ')
+
+                    let baseConstructors = typeTools.getSuperConstructors(type)
+                    let baseConstructor = baseConstructors && baseConstructors.length && baseConstructors[0]
+                    let baseClassConstructorParameters = baseConstructor && baseConstructor.parameters
+                    if (baseClassConstructorParameters && baseClassConstructorParameters.length) {
+                        flow.push(`public ${type.getSimpleName()}() {`).finishLine()
+                        flow.pushLineStart('    ').push(`super(${baseClassConstructorParameters.map(p => 'null').join(', ')});`).finishLine().pullLineStart()
+                        flow.push(`}`).finishLine()
+                    }
+
                     for (let unionedType of type.types) {
                         javaWriter.importType(this.JS_OVERLAY)
 
@@ -289,17 +300,9 @@ export class ExportPhase {
                     if (isClass && type.constructorSignatures && type.constructorSignatures.length) {
                         flow.blankLine().push('/*\n    Constructors\n*/').finishLine()
 
-                        // the base constructor if any
-                        let theBaseClassConstructorParameters: PreJavaTypeFormalParameter[] = null
-                        if (theClassBaseType) {
-                            while (theClassBaseType instanceof PreJavaTypeReference)
-                                theClassBaseType = theClassBaseType.type
-                            if (theClassBaseType instanceof PreJavaTypeClassOrInterface) {
-                                theBaseClassConstructorParameters = theClassBaseType.constructorSignatures
-                                    && theClassBaseType.constructorSignatures.length
-                                    && theClassBaseType.constructorSignatures[0].parameters
-                            }
-                        }
+                        let baseConstructors = typeTools.getSuperConstructors(type)
+                        let baseConstructor = baseConstructors && baseConstructors.length && baseConstructors[0]
+                        let theBaseClassConstructorParameters = baseConstructor && baseConstructor.parameters
 
                         type.constructorSignatures.forEach(constructor => {
                             if (constructor.comments && constructor.comments.length) {
