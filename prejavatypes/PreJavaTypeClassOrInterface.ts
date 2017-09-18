@@ -230,22 +230,6 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
             if (jsNamespace)
                 this.setPackageName(jsNamespace)
         }
-        /*if (symbol.getDeclarations()) {
-            symbol.getDeclarations()
-                .filter(d => d.kind == ts.SyntaxKind.ClassDeclaration)
-                .forEach((declaration: ts.ClassDeclaration) => {
-                    let jsNamespace = null
-                    let jsName = tsTools.guessName(declaration.name)
-
-                    if (jsName) {
-                        jsNamespace = context.getJavaPackage(declaration.getSourceFile())
-                        this.addPrototypeName(jsNamespace, jsName)
-                    }
-
-                    if (jsNamespace)
-                        this.setPackageName(jsNamespace)
-                })
-        }*/
     }
 
     private extractConstructor(type: ts.Type, context: ProcessContext) {

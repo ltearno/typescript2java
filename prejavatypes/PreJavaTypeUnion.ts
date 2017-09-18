@@ -60,6 +60,9 @@ export class PreJavaTypeUnion extends PreJavaType {
             this.typeParameters = typeParameters.map(name => new PreJavaTypeParameter(name))
 
         this.setTypes(unionType.types.map(t => context.getTypeMap().getOrCreatePreJavaTypeForTsType(t, false, this.typeParameters)))
+
+        if (type && type.symbol && type.symbol.valueDeclaration)
+            this.packageName = context.getJavaPackage(type.symbol.valueDeclaration.getSourceFile())
     }
 
     private fetchTypeParameters(type: ts.Type, typeParametersToApplyToAnonymousTypes: PreJavaTypeParameter[], typeParameters: string[]) {

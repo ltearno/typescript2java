@@ -53,6 +53,9 @@ export class PreJavaTypeEnum extends PreJavaType {
                 memberValue++
             }
         }
+
+        if (type && type.symbol && type.symbol.valueDeclaration)
+            this.packageName = context.getJavaPackage(type.symbol.valueDeclaration.getSourceFile())
     }
 
     dump() {
