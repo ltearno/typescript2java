@@ -3,7 +3,6 @@ import { PreJavaType, ProcessContext, TypeReplacer } from './PreJavaType'
 import { PreJavaTypeParameter } from './PreJavaTypeParameter'
 import { PreJavaTypeTPEnvironnement, PreJavaTypeReference } from './PreJavaTypeReference'
 import { PreJavaTypeCallSignature, PreJavaTypeFormalParameter } from './PreJavaTypeCallSignature'
-import { guessName } from '../tools'
 import * as Visit from './PreJavaTypeVisit'
 import * as tsTools from '../ts-tools'
 
@@ -221,7 +220,7 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
                 .filter(d => d.kind == ts.SyntaxKind.ClassDeclaration)
                 .forEach((declaration: ts.ClassDeclaration) => {
                     let jsNamespace = null
-                    let jsName = guessName(declaration.name)
+                    let jsName = tsTools.guessName(declaration.name)
 
                     if (jsName) {
                         jsNamespace = context.getJavaPackage(declaration.getSourceFile())

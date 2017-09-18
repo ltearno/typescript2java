@@ -1,7 +1,6 @@
 import * as ts from "typescript"
 import * as path from "path";
 import { PreJavaType, TypeReplacer, ProcessContext } from './prejavatypes/PreJavaType'
-import { guessName } from './tools'
 import * as Visit from './prejavatypes/PreJavaTypeVisit'
 import * as tsTools from './ts-tools'
 
@@ -299,13 +298,6 @@ export class TsToPreJavaTypemap {
                     newEnv[targetTypeParameters[tpi].getSimpleName(null)] = value
                 }
                 this.browseTypeHierarchy(type.type, visitor, newEnv, true)
-
-                // TODO no need for that shit, only have to transfer type arguments to new type parameters...
-                /*let env: { [key: string]: PreJavaType } = Object.create(typeVariableEnv)
-                let typeParameters = type.type.getTypeParameters(typeVariableEnv)
-                for (let tpi = 0; tpi < type.typeParameters.length; tpi++)
-                    env[typeParameters[tpi].getSimpleName(typeVariableEnv)] = type.typeParameters[tpi]
-                this.browseTypeHierarchy(type.type, visitor, env, true)*/
             },
 
             caseClassOrInterfaceType: type => {
