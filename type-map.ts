@@ -146,21 +146,33 @@ export class TsToPreJavaTypemap {
 
         let footprint = Visit.visitPreJavaType(type, {
             caseClassOrInterfaceType: (type) => {
-                let res =
-                    type.isClass ? 'C(' : 'I('
-                        + ((type.typeParameters && type.typeParameters.length) ? type.typeParameters.map(tp => this.getAnonymousClassFootprint(tp, selfReflect)).join() : '-')
-                        + ((type.constructorSignatures && type.constructorSignatures.length) ? type.constructorSignatures.map(sig => this.mapSignature(sig, selfReflect)).join() : '-')
-                        + ((type.numberIndexType) ? this.getAnonymousClassFootprint(type.numberIndexType, selfReflect) : '-')
-                        + ((type.stringIndexType) ? this.getAnonymousClassFootprint(type.stringIndexType, selfReflect) : '-')
-                        + ((type.methods && type.methods.length) ? type.methods.map(sig => this.mapSignature(sig, selfReflect)).join() : '-')
-                        + ((type.properties && type.properties.length) ? type.properties.map(ppty => this.mapProperty(ppty, selfReflect)).join() : '-')
-                        + ')'
-                return res
+                return (type.isAnonymousSourceType ? (type.isClass ? 'C(' : 'I(') : `${type.name}(`)
+                    + ((type.typeParameters && type.typeParameters.length) ? type.typeParameters.map(tp => this.getAnonymousClassFootprint(tp, selfReflect)).join() : '-')
+                    + ((type.constructorSignatures && type.constructorSignatures.length) ? type.constructorSignatures.map(sig => this.mapSignature(sig, selfReflect)).join() : '-')
+                    + ((type.numberIndexType) ? this.getAnonymousClassFootprint(type.numberIndexType, selfReflect) : '-')
+                    + ((type.stringIndexType) ? this.getAnonymousClassFootprint(type.stringIndexType, selfReflect) : '-')
+                    + ((type.methods && type.methods.length) ? type.methods.map(sig => this.mapSignature(sig, selfReflect)).join() : '-')
+                    + ((type.properties && type.properties.length) ? type.properties.map(ppty => this.mapProperty(ppty, selfReflect)).join() : '-')
+                    + ')'
             },
 
-            caseTypeParameter: (type) => type.getSimpleName(null),
+            caseUnion: type => {
+                return 'U('
+                    + ((type.typeParameters && type.typeParameters.length) ? type.typeParameters.map(tp => this.getAnonymousClassFootprint(tp, selfReflect)).join() : '-')
+                    + ((type.types && type.types.length) ? type.types.map(t => this.getAnonymousClassFootprint(t, selfReflect)).join() : '-')
+                    + ')'
+            },
 
-            onOther: (type) => type.getFullyQualifiedName(null)
+            caseReferenceType: type => {
+                return `R(${this.getAnonymousClassFootprint(type.type, selfReflect)}${(type.typeParameters && type.typeParameters.length) ? type.typeParameters.map(tp => this.getAnonymousClassFootprint(tp, selfReflect)).join() : '-'})`
+            },
+
+
+            caseTypeParameter: (type) => type.getSimpleName(null) + (type.constraint ? this.getAnonymousClassFootprint(type.constraint, selfReflect) : '-'),
+
+            onOther: (type) => type.getFullyQualifiedName(null),
+
+            caseTPEnvironnement: type => this.getAnonymousClassFootprint(type.type, selfReflect)
         })
 
         return footprint
@@ -184,6 +196,16 @@ export class TsToPreJavaTypemap {
                         typeDuplicates.set(footprint, list)
                     }
                     list.push(classType)
+                },
+
+                caseUnion: unionType => {
+                    let footprint = this.getAnonymousClassFootprint(unionType, null)
+                    let list = typeDuplicates.get(footprint)
+                    if (list == null) {
+                        list = []
+                        typeDuplicates.set(footprint, list)
+                    }
+                    list.push(unionType)
                 }
             })
         })
@@ -200,6 +222,13 @@ export class TsToPreJavaTypemap {
             let replacedTypes = list.slice(1, list.length - 1)
 
             let replacementType = list[0] as PreJavaTypeClassOrInterface
+
+            if (replacementType.getSimpleName(null) == 'Union_EventListenerOrEventListenerObject_OfEventListenerAndEventListenerObject') {
+                this.getAnonymousClassFootprint(replacementType, null)
+                console.log("klkj");
+            }
+
+
             replacedTypes
                 .filter(t => t instanceof PreJavaTypeClassOrInterface && t.comments && t.comments.length)
                 .forEach(t => {
