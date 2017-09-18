@@ -30,6 +30,8 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
     constructorSignatures: PreJavaTypeCallSignature[] = []
     properties: PreJavaTypeProperty[] = []
     methods: PreJavaTypeCallSignature[] = []
+    staticProperties: PreJavaTypeProperty[] = []
+    staticMethods: PreJavaTypeCallSignature[] = []
 
     numberIndexType: PreJavaType
     stringIndexType: PreJavaType
@@ -73,7 +75,7 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
         this.extractConstructor(type, context)
         this.extractComments(type)
         this.extractIndexTypes(type, context)
-        this.extractPropertiesAndMethods(type, context)
+        this.extractPropertiesAndMethods(type as ts.InterfaceTypeWithDeclaredMembers, context)
     }
 
     private extractTypeParameters(type: ts.Type, typeParametersToApplyToAnonymousTypes: PreJavaTypeParameter[], context: ProcessContext) {
@@ -248,8 +250,49 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
         }
     }
 
-    private extractPropertiesAndMethods(type: ts.Type, context: ProcessContext) {
-        let properties = (type as ts.InterfaceTypeWithDeclaredMembers).declaredProperties// type.getProperties()
+    private extractPropertiesAndMethods(type: ts.InterfaceTypeWithDeclaredMembers, context: ProcessContext) {
+        // static properties and methods
+        if (type.symbol && type.symbol.valueDeclaration) {
+            let declaredType = context.getProgram().getTypeChecker().getTypeOfSymbolAtLocation(type.symbol, type.symbol.valueDeclaration)
+            if (declaredType) {
+                let staticTypeProperties = declaredType.getProperties()
+                staticTypeProperties && staticTypeProperties.forEach(property => {
+                    if (property['parent'] == declaredType.symbol && property.name != 'prototype') {
+                        let comments = this.getCommentFromSymbol(property)
+                        let propertyType = context.getProgram().getTypeChecker().getTypeAtLocation(property.valueDeclaration)
+                        let callSignatures = propertyType.getCallSignatures()
+                        if (callSignatures && callSignatures.length && !(property.name.startsWith('on'))) {
+                            for (let callSignature of callSignatures) {
+                                let method = context.getTypeMap().convertSignature(property.name, callSignature, this.typeParameters)
+                                if (method) {
+                                    if (this.typeParameters && this.typeParameters.length) {
+                                        let toAdd = []
+                                        for (let tp of this.typeParameters)
+                                            if (toAdd.indexOf(tp.name) < 0)
+                                                toAdd.push(tp.name)
+                                        method.typeParameters = toAdd.map(name => new PreJavaTypeParameter(name)).concat(method.typeParameters ? method.typeParameters : [])
+                                    }
+
+                                    method.addComments(comments)
+                                    this.addStaticMethod(method)
+                                }
+                            }
+                        }
+                        else {
+                            let propertyPreJavaType = context.getTypeMap().getOrCreatePreJavaTypeForTsType(propertyType, false, this.typeParameters)
+                            this.addStaticProperty({
+                                name: property.name,
+                                type: propertyPreJavaType,
+                                writable: true,
+                                comments
+                            })
+                        }
+                    }
+                })
+            }
+        }
+
+        let properties = type.declaredProperties// type.getProperties()
         if (properties && properties.length) {
             properties.forEach(property => {
                 let propertyName = property.getName()
@@ -273,9 +316,6 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
                 }
                 else {
                     let propertyPreJavaType = context.getTypeMap().getOrCreatePreJavaTypeForTsType(propertyType, false, this.typeParameters)
-                    //if (propertyPreJavaType instanceof PreJavaTypeClassOrInterface)
-                    //    propertyPreJavaType.setSimpleName(`${propertyName.slice(0, 1).toUpperCase() + propertyName.slice(1)}Caller`)
-
                     this.addProperty({
                         name: propertyName,
                         type: propertyPreJavaType,
@@ -332,6 +372,18 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
 
         if (this.constructorSignatures)
             this.constructorSignatures = this.constructorSignatures.map(s => s.substituteType(replacer, cache, passThroughTypes)).filter(s => s != null)
+
+        if (this.staticProperties) {
+            this.staticProperties = this.staticProperties.map(p => {
+                p.type = p.type.substituteType(replacer, cache, passThroughTypes)
+                if (!p.type)
+                    return null
+                return p
+            }).filter(p => p != null)
+        }
+
+        if (this.staticMethods)
+            this.staticMethods = this.staticMethods.map(s => s.substituteType(replacer, cache, passThroughTypes)).filter(s => s != null)
 
         if (this.properties) {
             this.properties = this.properties.map(p => {
@@ -481,6 +533,18 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
 
     addMethod(method: PreJavaTypeCallSignature) {
         this.methods.push(method)
+    }
+
+    addStaticProperty(property: PreJavaTypeProperty) {
+        if (this.staticProperties && this.staticProperties.some(p => p.name == property.name))
+            return // bug where static methods are duplicated
+        this.staticProperties.push(property)
+    }
+
+    addStaticMethod(method: PreJavaTypeCallSignature) {
+        if (this.staticMethods && this.staticMethods.some(m => m.name == method.name))
+            return // bug where static methods are duplicated
+        this.staticMethods.push(method)
     }
 
     setNumberIndexType(type: PreJavaType) {

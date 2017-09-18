@@ -507,7 +507,7 @@ export class TsToPreJavaTypemap {
     changeDtoInterfacesIntoClasses() {
         let nb = 0
         for (let type of this.typeMap.values()) {
-            if (type instanceof PreJavaTypeClassOrInterface && type.hasOnlyProperties() && !this.hasSubType(type)) {
+            if (type instanceof PreJavaTypeClassOrInterface && type.hasOnlyProperties() && !this.hasSubType(type) && (!type.staticMethods || !type.staticMethods.length) && (!type.staticProperties || !type.staticProperties.length)) {
                 type.isClass = true
                 nb++
             }
@@ -620,6 +620,7 @@ export class TsToPreJavaTypemap {
             name,
             tsSignature.getParameters()
                 ? tsSignature.getParameters()
+                    .filter(p => p.name != 'thisArg')
                     .map(p => {
                         let parameteryType = this.program.getTypeChecker().getTypeAtLocation(p.valueDeclaration)
                         if (parameteryType
