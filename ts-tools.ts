@@ -1,6 +1,8 @@
 import * as ts from 'typescript'
 
 export function guessName(identifier: ts.Identifier | ts.BindingPattern): string {
+    if (!identifier)
+        return null
     if (identifier.kind == ts.SyntaxKind.Identifier)
         return identifier.text
     return "[UNKNOWN]"

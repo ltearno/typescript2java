@@ -215,7 +215,22 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
         if (!symbol)
             return
 
-        if (symbol.getDeclarations()) {
+        if (symbol.valueDeclaration) {
+            let declaration = symbol.valueDeclaration
+
+            let jsName = null
+            if (declaration.kind & ts.SyntaxKind.ClassDeclaration)
+                jsName = tsTools.guessName((declaration as ts.ClassDeclaration).name)
+
+            let jsNamespace = context.getJavaPackage(declaration.getSourceFile())
+
+            if (jsName)
+                this.addPrototypeName(jsNamespace, jsName)
+
+            if (jsNamespace)
+                this.setPackageName(jsNamespace)
+        }
+        /*if (symbol.getDeclarations()) {
             symbol.getDeclarations()
                 .filter(d => d.kind == ts.SyntaxKind.ClassDeclaration)
                 .forEach((declaration: ts.ClassDeclaration) => {
@@ -230,7 +245,7 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
                     if (jsNamespace)
                         this.setPackageName(jsNamespace)
                 })
-        }
+        }*/
     }
 
     private extractConstructor(type: ts.Type, context: ProcessContext) {
