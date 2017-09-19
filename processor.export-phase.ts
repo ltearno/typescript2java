@@ -429,7 +429,7 @@ export class ExportPhase {
                     javaWriter.importType(this.JS_PACKAGE)
 
                 javaWriter.importType(this.JS_METHOD)
-                flow.push(`@JsMethod(namespace="${methodNamespace ? ('"' + methodNamespace + '"') : 'JsPackage.GLOBAL'}", name = "${method.name}")`).finishLine()
+                flow.push(`@JsMethod(namespace=${methodNamespace ? ('"' + methodNamespace + '"') : 'JsPackage.GLOBAL'}, name = "${method.name}")`).finishLine()
                 flow.push(`public static native `)
                 let typeParameters = method.typeParameters
                 if (typeParameters && typeParameters.length)
