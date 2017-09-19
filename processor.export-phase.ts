@@ -369,11 +369,8 @@ export class ExportPhase {
             flow.finishLine()
             flow.pushLineStart('    ')
 
-            type.callSignatures && type.callSignatures.forEach(callSignature => {
-                flow.push(`/** SKIPPED CALL SIGNATURE ! */`).finishLine()
-            })
+            type.callSignatures && type.callSignatures.forEach(callSignature => flow.push(`/** SKIPPED CALL SIGNATURE ! */`).finishLine())
 
-            // TODO if there are callSignatures, we should output the appropriate wrappers
             if (isClass && type.constructorSignatures && type.constructorSignatures.length) {
                 flow.blankLine().push('/*\n    Constructors\n*/').finishLine()
 
@@ -537,41 +534,48 @@ export class ExportPhase {
 
                         if (property.name.indexOf('@') >= 0) {
                             flow.push(`// skipped property ${property.name}`).blankLine().blankLine()
+                            return
                         }
-                        else {
-                            if (property.comments && property.comments.length) {
-                                flow.startJavaDocComments()
-                                flow.push(property.comments)
-                                flow.endJavaDocComments()
-                            }
 
-                            let escapedPropertyName = this.escapePropertyName(property.name)
+                        if (property.comments && property.comments.length) {
+                            flow.startJavaDocComments()
+                            flow.push(property.comments)
+                            flow.endJavaDocComments()
+                        }
 
-                            if (isClass) {
-                                if (escapedPropertyName != property.name)
-                                    flow.push(`@JsProperty(name="${property.name}")`).finishLine()
+                        let escapedPropertyName = this.escapePropertyName(property.name)
 
-                                flow.push(`public ${javaWriter.importTypeParametrized(property.type)} ${escapedPropertyName};`).finishLine()
+                        if (isClass) {
+                            if (escapedPropertyName != property.name)
+                                flow.push(`@JsProperty(name="${property.name}")`).finishLine()
 
-                                flow.blankLine()
-                            }
-
-                            let upcaseName = escapedPropertyName.slice(0, 1).toLocaleUpperCase() + escapedPropertyName.slice(1)
-
-                            let getterName = `get${upcaseName}`
-                            let setterName = `set${upcaseName}`
-                            if ((type as PreJavaTypeClassOrInterface).methods.some(m => m.name == getterName || m.name == setterName)) {
-                                getterName = getterName + '__'
-                                setterName = setterName + '__'
-                            }
-
-                            flow.push(`@JsProperty( name = "${property.name}")`).finishLine()
-                            flow.push(`${isClass ? 'public native ' : ''}${javaWriter.importTypeParametrized(property.type)} ${getterName}();`).finishLine()
+                            flow.push(`public ${javaWriter.importTypeParametrized(property.type)} ${escapedPropertyName};`).finishLine()
 
                             flow.blankLine()
-                            flow.push(`@JsProperty( name = "${property.name}")`).finishLine()
-                            flow.push(`${isClass ? 'public native ' : ''}void ${setterName}( ${javaWriter.importTypeParametrized(property.type)} value );`).finishLine()
                         }
+
+                        let upcaseName = escapedPropertyName.slice(0, 1).toLocaleUpperCase() + escapedPropertyName.slice(1)
+
+                        let getterName = `get${upcaseName}`
+                        let setterName = `set${upcaseName}`
+                        if ((type as PreJavaTypeClassOrInterface).methods.some(m => m.name == getterName || m.name == setterName)) {
+                            getterName = getterName + '__'
+                            setterName = setterName + '__'
+                        }
+
+                        flow.push(`@JsProperty( name = "${property.name}")`).finishLine()
+                        flow.push(`${isClass ? 'public native ' : ''}${javaWriter.importTypeParametrized(property.type)} ${getterName}();`).finishLine()
+
+                        flow.blankLine()
+                        flow.push(`@JsProperty( name = "${property.name}")`).finishLine()
+                        flow.push(`${isClass ? 'public native ' : ''}void ${setterName}( ${javaWriter.importTypeParametrized(property.type)} value );`).finishLine()
+
+                        let unionedTypes =typeTools.getUnionedTypes(property.type)
+                        unionedTypes && unionedTypes.forEach(unionedType => {
+                            flow.blankLine()
+                            flow.push(`@JsProperty( name = "${property.name}")`).finishLine()
+                            flow.push(`${isClass ? 'public native ' : ''}void ${setterName}( ${javaWriter.importTypeParametrized(unionedType)} value );`).finishLine()
+                        })
                     })
             }
 

@@ -109,6 +109,15 @@ export function hasOnlyCallSignatures(type: PreJavaTypeClassOrInterface) {
     return true
 }
 
+export function getUnionedTypes(type: PreJavaType): PreJavaType[] {
+    return Visit.visitPreJavaType(type, {
+        caseUnion: type => type.types,
+        caseReferenceType: type => getUnionedTypes(type.type),
+        caseTPEnvironnement: type => getUnionedTypes(type.type),
+        onOther: type => null
+    })
+}
+
 const hasIndexCache = new Map<PreJavaType, boolean>()
 
 function hasIndexInTypeHierarchyInternal(type: PreJavaType) {
