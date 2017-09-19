@@ -132,7 +132,7 @@ export class ExportPhase {
         flow.push(`Union adapter`).finishLine()
         flow.endJavaDocComments()
         javaWriter.importType(this.JS_PACKAGE)
-        flow.push(`@JsType(isNative=true, namespace=JsPackage.GLOBAL, name="?")`).finishLine()
+        flow.push(`@JsType(isNative=true, namespace=JsPackage.GLOBAL, name="Object")`).finishLine()
         flow.push(`public abstract class ${type.getParametrizedSimpleName(null)} ${extendedBaseTypes.length ? `extends ${extendedBaseTypes.map(t => javaWriter.importTypeParametrized(t)).join()} ` : ''}${implementedBaseTypes.length ? `implements ${implementedBaseTypes.map(t => javaWriter.importTypeParametrized(t)).join()} ` : ''} {`).finishLine()
         flow.pushLineStart('    ')
 
@@ -149,7 +149,7 @@ export class ExportPhase {
             javaWriter.importType(this.JS_OVERLAY)
 
             flow.push(`@JsOverlay`).finishLine()
-            flow.push(`public ${javaWriter.importTypeParametrized(unionedType)} as${unionedType.getHumanizedName(null)}() {`).finishLine()
+            flow.push(`public final ${javaWriter.importTypeParametrized(unionedType)} as${unionedType.getHumanizedName(null)}() {`).finishLine()
             flow.pushLineStart('    ')
             flow.push(`return Js.uncheckedCast( this );`).finishLine()
             flow.pullLineStart()
@@ -178,7 +178,7 @@ export class ExportPhase {
         flow.endJavaDocComments()
 
         javaWriter.importType(this.JS_PACKAGE)
-        flow.push(`@JsType(isNative=true, namespace=JsPackage.GLOBAL, name="?")`).finishLine()
+        flow.push(`@JsType(isNative=true, namespace=JsPackage.GLOBAL, name="Object")`).finishLine()
         flow.push(`public class ${type.getParametrizedSimpleName(null)} {`).finishLine()
         flow.pushLineStart('    ')
         javaWriter.importType(this.JS_OVERLAY)
@@ -187,14 +187,14 @@ export class ExportPhase {
             let variableName = TUPLE_TYPE_VARIABLE_NAMES[i]
 
             flow.push(`@JsOverlay`).finishLine()
-            flow.push(`public ${variableName} getNb${i + 1}() {`).finishLine()
+            flow.push(`public final ${variableName} getNb${i + 1}() {`).finishLine()
             flow.pushLineStart('    ')
             flow.push(`return (${variableName}) Js.asArrayLike(this).getAt(${i});`).finishLine()
             flow.pullLineStart()
             flow.push(`}`).finishLine()
 
             flow.push(`@JsOverlay`).finishLine()
-            flow.push(`public void setNb${i + 1}(${variableName} value) {`).finishLine()
+            flow.push(`public final void setNb${i + 1}(${variableName} value) {`).finishLine()
             flow.pushLineStart('    ')
             flow.push(`Js.asArrayLike(this).setAt(${i}, value);`).finishLine()
             flow.pullLineStart()
@@ -202,7 +202,7 @@ export class ExportPhase {
         }
 
         flow.push(`@JsOverlay`).finishLine()
-        flow.push(`public ${javaWriter.importType(this.JS_ARRAY_LIKE)}<Object> asList() {`).finishLine()
+        flow.push(`public final ${javaWriter.importType(this.JS_ARRAY_LIKE)}<Object> asList() {`).finishLine()
         flow.pushLineStart('    ')
         flow.push(`return Js.uncheckedCast(this);`).finishLine()
         flow.pullLineStart()
@@ -346,7 +346,7 @@ export class ExportPhase {
 
             flow.blankLine()
             flow.push(`@JsOverlay`).finishLine()
-            flow.push(`${isClass ? 'public' : 'default'} void setByIndex(int index, ${javaWriter.importTypeParametrized(nit)} value) {`).finishLine()
+            flow.push(`${isClass ? 'public final' : 'default'} void setByIndex(int index, ${javaWriter.importTypeParametrized(nit)} value) {`).finishLine()
             flow.pushLineStart('    ')
             flow.push(`Js.asArrayLike(this).setAt(index, value);`).finishLine()
             flow.pullLineStart()
@@ -354,7 +354,7 @@ export class ExportPhase {
 
             flow.blankLine()
             flow.push(`@JsOverlay`).finishLine()
-            flow.push(`${isClass ? 'public' : 'default'} ${javaWriter.importTypeParametrized(nit)} getByIndex(int index) {`).finishLine()
+            flow.push(`${isClass ? 'public final' : 'default'} ${javaWriter.importTypeParametrized(nit)} getByIndex(int index) {`).finishLine()
             flow.pushLineStart('    ')
             flow.push(`return (${javaWriter.importTypeParametrized(nit)}) Js.asArrayLike(this).getAt(index);`).finishLine()
             flow.pullLineStart()
@@ -368,7 +368,7 @@ export class ExportPhase {
 
             flow.blankLine()
             flow.push(`@JsOverlay`).finishLine()
-            flow.push(`public void setByIndex(String index, ${javaWriter.importTypeParametrized(sit)} value) {`).finishLine()
+            flow.push(`public final void setByIndex(String index, ${javaWriter.importTypeParametrized(sit)} value) {`).finishLine()
             flow.pushLineStart('    ')
             flow.push(`Js.asPropertyMap(this).set(index, value);`).finishLine()
             flow.pullLineStart()
@@ -376,7 +376,7 @@ export class ExportPhase {
 
             flow.blankLine()
             flow.push(`@JsOverlay`).finishLine()
-            flow.push(`public ${javaWriter.importTypeParametrized(sit)} getByIndex(String index) {`).finishLine()
+            flow.push(`public final ${javaWriter.importTypeParametrized(sit)} getByIndex(String index) {`).finishLine()
             flow.pushLineStart('    ')
             flow.push(`return (${javaWriter.importTypeParametrized(sit)}) Js.asPropertyMap(this).get(index);`).finishLine()
             flow.pullLineStart()
