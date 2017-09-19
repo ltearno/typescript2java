@@ -222,13 +222,6 @@ export class TsToPreJavaTypemap {
             let replacedTypes = list.slice(1, list.length - 1)
 
             let replacementType = list[0] as PreJavaTypeClassOrInterface
-
-            if (replacementType.getSimpleName(null) == 'Union_EventListenerOrEventListenerObject_OfEventListenerAndEventListenerObject') {
-                this.getAnonymousClassFootprint(replacementType, null)
-                console.log("klkj");
-            }
-
-
             replacedTypes
                 .filter(t => t instanceof PreJavaTypeClassOrInterface && t.comments && t.comments.length)
                 .forEach(t => {
@@ -241,6 +234,33 @@ export class TsToPreJavaTypemap {
                 if (replacedTypes.some(replacedType => replacedType === type))
                     return list[0]
                 return type
+            })
+        })
+
+        this.substituteType(type => {
+            return Visit.visitPreJavaType<PreJavaType>(type, {
+                caseClassOrInterfaceType: type => {
+                    if (type.baseTypes && type.baseTypes.size)
+                        return type
+                    if (type.comments && type.comments.length)
+                        return type
+                    if (type.constructorSignatures && type.constructorSignatures.length)
+                        return type
+                    if (!type.isAnonymousSourceType)
+                        return type
+                    if (type.methods && type.methods.length || type.staticMethods && type.staticMethods.length)
+                        return type
+                    if (type.properties && type.properties.length || type.staticProperties && type.staticProperties.length)
+                        return type
+                    if (type.prototypeNames && type.prototypeNames.size)
+                        return type
+                    if (type.numberIndexType || type.stringIndexType)
+                        return type
+                    if (type.typeParameters && type.typeParameters.length)
+                        return type
+                    return BUILTIN_TYPE_OBJECT
+                },
+                onOther: type => type
             })
         })
         console.log(`total duplicates removed : ${totalDuplicates}`)
