@@ -400,12 +400,10 @@ export class ExportPhase {
 
                 let escapedPropertyName = this.escapePropertyName(property.name)
                 let propertyNamespace = prototypeNamespace ? (prototypeNamespace + '.' + prototypeName) : prototypeName
-                if (!propertyNamespace) {
+                if (!propertyNamespace)
                     javaWriter.importType(this.JS_PACKAGE)
-                    propertyNamespace = 'JsPackage.GLOBAL'
-                }
 
-                flow.push(`@JsProperty(namespace="${propertyNamespace}", name="${property.name}")`).finishLine()
+                flow.push(`@JsProperty(namespace=${propertyNamespace ? ('"' + propertyNamespace + '"') : 'JsPackage.GLOBAL'}, name="${property.name}")`).finishLine()
                 flow.push(`public static ${javaWriter.importTypeParametrized(property.type)} ${escapedPropertyName};`).finishLine()
                 flow.blankLine()
             })
@@ -427,13 +425,11 @@ export class ExportPhase {
                     escapedMethodName = '_' + escapedMethodName
                 escapedMethodName = this.escapePropertyName(escapedMethodName)
                 let methodNamespace = prototypeNamespace ? (prototypeNamespace + '.' + prototypeName) : prototypeName
-                if (!methodNamespace) {
+                if (!methodNamespace)
                     javaWriter.importType(this.JS_PACKAGE)
-                    methodNamespace = 'JsPackage.GLOBAL'
-                }
 
                 javaWriter.importType(this.JS_METHOD)
-                flow.push(`@JsMethod(namespace="${methodNamespace}", name = "${method.name}")`).finishLine()
+                flow.push(`@JsMethod(namespace="${methodNamespace ? ('"' + methodNamespace + '"') : 'JsPackage.GLOBAL'}", name = "${method.name}")`).finishLine()
                 flow.push(`public static native `)
                 let typeParameters = method.typeParameters
                 if (typeParameters && typeParameters.length)

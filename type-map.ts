@@ -183,6 +183,7 @@ export class TsToPreJavaTypemap {
 
         let typeDuplicates = new Map<string, PreJavaType[]>()
 
+        console.log(`finding duplicate anonymous types`)
         types.forEach(type => {
             Visit.visitPreJavaType(type, {
                 caseClassOrInterfaceType: (classType) => {
@@ -210,6 +211,7 @@ export class TsToPreJavaTypemap {
             })
         })
 
+        console.log(`merging duplicate anonymous types`)
         let totalDuplicates = 0
         typeDuplicates.forEach((list, footprint) => {
             if (list.length < 2)
@@ -217,11 +219,9 @@ export class TsToPreJavaTypemap {
 
             totalDuplicates += list.length - 1
 
-            console.log(`type duplicates : ${list.length} for footprint ${footprint}`)
-
             let replacedTypes = list.slice(1, list.length - 1)
-
             let replacementType = list[0] as PreJavaTypeClassOrInterface
+
             replacedTypes
                 .filter(t => t instanceof PreJavaTypeClassOrInterface && t.comments && t.comments.length)
                 .forEach(t => {
@@ -232,11 +232,13 @@ export class TsToPreJavaTypemap {
 
             this.substituteType((type: PreJavaType): PreJavaType => {
                 if (replacedTypes.some(replacedType => replacedType === type))
-                    return list[0]
+                    return replacementType
                 return type
             })
         })
+        console.log(`found and removed ${totalDuplicates} duplicates`)
 
+        console.log(`replacing empty classes by Object`)
         this.substituteType(type => {
             return Visit.visitPreJavaType<PreJavaType>(type, {
                 caseClassOrInterfaceType: type => {
@@ -263,7 +265,6 @@ export class TsToPreJavaTypemap {
                 onOther: type => type
             })
         })
-        console.log(`total duplicates removed : ${totalDuplicates}`)
     }
 
     private doesTypeUsesType(type: PreJavaType, usedType: PreJavaType) {
@@ -418,23 +419,63 @@ export class TsToPreJavaTypemap {
     replaceAnonymousTypes() {
         let PARAMETER_NAMES = ['T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'A']
         let NB_PARAMS = PARAMETER_NAMES.length
+
         let LAMBDAS: PreJavaTypeClassOrInterface[] = []
         for (let i = 0; i < NB_PARAMS; i++) {
             let LAMBDA = new PreJavaTypeClassOrInterface()
-            LAMBDA.setSimpleName(`Function${i}`)
+            LAMBDA.setSimpleName(`Function${i ? i : ''}`)
             LAMBDA.setPackageName('fr.lteconsulting.prebuilt')
             let typeParameters = [new PreJavaTypeParameter('R')]
             for (let j = 0; j < i; j++)
                 typeParameters.push(new PreJavaTypeParameter(PARAMETER_NAMES[j]))
             LAMBDA.setTypeParameters(typeParameters)
-            this.typeMap.set(`prebuilt-function-${i}`, LAMBDA)
 
+            let parameters: PreJavaTypeFormalParameter[] = []
+            for (let j = 0; j < i; j++)
+                parameters.push({
+                    dotdotdot: false,
+                    optional: false,
+                    type: typeParameters[j + 1],
+                    name: `p${j + 1}`
+                })
+            let method = new PreJavaTypeCallSignature(null, typeParameters[0], 'execute', parameters)
+            LAMBDA.addMethod(method)
+
+            this.typeMap.set(`prebuilt-function-${i}`, LAMBDA)
             LAMBDAS.push(LAMBDA)
+        }
+
+        let PROCS: PreJavaTypeClassOrInterface[] = []
+        for (let i = 0; i < NB_PARAMS; i++) {
+            let PROC = new PreJavaTypeClassOrInterface()
+            PROC.setSimpleName(`Action${i ? i : ''}`)
+            PROC.setPackageName('fr.lteconsulting.prebuilt')
+            let typeParameters = []
+            for (let j = 0; j < i; j++)
+                typeParameters.push(new PreJavaTypeParameter(PARAMETER_NAMES[j]))
+            PROC.setTypeParameters(typeParameters)
+
+            let parameters: PreJavaTypeFormalParameter[] = []
+            for (let j = 0; j < i; j++)
+                parameters.push({
+                    dotdotdot: false,
+                    optional: false,
+                    type: typeParameters[j],
+                    name: `p${j + 1}`
+                })
+            let method = new PreJavaTypeCallSignature(null, BUILTIN_TYPE_UNIT, 'execute', parameters)
+            PROC.addMethod(method)
+
+            this.typeMap.set(`prebuilt-action-${i}`, PROC)
+            PROCS.push(PROC)
         }
 
         this.substituteType(type => {
             return Visit.visitPreJavaType(type, {
                 caseClassOrInterfaceType: type => {
+                    if (PROCS.indexOf(type) >= 0 || LAMBDAS.indexOf(type) >= 0)
+                        return type
+
                     if (type.isAnonymousSourceType) {
                         if (type.methods && type.methods.length == 1) {
                             let functionalMethod = type.methods[0]
@@ -442,12 +483,22 @@ export class TsToPreJavaTypemap {
                                 let returnType = functionalMethod.returnType
                                 let nbParameters = functionalMethod.parameters && functionalMethod.parameters.length
 
-                                let ref = new PreJavaTypeReference()
-                                ref.type = LAMBDAS[nbParameters]
-                                ref.typeParameters = [returnType]
-                                for (let i = 0; i < nbParameters; i++)
-                                    ref.typeParameters.push(functionalMethod.parameters[i].type)
-                                return ref
+                                if (returnType == BUILTIN_TYPE_UNIT) {
+                                    let ref = new PreJavaTypeReference()
+                                    ref.type = PROCS[nbParameters]
+                                    ref.typeParameters = []
+                                    for (let i = 0; i < nbParameters; i++)
+                                        ref.typeParameters.push(functionalMethod.parameters[i].type)
+                                    return ref
+                                }
+                                else {
+                                    let ref = new PreJavaTypeReference()
+                                    ref.type = LAMBDAS[nbParameters]
+                                    ref.typeParameters = [returnType]
+                                    for (let i = 0; i < nbParameters; i++)
+                                        ref.typeParameters.push(functionalMethod.parameters[i].type)
+                                    return ref
+                                }
                             }
                         }
                     }
