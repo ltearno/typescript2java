@@ -1,7 +1,9 @@
-import { PreJavaType } from './prejavatypes/PreJavaType'
+import { PreJavaType, TypeEnvironment } from './prejavatypes/PreJavaType'
 import { PreJavaTypeClassOrInterface } from './prejavatypes/PreJavaTypeClassOrInterface'
 import * as Visit from './prejavatypes/PreJavaTypeVisit'
 import { PreJavaTypeCallSignature } from './prejavatypes/PreJavaTypeCallSignature'
+import { PreJavaTypeTPEnvironnement } from './prejavatypes/PreJavaTypeReference'
+import { PreJavaTypeParameter } from './prejavatypes/PreJavaTypeParameter'
 
 export function browseTypeHierarchy(type: PreJavaType, visitor: { (visitedInterface: PreJavaTypeClassOrInterface, typeVariableEnv: { [key: string]: PreJavaType }) }, typeVariableEnv: { [key: string]: PreJavaType } = null, visitSelf: boolean = false) {
     Visit.visitPreJavaType(type, {
@@ -109,11 +111,19 @@ export function hasOnlyCallSignatures(type: PreJavaTypeClassOrInterface) {
     return true
 }
 
-export function getUnionedTypes(type: PreJavaType): PreJavaType[] {
+export function getUnionedTypes(type: PreJavaType, env: TypeEnvironment = null): PreJavaType[] {
     return Visit.visitPreJavaType(type, {
-        caseUnion: type => type.types,
-        caseReferenceType: type => getUnionedTypes(type.type),
-        caseTPEnvironnement: type => getUnionedTypes(type.type),
+        caseUnion: type => env ? type.types.map(t => new PreJavaTypeTPEnvironnement(t, env)) : type.types,
+        caseReferenceType: type => getUnionedTypes(type.type, env),
+        caseTPEnvironnement: type => {
+            if (!type.environment)
+                return getUnionedTypes(type.type, env)
+
+            let res = getUnionedTypes(type.type, type.environment)
+            if (res && env)
+                return res.map(t => new PreJavaTypeTPEnvironnement(t, env))
+            return res
+        },
         onOther: type => null
     })
 }

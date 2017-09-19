@@ -570,7 +570,7 @@ export class ExportPhase {
                         flow.push(`@JsProperty( name = "${property.name}")`).finishLine()
                         flow.push(`${isClass ? 'public native ' : ''}void ${setterName}( ${javaWriter.importTypeParametrized(property.type)} value );`).finishLine()
 
-                        let unionedTypes =typeTools.getUnionedTypes(property.type)
+                        let unionedTypes = typeTools.getUnionedTypes(property.type)
                         unionedTypes && unionedTypes.forEach(unionedType => {
                             flow.blankLine()
                             flow.push(`@JsProperty( name = "${property.name}")`).finishLine()

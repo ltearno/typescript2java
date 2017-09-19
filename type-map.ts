@@ -216,8 +216,6 @@ export class TsToPreJavaTypemap {
             }
         }
 
-        // NOT ON JSFUNCTION TYPES METHODS !
-
         do {
             let dup = new PreJavaTypeCallSignature(method.typeParameters, method.returnType, method.name, method.parameters.map((parameter, index) => {
                 return {
@@ -237,6 +235,10 @@ export class TsToPreJavaTypemap {
         for (let type of this.typeSet()) {
             Visit.visitPreJavaType(type, {
                 caseClassOrInterfaceType: type => {
+                    let functionalInterface = typeTools.hasOnlyCallSignatures(type)
+                    if (functionalInterface && type.callSignatures.length == 1)
+                        return
+
                     type.methods && type.methods.forEach(m => {
                         let dups = this.developMethod(m)
                         dups && dups.forEach(dup => type.addMethod(dup))
@@ -429,11 +431,11 @@ export class TsToPreJavaTypemap {
                                     return true
                                 })) {
                                     let method = new PreJavaTypeCallSignature(visitedMethod.typeParameters, visitedMethod.returnType, visitedMethod.name, visitedMethod.parameters)
-                                    method.returnType = new PreJavaTypeTPEnvironnement(visitedMethod.returnType, typeVariableEnv)
+                                    method.returnType = typeVariableEnv ? new PreJavaTypeTPEnvironnement(visitedMethod.returnType, typeVariableEnv) : visitedMethod.returnType
                                     if (method.parameters)
                                         method.parameters = method.parameters.map(p => ({
                                             name: p.name,
-                                            type: new PreJavaTypeTPEnvironnement(p.type, typeVariableEnv),
+                                            type: typeVariableEnv ? new PreJavaTypeTPEnvironnement(p.type, typeVariableEnv) : p.type,
                                             optional: p.optional,
                                             dotdotdot: p.dotdotdot
                                         }))
@@ -446,7 +448,7 @@ export class TsToPreJavaTypemap {
                                 // TODO For the moment, we just keep the super type class
                                 let existingProperty = type.properties && type.properties.find(p => p.name == visitedProperty.name)
                                 if (existingProperty) {
-                                    existingProperty.type = new PreJavaTypeTPEnvironnement(visitedProperty.type, typeVariableEnv)
+                                    existingProperty.type = typeVariableEnv ? new PreJavaTypeTPEnvironnement(visitedProperty.type, typeVariableEnv) : visitedProperty.type
                                 }
                                 else {
                                     let newProperty: PreJavaTypeProperty = {

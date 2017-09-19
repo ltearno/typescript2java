@@ -111,6 +111,9 @@ export class JavaWriter {
     constructor(public unitPackageName: string) { }
 
     importType(type: PreJavaType): string {
+        if (!type)
+            console.log('cvc');
+
         if (type.getPackageName() == null || type.getPackageName() == this.unitPackageName || type.getPackageName() == 'java.lang')
             return type.getSimpleName(null)
 

@@ -7,6 +7,10 @@ export class PreJavaTypeTPEnvironnement extends PreJavaType {
     constructor(public type: PreJavaType,
         public environment: { [key: string]: PreJavaType }) {
         super()
+
+        if (!environment)
+            console.log('fuck');
+
     }
 
     processSourceType(type: ts.Type, typeParametersToApplyToAnonymousTypes: PreJavaTypeParameter[], context: ProcessContext) {
