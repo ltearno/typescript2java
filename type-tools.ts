@@ -89,6 +89,26 @@ export function skipReferencingTypes(type: PreJavaType) {
     })
 }
 
+export function hasOnlyCallSignatures(type: PreJavaTypeClassOrInterface) {
+    if (type.baseTypes && type.baseTypes.size)
+        return false
+    if (!type.callSignatures || !type.callSignatures.length)
+        return false
+    if (type.constructorSignatures && type.constructorSignatures.length)
+        return false
+    if (type.methods && type.methods.length)
+        return false
+    if (type.numberIndexType || type.stringIndexType)
+        return false
+    if (type.properties && type.properties.length)
+        return false
+    if (type.staticMethods && type.staticMethods.length)
+        return false
+    if (type.staticProperties && type.staticProperties.length)
+        return false
+    return true
+}
+
 const hasIndexCache = new Map<PreJavaType, boolean>()
 
 function hasIndexInTypeHierarchyInternal(type: PreJavaType) {

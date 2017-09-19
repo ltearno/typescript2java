@@ -29,6 +29,7 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
     prototypeNames = new Set<string>()
 
     constructorSignatures: PreJavaTypeCallSignature[] = []
+    callSignatures: PreJavaTypeCallSignature[] = []
     properties: PreJavaTypeProperty[] = []
     methods: PreJavaTypeCallSignature[] = []
     staticProperties: PreJavaTypeProperty[] = []
@@ -328,16 +329,11 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
         }
 
         let callSignatures = type.getCallSignatures()
-        if (callSignatures && callSignatures.length) {
-            // TODO : Check that the method is alone so that it is a correct functional type
-            // TODO : check if it can be melted down with other similar types
-            // TODO : try to get a name for it from where it has been created (callback of a function, ...)
-            callSignatures.forEach(callSignature => {
-                let signature = context.getTypeMap().convertSignature('execute', callSignature, this.typeParameters)
-                if (signature)
-                    this.addMethod(signature)
-            })
-        }
+        callSignatures && callSignatures.forEach(callSignature => {
+            let signature = context.getTypeMap().convertSignature(null, callSignature, this.typeParameters)
+            if (signature)
+                this.callSignatures.push(signature)
+        })
     }
 
     hasOnlyProperties() {
@@ -373,6 +369,9 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
 
         if (this.constructorSignatures)
             this.constructorSignatures = this.constructorSignatures.map(s => s.substituteType(replacer, cache, passThroughTypes)).filter(s => s != null)
+
+        if (this.callSignatures)
+            this.callSignatures = this.callSignatures.map(s => s.substituteType(replacer, cache, passThroughTypes)).filter(s => s != null)
 
         if (this.staticProperties) {
             this.staticProperties = this.staticProperties.map(p => {

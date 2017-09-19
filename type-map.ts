@@ -73,7 +73,7 @@ export class TsToPreJavaTypemap {
             })
         }
         function getMethodFootprint(method: PreJavaTypeCallSignature) {
-            let res = method.name
+            let res = method.name ? method.name : '?'
             if (method.parameters && method.parameters.length)
                 res += '-' + method.parameters.map(p => getTypeFootprint(p.type)).join('-')
             return res
@@ -120,7 +120,7 @@ export class TsToPreJavaTypemap {
 
     private mapSignature(signature: PreJavaTypeCallSignature, selfReflect: Map<PreJavaType, string>) {
         return 'S('
-            + signature.name
+            + (signature.name ? signature.name : '?')
             + ',' + this.getAnonymousClassFootprint(signature.returnType, selfReflect)
             + ',' + ((signature.typeParameters && signature.typeParameters.length) ? signature.typeParameters.map(tp => this.getAnonymousClassFootprint(tp, selfReflect)).join() : '')
             + ',' + ((signature.parameters && signature.parameters.length) ? signature.parameters.map(param => this.mapParameter(param, selfReflect)).join() : '')
@@ -149,6 +149,7 @@ export class TsToPreJavaTypemap {
                 return (type.isAnonymousSourceType ? (type.isClass ? 'C(' : 'I(') : `${type.name}(`)
                     + ((type.typeParameters && type.typeParameters.length) ? type.typeParameters.map(tp => this.getAnonymousClassFootprint(tp, selfReflect)).join() : '-')
                     + ((type.constructorSignatures && type.constructorSignatures.length) ? type.constructorSignatures.map(sig => this.mapSignature(sig, selfReflect)).join() : '-')
+                    + ((type.callSignatures && type.callSignatures.length) ? type.callSignatures.map(sig => this.mapSignature(sig, selfReflect)).join() : '-')
                     + ((type.numberIndexType) ? this.getAnonymousClassFootprint(type.numberIndexType, selfReflect) : '-')
                     + ((type.stringIndexType) ? this.getAnonymousClassFootprint(type.stringIndexType, selfReflect) : '-')
                     + ((type.methods && type.methods.length) ? type.methods.map(sig => this.mapSignature(sig, selfReflect)).join() : '-')
@@ -242,6 +243,8 @@ export class TsToPreJavaTypemap {
         this.substituteType(type => {
             return Visit.visitPreJavaType<PreJavaType>(type, {
                 caseClassOrInterfaceType: type => {
+                    if (type.callSignatures && type.callSignatures.length)
+                        return type
                     if (type.baseTypes && type.baseTypes.size)
                         return type
                     if (type.comments && type.comments.length)
