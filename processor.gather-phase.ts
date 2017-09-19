@@ -147,7 +147,7 @@ export class GatherPhase {
                 || t.getStringIndexType()
                 || (t.getCallSignatures() && t.getCallSignatures().some(s => s.declaration && s.declaration.name && s.declaration.name.getText() != '__call'))
                 || (t.getProperties() && t.getProperties().some(p => p.name != 'prototype'))) {
-                let variableType = this.typeMap.getOrCreatePreJavaTypeForTsType(t)
+                let variableType = this.typeMap.getOrCreatePreJavaTypeForTsType(t, false)
 
                 this.globalVariables.push({ type: variableType, name: guessName(declaration.name) });
             }
@@ -162,7 +162,7 @@ export class GatherPhase {
             return
 
         let callSignatures = t.getCallSignatures()
-        if (callSignatures && callSignatures.length == 1) {
+        if (callSignatures && callSignatures.length) {
             let signature = this.typeMap.convertSignature(name, callSignatures[0], null)
             if (signature)
                 this.globalMethods.push(signature)

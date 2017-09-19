@@ -114,6 +114,16 @@ export class ExportPhase {
                 caseClassOrInterfaceType: type => this.exportClassOrInterface(type, program, baseDirectory)
             })
         }
+
+        console.log(`global methods :`)
+        this.gatherPhase.globalMethods.forEach(method => {
+            console.log(`  ${method.name}`)
+        })
+
+        console.log(`global variables :`)
+        this.gatherPhase.globalVariables.forEach(variable => {
+            console.log(`  ${variable.name} : ${variable.type.getParametrizedFullyQualifiedName(null)}`)
+        })
     }
 
     private exportUnionType(type: PreJavaTypeUnion, program: ts.Program, baseDirectory: string) {
