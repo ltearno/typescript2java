@@ -23,19 +23,21 @@ export class GatherPhase {
     constructor(private baseJavaPackage: string,
         private javaPackages: { [key: string]: string },
         private program: ts.Program) {
-        this.typeMap = new TsToPreJavaTypemap(program, (sourceFile: ts.SourceFile) => {
-            let relative = path.relative(this.program.getCurrentDirectory(), sourceFile.fileName);
-            for (let pathPrefix in this.javaPackages) {
-                let sourceRelativePath = path.relative(pathPrefix, relative)
-                if (!sourceRelativePath.startsWith('..')) {
-                    let dirRelativePackagePath = path.dirname(sourceRelativePath).replace(new RegExp('\\\\', 'g'), '.').replace(new RegExp('-', 'g'), '.').replace(new RegExp('\\/', 'g'), '.')
-                    let packagePrefix = this.javaPackages[pathPrefix] + (dirRelativePackagePath == '.' ? '' : ('.' + dirRelativePackagePath))
+        this.typeMap = new TsToPreJavaTypemap(program, sourceFile => this.getJavaPackage(sourceFile))
+    }
 
-                    return packagePrefix
-                }
+    private getJavaPackage(sourceFile: ts.SourceFile) {
+        let relative = path.relative(this.program.getCurrentDirectory(), sourceFile.fileName);
+        for (let pathPrefix in this.javaPackages) {
+            let sourceRelativePath = path.relative(pathPrefix, relative)
+            if (!sourceRelativePath.startsWith('..')) {
+                let dirRelativePackagePath = path.dirname(sourceRelativePath).replace(new RegExp('\\\\', 'g'), '.').replace(new RegExp('-', 'g'), '.').replace(new RegExp('\\/', 'g'), '.')
+                let packagePrefix = this.javaPackages[pathPrefix] + (dirRelativePackagePath == '.' ? '' : ('.' + dirRelativePackagePath))
+
+                return packagePrefix
             }
-            return null
-        })
+        }
+        return null
     }
 
     addTypesFromSourceFile(sourceFile: ts.SourceFile, onlyExportedSymbols: boolean) {
@@ -114,27 +116,34 @@ export class GatherPhase {
         this.typeMap.checkNoDuplicateTypeNames()
 
         console.log(`statistics:`)
-        console.log(`${this.globalClass && this.globalClass.staticProperties && this.globalClass.staticProperties.length} global variables`)
-        console.log(`${this.globalClass && this.globalClass.staticMethods && this.globalClass.staticMethods.length} global methods`)
+        console.log(`${this.globalClasses.size} global scope classes`)
         console.log(`${this.typeMap.typeMap.size} jsinterop types`)
     }
 
-    private globalClass: PreJavaTypeClassOrInterface = null
+    // maps js package names to global element holder java classes
+    private globalClasses = new Map<string, PreJavaTypeClassOrInterface>()
 
-    private ensureGlobalClass() {
-        if (!this.globalClass) {
-            this.globalClass = new PreJavaTypeClassOrInterface()
-            this.globalClass.comments = [`Wrapper class for all global definition`]
-            this.globalClass.isClass = true
-            this.globalClass.name = "GlobalScope"
-            this.globalClass.packageName = 'fr.lteconsulting'
-            this.typeMap.typeMap.set('global-declarations-class', this.globalClass)
+    private getGlobalClass(jsPackage: string): PreJavaTypeClassOrInterface {
+        if (!jsPackage)
+            jsPackage = 'global'
+
+        if (!this.globalClasses.has(jsPackage)) {
+            let globalClass = new PreJavaTypeClassOrInterface()
+            globalClass.comments = [`Wrapper class for all global definition of ${jsPackage} package`]
+            globalClass.isClass = true
+            globalClass.name = "GlobalScope"
+            globalClass.packageName = jsPackage
+
+            this.globalClasses.set(jsPackage, globalClass)
+            this.typeMap.typeMap.set('global-declarations-class-' + jsPackage, globalClass)
+
+            return globalClass
         }
+
+        return this.globalClasses.get(jsPackage)
     }
 
     private registerVariableStatement(statement: ts.VariableStatement) {
-        this.ensureGlobalClass()
-
         statement.declarationList.declarations.forEach((declaration) => {
             let t = this.program.getTypeChecker().getTypeFromTypeNode(declaration.type)
 
@@ -157,26 +166,26 @@ export class GatherPhase {
                 || (t.getProperties() && t.getProperties().some(p => p.name != 'prototype'))) {
                 let variableType = this.typeMap.getOrCreatePreJavaTypeForTsType(t, false)
 
-                this.globalClass.addStaticProperty({ name: guessName(declaration.name), comments: null, type: variableType, writable: true })
+                this.getGlobalClass(this.getJavaPackage(declaration.getSourceFile())).addStaticProperty({ name: guessName(declaration.name), comments: null, type: variableType, writable: true })
             }
         })
     }
 
     private registerFunctionDeclaration(declaration: ts.FunctionDeclaration) {
-        this.ensureGlobalClass()
-
         let t = this.program.getTypeChecker().getTypeAtLocation(declaration)
 
         let name = declaration && declaration.name && declaration.name.text
         if (!name)
             return
 
+        let javaPackage = this.getJavaPackage(declaration.getSourceFile())
+
         let callSignatures = t.getCallSignatures()
         if (callSignatures && callSignatures.length) {
             callSignatures.forEach(tsSignature => {
                 let signature = this.typeMap.convertSignature(name, tsSignature, null)
                 if (signature) {
-                    this.globalClass.addStaticMethod(signature)
+                    this.getGlobalClass(javaPackage).addStaticMethod(signature)
                 }
             })
         }
