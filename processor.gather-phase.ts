@@ -18,13 +18,6 @@ function guessName(identifier: ts.Identifier | ts.BindingPattern): string {
 export class GatherPhase {
     typeMap: TsToPreJavaTypemap
 
-    globalVariables: {
-        type: PreJavaType;
-        name: string;
-    }[] = [];
-
-    globalMethods: PreJavaTypeCallSignature[] = []
-
     private ignoredSyntaxKinds: Set<ts.SyntaxKind> = new Set()
 
     constructor(private baseJavaPackage: string,
@@ -121,12 +114,27 @@ export class GatherPhase {
         this.typeMap.checkNoDuplicateTypeNames()
 
         console.log(`statistics:`)
-        console.log(`${this.globalVariables.length} global variables`)
-        console.log(`${this.globalMethods.length} global methods`)
+        console.log(`${this.globalClass && this.globalClass.staticProperties && this.globalClass.staticProperties.length} global variables`)
+        console.log(`${this.globalClass && this.globalClass.staticMethods && this.globalClass.staticMethods.length} global methods`)
         console.log(`${this.typeMap.typeMap.size} jsinterop types`)
     }
 
+    private globalClass: PreJavaTypeClassOrInterface = null
+
+    private ensureGlobalClass() {
+        if (!this.globalClass) {
+            this.globalClass = new PreJavaTypeClassOrInterface()
+            this.globalClass.comments = [`Wrapper class for all global definition`]
+            this.globalClass.isClass = true
+            this.globalClass.name = "GlobalScope"
+            this.globalClass.packageName = 'fr.lteconsulting'
+            this.typeMap.typeMap.set('global-declarations-class', this.globalClass)
+        }
+    }
+
     private registerVariableStatement(statement: ts.VariableStatement) {
+        this.ensureGlobalClass()
+
         statement.declarationList.declarations.forEach((declaration) => {
             let t = this.program.getTypeChecker().getTypeFromTypeNode(declaration.type)
 
@@ -149,12 +157,14 @@ export class GatherPhase {
                 || (t.getProperties() && t.getProperties().some(p => p.name != 'prototype'))) {
                 let variableType = this.typeMap.getOrCreatePreJavaTypeForTsType(t, false)
 
-                this.globalVariables.push({ type: variableType, name: guessName(declaration.name) });
+                this.globalClass.addStaticProperty({ name: guessName(declaration.name), comments: null, type: variableType, writable: true })
             }
         })
     }
 
     private registerFunctionDeclaration(declaration: ts.FunctionDeclaration) {
+        this.ensureGlobalClass()
+
         let t = this.program.getTypeChecker().getTypeAtLocation(declaration)
 
         let name = declaration && declaration.name && declaration.name.text
@@ -163,9 +173,12 @@ export class GatherPhase {
 
         let callSignatures = t.getCallSignatures()
         if (callSignatures && callSignatures.length) {
-            let signature = this.typeMap.convertSignature(name, callSignatures[0], null)
-            if (signature)
-                this.globalMethods.push(signature)
+            callSignatures.forEach(tsSignature => {
+                let signature = this.typeMap.convertSignature(name, tsSignature, null)
+                if (signature) {
+                    this.globalClass.addStaticMethod(signature)
+                }
+            })
         }
     }
 }

@@ -114,16 +114,6 @@ export class ExportPhase {
                 caseClassOrInterfaceType: type => this.exportClassOrInterface(type, program, baseDirectory)
             })
         }
-
-        console.log(`global methods :`)
-        this.gatherPhase.globalMethods.forEach(method => {
-            console.log(`  ${method.name}`)
-        })
-
-        console.log(`global variables :`)
-        this.gatherPhase.globalVariables.forEach(variable => {
-            console.log(`  ${variable.name} : ${variable.type.getParametrizedFullyQualifiedName(null)}`)
-        })
     }
 
     private exportUnionType(type: PreJavaTypeUnion, program: ts.Program, baseDirectory: string) {
@@ -410,6 +400,10 @@ export class ExportPhase {
 
                 let escapedPropertyName = this.escapePropertyName(property.name)
                 let propertyNamespace = prototypeNamespace ? (prototypeNamespace + '.' + prototypeName) : prototypeName
+                if (!propertyNamespace) {
+                    javaWriter.importType(this.JS_PACKAGE)
+                    propertyNamespace = 'JsPackage.GLOBAL'
+                }
 
                 flow.push(`@JsProperty(namespace="${propertyNamespace}", name="${property.name}")`).finishLine()
                 flow.push(`public static ${javaWriter.importTypeParametrized(property.type)} ${escapedPropertyName};`).finishLine()
@@ -433,6 +427,10 @@ export class ExportPhase {
                     escapedMethodName = '_' + escapedMethodName
                 escapedMethodName = this.escapePropertyName(escapedMethodName)
                 let methodNamespace = prototypeNamespace ? (prototypeNamespace + '.' + prototypeName) : prototypeName
+                if (!methodNamespace) {
+                    javaWriter.importType(this.JS_PACKAGE)
+                    methodNamespace = 'JsPackage.GLOBAL'
+                }
 
                 javaWriter.importType(this.JS_METHOD)
                 flow.push(`@JsMethod(namespace="${methodNamespace}", name = "${method.name}")`).finishLine()

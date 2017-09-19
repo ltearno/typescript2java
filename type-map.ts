@@ -65,7 +65,7 @@ export class TsToPreJavaTypemap {
             return id
         }
         function getTypeFootprint(type: PreJavaType) {
-            Visit.visitPreJavaType(type, {
+            Visit.visitPreJavaType<void>(type, {
                 caseReferenceType: type => getTypeFootprint(type.type),
                 caseTPEnvironnement: type => getTypeFootprint(type.type),
                 caseTypeParameter: type => type.name + (type.constraint ? getTypeFootprint(type.constraint) : ''),
