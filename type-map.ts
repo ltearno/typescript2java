@@ -179,6 +179,73 @@ export class TsToPreJavaTypemap {
         return footprint
     }
 
+    private developMethod(method: PreJavaTypeCallSignature): PreJavaTypeCallSignature[] {
+        if (!method.parameters || !method.parameters.length)
+            return null
+
+        // for each of the parameters, make up an array with the type possibilites
+        let possibleParams: PreJavaType[][] = []
+        let counter = []
+        method.parameters.forEach(parameter => {
+            counter.push(0)
+
+            let unionedTypes = typeTools.getUnionedTypes(parameter.type)
+            if (unionedTypes)
+                possibleParams.push(unionedTypes)
+            else
+                possibleParams.push([parameter.type])
+        })
+
+        if (possibleParams.every(p => p.length == 1))
+            return null
+
+        let res: PreJavaTypeCallSignature[] = []
+
+        function nextCounter(): boolean {
+            let i = 0
+            while (true) {
+                if (i >= counter.length)
+                    return false
+
+                counter[i]++
+                if (counter[i] < possibleParams[i].length)
+                    return true
+
+                counter[i] = 0
+                i++
+            }
+        }
+
+        // NOT ON JSFUNCTION TYPES METHODS !
+
+        do {
+            let dup = new PreJavaTypeCallSignature(method.typeParameters, method.returnType, method.name, method.parameters.map((parameter, index) => {
+                return {
+                    name: parameter.name,
+                    type: possibleParams[index][counter[index]],
+                    optional: parameter.optional,
+                    dotdotdot: parameter.dotdotdot
+                } as PreJavaTypeFormalParameter
+            }))
+            res.push(dup)
+        }
+        while (nextCounter())
+        return res
+    }
+
+    developMethodsWithUnionParameters() {
+        for (let type of this.typeSet()) {
+            Visit.visitPreJavaType(type, {
+                caseClassOrInterfaceType: type => {
+                    type.methods && type.methods.forEach(m => {
+                        let dups = this.developMethod(m)
+                        dups && dups.forEach(dup => type.addMethod(dup))
+                    })
+                }
+            })
+        }
+    }
+
     reduceAnonymousTypes() {
         let types = this.typeSet()
 

@@ -101,16 +101,13 @@ export class GatherPhase {
         console.log(`add missing methods from interface hierarchy in classes`)
         this.typeMap.addMethodsFromInterfaceHierarchy()
 
-        console.log(`(todo) develop union types in methods parameters into overrides`)
-        console.log(`(todo) removing invalid method duplicates (same type erasure overrides and so on...)`)
-        console.log(`(todo) merge types with same name and same structure`)
         console.log(`(todo) Array should be replaced by an externally provided type`)
-
-        console.log(`(todo) add methods from hierarchy`)
-        console.log(`(todo) remove duplicate methods in hierarchy`)
 
         console.log(`replacing anonymous types`)
         this.typeMap.replaceAnonymousTypes()
+
+        console.log(`developping methods with union parameters`)
+        this.typeMap.developMethodsWithUnionParameters()
 
         console.log(`renaming duplicate fqns`)
         this.typeMap.checkNoDuplicateTypeNames()
