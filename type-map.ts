@@ -580,6 +580,8 @@ export class TsToPreJavaTypemap {
         for (let type of this.typeMap.values()) {
             if (type instanceof PreJavaTypeClassOrInterface && type.hasOnlyProperties() && !this.hasSubType(type) && (!type.staticMethods || !type.staticMethods.length) && (!type.staticProperties || !type.staticProperties.length)) {
                 type.isClass = true
+                type.comments = type.comments || []
+                type.comments.push('// TRANSFORMED INTO DTO')
                 nb++
             }
         }

@@ -5,6 +5,7 @@ import { PreJavaTypeTPEnvironnement, PreJavaTypeReference } from './PreJavaTypeR
 import { PreJavaTypeCallSignature, PreJavaTypeFormalParameter } from './PreJavaTypeCallSignature'
 import * as Visit from './PreJavaTypeVisit'
 import * as tsTools from '../ts-tools'
+import * as typeTools from '../type-tools'
 
 let nextTypeId = 1
 

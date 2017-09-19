@@ -80,3 +80,43 @@ export function getSuperConstructors(type: PreJavaType): PreJavaTypeCallSignatur
 
     return getSuperConstructors(implementationBaseType)
 }
+
+export function skipReferencingTypes(type: PreJavaType) {
+    return Visit.visitPreJavaType(type, {
+        caseReferenceType: type => skipReferencingTypes(type.type),
+        caseTPEnvironnement: type => skipReferencingTypes(type.type),
+        onOther: type => type
+    })
+}
+
+const hasIndexCache = new Map<PreJavaType, boolean>()
+
+function hasIndexInTypeHierarchyInternal(type: PreJavaType) {
+    if (!type)
+        return false
+    let baseTypes = getBaseTypes(type)
+    if (!baseTypes)
+        return false
+
+    for (let baseType of baseTypes) {
+        let hasIndex = Visit.visitPreJavaType(skipReferencingTypes(baseType), {
+            caseClassOrInterfaceType: type => type.stringIndexType != null || type.numberIndexType != null,
+            onOther: type => false
+        })
+        if (hasIndex)
+            return true
+
+        if (hasIndexInTypeHierarchyInternal(baseType))
+            return true
+    }
+
+    return false
+}
+
+export function hasIndexInTypeHierarchy(type: PreJavaType) {
+    if (hasIndexCache.has(type))
+        return hasIndexCache.get(type)
+    let res = hasIndexInTypeHierarchyInternal(type)
+    hasIndexCache.set(type, res)
+    return res
+}

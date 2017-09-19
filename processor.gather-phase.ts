@@ -117,7 +117,7 @@ export class GatherPhase {
 
         console.log(`statistics:`)
         console.log(`${this.globalClasses.size} global scope classes`)
-        console.log(`${this.typeMap.typeMap.size} jsinterop types`)
+        console.log(`${this.typeMap.typeSet().size} jsinterop types`)
     }
 
     // maps js package names to global element holder java classes

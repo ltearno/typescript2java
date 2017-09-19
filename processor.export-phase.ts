@@ -154,12 +154,15 @@ export class ExportPhase {
             flow.push(`return Js.uncheckedCast( this );`).finishLine()
             flow.pullLineStart()
             flow.push(`}`).finishLine()
+            flow.finishLine()
 
+            flow.push(`@JsOverlay`).finishLine()
             flow.push(`public static ${type.getParametrization(null)} ${type.getParametrizedSimpleName(null)} of${unionedType.getHumanizedName(null)}(${unionedType.getSimpleName(null)} value) {`).finishLine()
             flow.pushLineStart('    ')
             flow.push(`return Js.uncheckedCast( value );`).finishLine()
             flow.pullLineStart()
             flow.push(`}`).finishLine()
+            flow.finishLine()
         }
         flow.pullLineStart()
         flow.push(`}`).finishLine()
@@ -341,46 +344,56 @@ export class ExportPhase {
 
         let nit = type.numberIndexType
         if (nit) {
-            javaWriter.importType(this.JS_OVERLAY)
-            javaWriter.importType(this.JS)
+            if (typeTools.hasIndexInTypeHierarchy(type)) {
+                flow.blankLine().push(`/** skipped index of type {@link ${javaWriter.importTypeParametrized(nit)}} because already in type hierarchy */`).finishLine()
+            }
+            else {
+                javaWriter.importType(this.JS_OVERLAY)
+                javaWriter.importType(this.JS)
 
-            flow.blankLine()
-            flow.push(`@JsOverlay`).finishLine()
-            flow.push(`${isClass ? 'public final' : 'default'} void setByIndex(int index, ${javaWriter.importTypeParametrized(nit)} value) {`).finishLine()
-            flow.pushLineStart('    ')
-            flow.push(`Js.asArrayLike(this).setAt(index, value);`).finishLine()
-            flow.pullLineStart()
-            flow.push(`}`).finishLine()
+                flow.blankLine()
+                flow.push(`@JsOverlay`).finishLine()
+                flow.push(`${isClass ? 'public final' : 'default'} void setByIndex(int index, ${javaWriter.importTypeParametrized(nit)} value) {`).finishLine()
+                flow.pushLineStart('    ')
+                flow.push(`Js.asArrayLike(this).setAt(index, value);`).finishLine()
+                flow.pullLineStart()
+                flow.push(`}`).finishLine()
 
-            flow.blankLine()
-            flow.push(`@JsOverlay`).finishLine()
-            flow.push(`${isClass ? 'public final' : 'default'} ${javaWriter.importTypeParametrized(nit)} getByIndex(int index) {`).finishLine()
-            flow.pushLineStart('    ')
-            flow.push(`return (${javaWriter.importTypeParametrized(nit)}) Js.asArrayLike(this).getAt(index);`).finishLine()
-            flow.pullLineStart()
-            flow.push(`}`).finishLine()
+                flow.blankLine()
+                flow.push(`@JsOverlay`).finishLine()
+                flow.push(`${isClass ? 'public final' : 'default'} ${javaWriter.importTypeParametrized(nit)} getByIndex(int index) {`).finishLine()
+                flow.pushLineStart('    ')
+                flow.push(`return (${javaWriter.importTypeParametrized(nit)}) Js.asArrayLike(this).getAt(index);`).finishLine()
+                flow.pullLineStart()
+                flow.push(`}`).finishLine()
+            }
         }
 
         let sit = type.stringIndexType
         if (sit) {
-            javaWriter.importType(this.JS_OVERLAY)
-            javaWriter.importType(this.JS)
+            if (typeTools.hasIndexInTypeHierarchy(type)) {
+                flow.blankLine().push(`/** skipped index of type {@link ${javaWriter.importTypeParametrized(sit)}} because already in type hierarchy */`).finishLine()
+            }
+            else {
+                javaWriter.importType(this.JS_OVERLAY)
+                javaWriter.importType(this.JS)
 
-            flow.blankLine()
-            flow.push(`@JsOverlay`).finishLine()
-            flow.push(`public final void setByIndex(String index, ${javaWriter.importTypeParametrized(sit)} value) {`).finishLine()
-            flow.pushLineStart('    ')
-            flow.push(`Js.asPropertyMap(this).set(index, value);`).finishLine()
-            flow.pullLineStart()
-            flow.push(`}`).finishLine()
+                flow.blankLine()
+                flow.push(`@JsOverlay`).finishLine()
+                flow.push(`public final void setByIndex(String index, ${javaWriter.importTypeParametrized(sit)} value) {`).finishLine()
+                flow.pushLineStart('    ')
+                flow.push(`Js.asPropertyMap(this).set(index, value);`).finishLine()
+                flow.pullLineStart()
+                flow.push(`}`).finishLine()
 
-            flow.blankLine()
-            flow.push(`@JsOverlay`).finishLine()
-            flow.push(`public final ${javaWriter.importTypeParametrized(sit)} getByIndex(String index) {`).finishLine()
-            flow.pushLineStart('    ')
-            flow.push(`return (${javaWriter.importTypeParametrized(sit)}) Js.asPropertyMap(this).get(index);`).finishLine()
-            flow.pullLineStart()
-            flow.push(`}`).finishLine()
+                flow.blankLine()
+                flow.push(`@JsOverlay`).finishLine()
+                flow.push(`public final ${javaWriter.importTypeParametrized(sit)} getByIndex(String index) {`).finishLine()
+                flow.pushLineStart('    ')
+                flow.push(`return (${javaWriter.importTypeParametrized(sit)}) Js.asPropertyMap(this).get(index);`).finishLine()
+                flow.pullLineStart()
+                flow.push(`}`).finishLine()
+            }
         }
 
         if (type.isClassLike() && type.staticProperties && type.staticProperties.length) {
@@ -392,20 +405,25 @@ export class ExportPhase {
             type.staticProperties.forEach(property => {
                 flow.blankLine()
 
-                if (property.comments && property.comments.length) {
-                    flow.startJavaDocComments()
-                    flow.push(property.comments)
-                    flow.endJavaDocComments()
+                if (property.name.indexOf('@') >= 0) {
+                    flow.push(`// skipped static property ${property.name}`).blankLine().blankLine()
                 }
+                else {
+                    if (property.comments && property.comments.length) {
+                        flow.startJavaDocComments()
+                        flow.push(property.comments)
+                        flow.endJavaDocComments()
+                    }
 
-                let escapedPropertyName = this.escapePropertyName(property.name)
-                let propertyNamespace = prototypeNamespace ? (prototypeNamespace + '.' + prototypeName) : prototypeName
-                if (!propertyNamespace)
-                    javaWriter.importType(this.JS_PACKAGE)
+                    let escapedPropertyName = this.escapePropertyName(property.name)
+                    let propertyNamespace = prototypeNamespace ? (prototypeNamespace + '.' + prototypeName) : prototypeName
+                    if (!propertyNamespace)
+                        javaWriter.importType(this.JS_PACKAGE)
 
-                flow.push(`@JsProperty(namespace=${propertyNamespace ? ('"' + propertyNamespace + '"') : 'JsPackage.GLOBAL'}, name="${property.name}")`).finishLine()
-                flow.push(`public static ${javaWriter.importTypeParametrized(property.type)} ${escapedPropertyName};`).finishLine()
-                flow.blankLine()
+                    flow.push(`@JsProperty(namespace=${propertyNamespace ? ('"' + propertyNamespace + '"') : 'JsPackage.GLOBAL'}, name="${property.name}")`).finishLine()
+                    flow.push(`public static ${javaWriter.importTypeParametrized(property.type)} ${escapedPropertyName};`).finishLine()
+                    flow.blankLine()
+                }
             })
         }
 
@@ -414,30 +432,35 @@ export class ExportPhase {
                 .push('/*\n    Static methods\n*/').finishLine()
 
             type.staticMethods.filter(method => method.name != 'toString').forEach(method => {
-                if (method.comments && method.comments.length) {
-                    flow.startJavaDocComments()
-                    flow.push(method.comments)
-                    flow.endJavaDocComments()
+                if (method.name.indexOf('@') >= 0) {
+                    flow.push(`// skipped static method ${method.name}`).blankLine().blankLine()
                 }
+                else {
+                    if (method.comments && method.comments.length) {
+                        flow.startJavaDocComments()
+                        flow.push(method.comments)
+                        flow.endJavaDocComments()
+                    }
 
-                let escapedMethodName = method.name
-                if (type.methods && type.methods.some(m => m.name == escapedMethodName))
-                    escapedMethodName = '_' + escapedMethodName
-                escapedMethodName = this.escapePropertyName(escapedMethodName)
-                let methodNamespace = prototypeNamespace ? (prototypeNamespace + '.' + prototypeName) : prototypeName
-                if (!methodNamespace)
-                    javaWriter.importType(this.JS_PACKAGE)
+                    let escapedMethodName = method.name
+                    if (type.methods && type.methods.some(m => m.name == escapedMethodName))
+                        escapedMethodName = '_' + escapedMethodName
+                    escapedMethodName = this.escapePropertyName(escapedMethodName)
+                    let methodNamespace = prototypeNamespace ? (prototypeNamespace + '.' + prototypeName) : prototypeName
+                    if (!methodNamespace)
+                        javaWriter.importType(this.JS_PACKAGE)
 
-                javaWriter.importType(this.JS_METHOD)
-                flow.push(`@JsMethod(namespace=${methodNamespace ? ('"' + methodNamespace + '"') : 'JsPackage.GLOBAL'}, name = "${method.name}")`).finishLine()
-                flow.push(`public static native `)
-                let typeParameters = method.typeParameters
-                if (typeParameters && typeParameters.length)
-                    flow.push(`<${typeParameters.map(tp => tp.name).join(', ')}> `)
-                flow.push(`${javaWriter.importTypeParametrized(method.returnType)} ${escapedMethodName}(`)
-                if (method.parameters)
-                    flow.push(method.parameters.map(p => `${javaWriter.importTypeParametrized(p.type)}${p.dotdotdot ? '...' : ''} ${this.escapePropertyName(p.name)}${p.optional ? ' /* optional */' : ''}`).join(', '))
-                flow.push(`);`).finishLine()
+                    javaWriter.importType(this.JS_METHOD)
+                    flow.push(`@JsMethod(namespace=${methodNamespace ? ('"' + methodNamespace + '"') : 'JsPackage.GLOBAL'}, name = "${method.name}")`).finishLine()
+                    flow.push(`public static native `)
+                    let typeParameters = method.typeParameters
+                    if (typeParameters && typeParameters.length)
+                        flow.push(`<${typeParameters.map(tp => tp.name).join(', ')}> `)
+                    flow.push(`${javaWriter.importTypeParametrized(method.returnType)} ${escapedMethodName}(`)
+                    if (method.parameters)
+                        flow.push(method.parameters.map(p => `${javaWriter.importTypeParametrized(p.type)}${p.dotdotdot ? '...' : ''} ${this.escapePropertyName(p.name)}${p.optional ? ' /* optional */' : ''}`).join(', '))
+                    flow.push(`);`).finishLine()
+                }
             })
         }
 
@@ -452,38 +475,43 @@ export class ExportPhase {
                 .forEach(property => {
                     flow.blankLine()
 
-                    if (property.comments && property.comments.length) {
-                        flow.startJavaDocComments()
-                        flow.push(property.comments)
-                        flow.endJavaDocComments()
+                    if (property.name.indexOf('@') >= 0) {
+                        flow.push(`// skipped property ${property.name}`).blankLine().blankLine()
                     }
+                    else {
+                        if (property.comments && property.comments.length) {
+                            flow.startJavaDocComments()
+                            flow.push(property.comments)
+                            flow.endJavaDocComments()
+                        }
 
-                    let escapedPropertyName = this.escapePropertyName(property.name)
+                        let escapedPropertyName = this.escapePropertyName(property.name)
 
-                    if (isClass) {
-                        if (escapedPropertyName != property.name)
-                            flow.push(`@JsProperty(name="${property.name}")`).finishLine()
+                        if (isClass) {
+                            if (escapedPropertyName != property.name)
+                                flow.push(`@JsProperty(name="${property.name}")`).finishLine()
 
-                        flow.push(`public ${javaWriter.importTypeParametrized(property.type)} ${escapedPropertyName};`).finishLine()
+                            flow.push(`public ${javaWriter.importTypeParametrized(property.type)} ${escapedPropertyName};`).finishLine()
+
+                            flow.blankLine()
+                        }
+
+                        let upcaseName = escapedPropertyName.slice(0, 1).toLocaleUpperCase() + escapedPropertyName.slice(1)
+
+                        let getterName = `get${upcaseName}`
+                        let setterName = `set${upcaseName}`
+                        if ((type as PreJavaTypeClassOrInterface).methods.some(m => m.name == getterName || m.name == setterName)) {
+                            getterName = getterName + '__'
+                            setterName = setterName + '__'
+                        }
+
+                        flow.push(`@JsProperty( name = "${property.name}")`).finishLine()
+                        flow.push(`${isClass ? 'public native ' : ''}${javaWriter.importTypeParametrized(property.type)} ${getterName}();`).finishLine()
 
                         flow.blankLine()
+                        flow.push(`@JsProperty( name = "${property.name}")`).finishLine()
+                        flow.push(`${isClass ? 'public native ' : ''}void ${setterName}( ${javaWriter.importTypeParametrized(property.type)} value );`).finishLine()
                     }
-
-                    let upcaseName = escapedPropertyName.slice(0, 1).toLocaleUpperCase() + escapedPropertyName.slice(1)
-
-                    let getterName = `get${upcaseName}`
-                    let setterName = `set${upcaseName}`
-                    if ((type as PreJavaTypeClassOrInterface).methods.some(m => m.name == getterName || m.name == setterName)) {
-                        getterName = getterName + '__'
-                        setterName = setterName + '__'
-                    }
-
-                    flow.push(`@JsProperty( name = "${property.name}")`).finishLine()
-                    flow.push(`${isClass ? 'public native ' : ''}${javaWriter.importTypeParametrized(property.type)} ${getterName}();`).finishLine()
-
-                    flow.blankLine()
-                    flow.push(`@JsProperty( name = "${property.name}")`).finishLine()
-                    flow.push(`${isClass ? 'public native ' : ''}void ${setterName}( ${javaWriter.importTypeParametrized(property.type)} value );`).finishLine()
                 })
         }
 
@@ -492,25 +520,30 @@ export class ExportPhase {
                 .push('/*\n    Methods\n*/').finishLine()
 
             type.methods.filter(method => method.name != 'toString').forEach(method => {
-                if (method.comments && method.comments.length) {
-                    flow.startJavaDocComments()
-                    flow.push(method.comments)
-                    flow.endJavaDocComments()
+                if (method.name.indexOf('@') >= 0) {
+                    flow.push(`// skipped property ${method.name}`).blankLine().blankLine()
                 }
+                else {
+                    if (method.comments && method.comments.length) {
+                        flow.startJavaDocComments()
+                        flow.push(method.comments)
+                        flow.endJavaDocComments()
+                    }
 
-                let escapedMethodName = this.escapePropertyName(method.name)
+                    let escapedMethodName = this.escapePropertyName(method.name)
 
-                if (escapedMethodName != method.name) {
-                    javaWriter.importType(this.JS_METHOD)
-                    flow.push(`@JsMethod(name = "${method.name}")`).finishLine()
+                    if (escapedMethodName != method.name) {
+                        javaWriter.importType(this.JS_METHOD)
+                        flow.push(`@JsMethod(name = "${method.name}")`).finishLine()
+                    }
+                    flow.push(`${isClass ? 'public native ' : ''}`)
+                    if (method.typeParameters && method.typeParameters.length)
+                        flow.push(`<${method.typeParameters.map(tp => tp.name).join(', ')}> `)
+                    flow.push(`${javaWriter.importTypeParametrized(method.returnType)} ${escapedMethodName}(`)
+                    if (method.parameters)
+                        flow.push(method.parameters.map(p => `${javaWriter.importTypeParametrized(p.type)} ${this.escapePropertyName(p.name)}${p.dotdotdot ? ' /* ... */' : ''}${p.optional ? ' /* optional */' : ''}`).join(', '))
+                    flow.push(`);`).finishLine()
                 }
-                flow.push(`${isClass ? 'public native ' : ''}`)
-                if (method.typeParameters && method.typeParameters.length)
-                    flow.push(`<${method.typeParameters.map(tp => tp.name).join(', ')}> `)
-                flow.push(`${javaWriter.importTypeParametrized(method.returnType)} ${escapedMethodName}(`)
-                if (method.parameters)
-                    flow.push(method.parameters.map(p => `${javaWriter.importTypeParametrized(p.type)} ${this.escapePropertyName(p.name)}${p.dotdotdot ? ' /* ... */' : ''}${p.optional ? ' /* optional */' : ''}`).join(', '))
-                flow.push(`);`).finishLine()
             })
         }
 
