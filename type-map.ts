@@ -4,6 +4,7 @@ import { PreJavaType, TypeReplacer, ProcessContext } from './prejavatypes/PreJav
 import * as Visit from './prejavatypes/PreJavaTypeVisit'
 import * as tsTools from './ts-tools'
 import * as typeTools from './type-tools'
+import * as Signature from './signature'
 
 import { PreJavaTypeFakeType } from './prejavatypes/PreJavaTypeFakeType'
 import { PreJavaTypeBuiltinJavaType } from './prejavatypes/PreJavaTypeBuiltinJavaType'
@@ -104,7 +105,7 @@ export class TsToPreJavaTypemap {
                         })
 
                         type.methods = []
-                        methodsByFootprint.forEach(m => type.methods.push(m))
+                        methodsByFootprint.forEach(m => type.addMethod(m))
                     }
                 }
             })
@@ -116,67 +117,6 @@ export class TsToPreJavaTypemap {
         for (let type of this.typeMap.values())
             result.add(type)
         return result
-    }
-
-    private mapSignature(signature: PreJavaTypeCallSignature, selfReflect: Map<PreJavaType, string>) {
-        return 'S('
-            + (signature.name ? signature.name : '?')
-            + ',' + this.getAnonymousClassFootprint(signature.returnType, selfReflect)
-            + ',' + ((signature.typeParameters && signature.typeParameters.length) ? signature.typeParameters.map(tp => this.getAnonymousClassFootprint(tp, selfReflect)).join() : '')
-            + ',' + ((signature.parameters && signature.parameters.length) ? signature.parameters.map(param => this.mapParameter(param, selfReflect)).join() : '')
-            + ')'
-    }
-
-    private mapParameter(parameter: PreJavaTypeFormalParameter, selfReflect: Map<PreJavaType, string>) {
-        return `P(${parameter.dotdotdot ? 'D' : 'd'}${parameter.optional ? 'O' : 'o'}${this.getAnonymousClassFootprint(parameter.type, selfReflect)})`
-    }
-
-    private mapProperty(property: PreJavaTypeProperty, selfReflect: Map<PreJavaType, string>) {
-        return `p(${property.name}|${this.getAnonymousClassFootprint(property.type, selfReflect)})`
-    }
-
-    private getAnonymousClassFootprint(type: PreJavaType, selfReflect: Map<PreJavaType, string>): string {
-        if (selfReflect == null)
-            selfReflect = new Map()
-
-        if (selfReflect.has(type))
-            return selfReflect.get(type)
-
-        selfReflect.set(type, `${selfReflect.size + 1}`)
-
-        let footprint = Visit.visitPreJavaType(type, {
-            caseClassOrInterfaceType: (type) => {
-                return (type.isAnonymousSourceType ? (type.isClass ? 'C(' : 'I(') : `${type.name}(`)
-                    + ((type.typeParameters && type.typeParameters.length) ? type.typeParameters.map(tp => this.getAnonymousClassFootprint(tp, selfReflect)).join() : '-')
-                    + ((type.constructorSignatures && type.constructorSignatures.length) ? type.constructorSignatures.map(sig => this.mapSignature(sig, selfReflect)).join() : '-')
-                    + ((type.callSignatures && type.callSignatures.length) ? type.callSignatures.map(sig => this.mapSignature(sig, selfReflect)).join() : '-')
-                    + ((type.numberIndexType) ? this.getAnonymousClassFootprint(type.numberIndexType, selfReflect) : '-')
-                    + ((type.stringIndexType) ? this.getAnonymousClassFootprint(type.stringIndexType, selfReflect) : '-')
-                    + ((type.methods && type.methods.length) ? type.methods.map(sig => this.mapSignature(sig, selfReflect)).join() : '-')
-                    + ((type.properties && type.properties.length) ? type.properties.map(ppty => this.mapProperty(ppty, selfReflect)).join() : '-')
-                    + ')'
-            },
-
-            caseUnion: type => {
-                return 'U('
-                    + ((type.typeParameters && type.typeParameters.length) ? type.typeParameters.map(tp => this.getAnonymousClassFootprint(tp, selfReflect)).join() : '-')
-                    + ((type.types && type.types.length) ? type.types.map(t => this.getAnonymousClassFootprint(t, selfReflect)).join() : '-')
-                    + ')'
-            },
-
-            caseReferenceType: type => {
-                return `R(${this.getAnonymousClassFootprint(type.type, selfReflect)}${(type.typeParameters && type.typeParameters.length) ? type.typeParameters.map(tp => this.getAnonymousClassFootprint(tp, selfReflect)).join() : '-'})`
-            },
-
-
-            caseTypeParameter: (type) => type.getSimpleName(null) + (type.constraint ? this.getAnonymousClassFootprint(type.constraint, selfReflect) : '-'),
-
-            onOther: (type) => type.getFullyQualifiedName(null),
-
-            caseTPEnvironnement: type => this.getAnonymousClassFootprint(type.type, selfReflect)
-        })
-
-        return footprint
     }
 
     private developMethod(method: PreJavaTypeCallSignature): PreJavaTypeCallSignature[] {
@@ -232,20 +172,36 @@ export class TsToPreJavaTypemap {
     }
 
     developMethodsWithUnionParameters() {
+        let maxCounter = 0
+        let maxType = null
+
         for (let type of this.typeSet()) {
             Visit.visitPreJavaType(type, {
                 caseClassOrInterfaceType: type => {
+                    let counter = 0
                     let functionalInterface = typeTools.hasOnlyCallSignatures(type)
                     if (functionalInterface && type.callSignatures.length == 1)
                         return
 
                     type.methods && type.methods.forEach(m => {
                         let dups = this.developMethod(m)
-                        dups && dups.forEach(dup => type.addMethod(dup))
+                        counter += dups && dups.length
+
+                        // TODO This is an arbitrary number of acceptable generated methods
+                        // If not, sometimes can generate as much as 2900 methods !
+                        if (dups && dups.length < 5)
+                            dups && dups.forEach(dup => type.addMethod(dup))
                     })
+
+                    if (maxType == null || maxCounter < counter) {
+                        maxType = type
+                        maxCounter = counter
+                    }
                 }
             })
         }
+
+        console.log(`${maxCounter} on ${maxType} developped methods with union parameters`)
     }
 
     reduceAnonymousTypes() {
@@ -260,7 +216,7 @@ export class TsToPreJavaTypemap {
                     if (!classType.isAnonymousSourceType)
                         return
 
-                    let footprint = this.getAnonymousClassFootprint(classType, null)
+                    let footprint = Signature.getTypeSignature(classType, null)
                     let list = typeDuplicates.get(footprint)
                     if (list == null) {
                         list = []
@@ -270,7 +226,7 @@ export class TsToPreJavaTypemap {
                 },
 
                 caseUnion: unionType => {
-                    let footprint = this.getAnonymousClassFootprint(unionType, null)
+                    let footprint = Signature.getTypeSignature(unionType, null)
                     let list = typeDuplicates.get(footprint)
                     if (list == null) {
                         list = []
@@ -413,34 +369,27 @@ export class TsToPreJavaTypemap {
             Visit.visitPreJavaType(pjt, {
                 caseClassOrInterfaceType: type => {
                     if (type.isClassLike()) {
+                        let methodsSignatures = new Set<string>()
+                        type.methods && type.methods.forEach(m => methodsSignatures.add(Signature.getCallSignatureSignature(m)))
+
                         typeTools.browseTypeHierarchy(type, (visitedInterface, typeVariableEnv) => {
                             if (visitedInterface.isClassLike())
                                 return
 
                             visitedInterface.methods && visitedInterface.methods.forEach(visitedMethod => {
-                                if (!type.methods || !type.methods.some(m => {
-                                    // vérifie que deux méthodes ne sont pas identiques du point de vue de leur noms et des type erasure de leurs paramètres.
-                                    if (m.name != visitedMethod.name)
-                                        return false
-                                    if ((m.parameters && m.parameters.length) != (visitedMethod.parameters && visitedMethod.parameters.length))
-                                        return false
-                                    for (let i = 0; i < m.parameters.length; i++) {
-                                        if (m.parameters[i].type.getFullyQualifiedName(null) != visitedMethod.parameters[i].type.getFullyQualifiedName(null))
-                                            return false
-                                    }
-                                    return true
-                                })) {
-                                    let method = new PreJavaTypeCallSignature(visitedMethod.typeParameters, visitedMethod.returnType, visitedMethod.name, visitedMethod.parameters)
-                                    method.returnType = typeVariableEnv ? new PreJavaTypeTPEnvironnement(visitedMethod.returnType, typeVariableEnv) : visitedMethod.returnType
-                                    if (method.parameters)
-                                        method.parameters = method.parameters.map(p => ({
-                                            name: p.name,
-                                            type: typeVariableEnv ? new PreJavaTypeTPEnvironnement(p.type, typeVariableEnv) : p.type,
-                                            optional: p.optional,
-                                            dotdotdot: p.dotdotdot
-                                        }))
-                                    type.addMethod(method)
-                                }
+                                let method = new PreJavaTypeCallSignature(visitedMethod.typeParameters, visitedMethod.returnType, visitedMethod.name, visitedMethod.parameters)
+                                method.returnType = typeVariableEnv ? new PreJavaTypeTPEnvironnement(visitedMethod.returnType, typeVariableEnv) : visitedMethod.returnType
+                                if (method.parameters)
+                                    method.parameters = method.parameters.map(p => ({
+                                        name: p.name,
+                                        type: typeVariableEnv ? new PreJavaTypeTPEnvironnement(p.type, typeVariableEnv) : p.type,
+                                        optional: p.optional,
+                                        dotdotdot: p.dotdotdot
+                                    }))
+                                /*if (!method.comments)
+                                    method.comments = []
+                                method.comments.push("// FROM ADDMETHODSFROMINTERFACEHIERARCHY")*/
+                                type.addMethod(method)
                             })
 
                             visitedInterface.properties && visitedInterface.properties.forEach(visitedProperty => {
@@ -650,10 +599,10 @@ export class TsToPreJavaTypemap {
     changeDtoInterfacesIntoClasses() {
         let nb = 0
         for (let type of this.typeMap.values()) {
-            if (type instanceof PreJavaTypeClassOrInterface && type.hasOnlyProperties() && !this.hasSubType(type) && (!type.staticMethods || !type.staticMethods.length) && (!type.staticProperties || !type.staticProperties.length)) {
+            if (type instanceof PreJavaTypeClassOrInterface && (!type.isClass) && type.hasOnlyProperties() && !this.hasSubType(type) && (!type.staticMethods || !type.staticMethods.length) && (!type.staticProperties || !type.staticProperties.length)) {
                 type.isClass = true
-                type.comments = type.comments || []
-                type.comments.push('// TRANSFORMED INTO DTO')
+                //type.comments = type.comments || []
+                //type.comments.push('// TRANSFORMED INTO DTO')
                 nb++
             }
         }
@@ -692,6 +641,12 @@ export class TsToPreJavaTypemap {
                     newType.comments = superType.comments && superType.comments.slice()
                     newType.constructorSignatures = superType.constructorSignatures
                     newType.methods = superType.methods && superType.methods.slice()
+                    /*newType.methods && newType.methods.forEach(m => {
+                        if (!m.comments)
+                            m.comments = []
+                        m.comments.push('//FROM ARRANGEMULtiple...')
+                    })*/
+                    newType.callSignatures = superType.callSignatures && superType.callSignatures.slice()
                     newType.name = superType.name + CONFIGURATION_IMPLEMENTATION_SUFFIX
                     newType.numberIndexType = superType.numberIndexType
                     newType.stringIndexType = superType.stringIndexType
@@ -706,22 +661,14 @@ export class TsToPreJavaTypemap {
                     superType.constructorSignatures = null
                     superType.prototypeNames = null
 
+                    newType.cleanAndCheckMethods()
+
                     this.typeMap.set({} as ts.Type, newType)
                 }
             }
         }
 
         return somethingDone
-    }
-
-    developMethodOverridesForUnionParameters() {
-        let developMethods = (type: PreJavaTypeClassOrInterface) => {
-            // constructors and methods with union type parameters or inside parameters...
-        }
-
-        for (let type of this.typeMap.values())
-            if (type instanceof PreJavaTypeClassOrInterface)
-                developMethods(type)
     }
 
     convertSignature(name: string, tsSignature: ts.Signature, typeParametersToApplyToAnonymousTypes: PreJavaTypeParameter[]): PreJavaTypeCallSignature {

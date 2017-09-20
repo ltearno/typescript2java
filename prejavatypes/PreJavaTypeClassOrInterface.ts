@@ -4,6 +4,7 @@ import { PreJavaTypeParameter } from './PreJavaTypeParameter'
 import { PreJavaTypeTPEnvironnement, PreJavaTypeReference } from './PreJavaTypeReference'
 import { PreJavaTypeCallSignature, PreJavaTypeFormalParameter } from './PreJavaTypeCallSignature'
 import * as Visit from './PreJavaTypeVisit'
+import * as Signature from '../signature'
 import * as tsTools from '../ts-tools'
 import * as typeTools from '../type-tools'
 
@@ -60,8 +61,8 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
 
     removeMethod(method: PreJavaTypeCallSignature) {
         let index = this.methods.indexOf(method)
-        console.log(`remove method ${method.name} in type ${this.getSimpleName(null)}`)
-        method && this.methods && this.methods.splice(index, 1)
+        if (index >= 0)
+            this.methods.splice(index, 1)
     }
 
     processSourceType(type: ts.Type, typeParametersToApplyToAnonymousTypes: PreJavaTypeParameter[], context: ProcessContext) {
@@ -531,7 +532,26 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
         this.properties.push(property)
     }
 
+    private methodSignatures = new Set<string>()
+
+    cleanAndCheckMethods() {
+        this.methodSignatures.clear()
+        this.methods.forEach(m => this.methodSignatures.add(Signature.getCallSignatureSignature(m)))
+    }
+
     addMethod(method: PreJavaTypeCallSignature) {
+        if (!method)
+            return
+
+        if (this.methodSignatures.size != this.methods.length)
+            this.cleanAndCheckMethods()
+
+        let sig = Signature.getCallSignatureSignature(method)
+
+        if (this.methodSignatures.has(sig))
+            return
+        this.methodSignatures.add(sig)
+
         this.methods.push(method)
     }
 

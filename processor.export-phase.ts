@@ -3,7 +3,8 @@ import * as path from "path"
 import * as ts from "typescript"
 import * as TypeMap from './type-map'
 import * as GatherPhase from './processor.gather-phase'
-import * as typeTools from './type-tools';
+import * as typeTools from './type-tools'
+import * as Signature from './signature'
 import { mkdirRec } from './tools';
 import { visitPreJavaType } from './prejavatypes/PreJavaTypeVisit'
 import { TextFlow, JavaWriter } from './TextFlow'
@@ -105,8 +106,8 @@ export class ExportPhase {
 
     exportNodes(program: ts.Program, baseDirectory: string) {
         for (let type of this.gatherPhase.typeMap.typeSet()) {
-            //let fqn = type.getParametrizedFullyQualifiedName(null)
-            //console.log(`exporting ${fqn}`)
+            let fqn = type.getParametrizedFullyQualifiedName(null)
+            console.log(`exporting ${fqn}`)
 
             visitPreJavaType(type, {
                 caseUnion: type => this.exportUnionType(type, program, baseDirectory),
@@ -573,8 +574,18 @@ export class ExportPhase {
                         let unionedTypes = typeTools.getUnionedTypes(property.type)
                         unionedTypes && unionedTypes.forEach(unionedType => {
                             flow.blankLine()
-                            flow.push(`@JsProperty( name = "${property.name}")`).finishLine()
-                            flow.push(`${isClass ? 'public native ' : ''}void ${setterName}( ${javaWriter.importTypeParametrized(unionedType)} value );`).finishLine()
+                            if (isClass) {
+                                javaWriter.importType(this.JS_OVERLAY)
+                                flow.push(`@JsOverlay`).finishLine()
+                                flow.push('public final ')
+                            }
+                            else {
+                                flow.push('default ')
+                            }
+
+                            flow.push(`void ${setterName}( ${javaWriter.importTypeParametrized(unionedType)} value ) `)
+                                .push(`{ ${setterName}(${javaWriter.importType(property.type)}.of${unionedType.getHumanizedName(null)}( value )); }`)
+                                .finishLine()
                         })
                     })
             }
@@ -585,7 +596,7 @@ export class ExportPhase {
 
                 type.methods.filter(method => method.name != 'toString').forEach(method => {
                     if (method.name.indexOf('@') >= 0) {
-                        flow.push(`// skipped property ${method.name}`).blankLine().blankLine()
+                        flow.push(`// skipped method ${method.name}`).blankLine().blankLine()
                     }
                     else {
                         if (method.comments && method.comments.length) {
