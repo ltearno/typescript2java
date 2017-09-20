@@ -268,6 +268,9 @@ export class TsToPreJavaTypemap {
         this.substituteType(type => {
             return Visit.visitPreJavaType<PreJavaType>(type, {
                 caseClassOrInterfaceType: type => {
+                    if (type.getSimpleName(null) == 'AnonymousType734')
+                        console.log('DONC IL EST BIEN CENSE NE PLUS ETRE REFERNCE NULLE PART (voir AnimationViewContext)');
+
                     if (type.callSignatures && type.callSignatures.length)
                         return type
                     if (type.baseTypes && type.baseTypes.size)
@@ -278,9 +281,9 @@ export class TsToPreJavaTypemap {
                         return type
                     if (!type.isAnonymousSourceType)
                         return type
-                    if (type.methods && type.methods.length || type.staticMethods && type.staticMethods.length)
+                    if ((type.methods && type.methods.length) || (type.staticMethods && type.staticMethods.length))
                         return type
-                    if (type.properties && type.properties.length || type.staticProperties && type.staticProperties.length)
+                    if ((type.properties && type.properties.length) || (type.staticProperties && type.staticProperties.length))
                         return type
                     if (type.prototypeNames && type.prototypeNames.size)
                         return type
@@ -319,8 +322,9 @@ export class TsToPreJavaTypemap {
         return false
     }
 
-    private substituteType(replacer: TypeReplacer) {
+    private substituteType(replacer: TypeReplacer): boolean {
         let cache = new Map<PreJavaType, PreJavaType>()
+        let somethingChanged = false
 
         for (let [typeKey, type] of this.typeMap.entries()) {
             let substitute = type.substituteType(replacer, cache, new Set())
@@ -328,7 +332,11 @@ export class TsToPreJavaTypemap {
                 this.typeMap.delete(typeKey)
             else if (substitute != type)
                 this.typeMap.set(typeKey, substitute)
+
+            somethingChanged = somethingChanged || (substitute != type)
         }
+
+        return somethingChanged
     }
 
     hasSubType(type: PreJavaType) {
@@ -409,8 +417,6 @@ export class TsToPreJavaTypemap {
 
                                     type.addProperty(newProperty)
                                 }
-                                //if (!type.properties || !type.properties.some(p => p.name == visitedProperty.name))
-                                //    type.addProperty(visitedProperty) // TODO Take care of the concretized type parameters
                             })
                         })
                     }
@@ -459,8 +465,8 @@ export class TsToPreJavaTypemap {
                     type: typeParameters[j + 1],
                     name: `p${j + 1}`
                 })
-            let method = new PreJavaTypeCallSignature(null, typeParameters[0], 'execute', parameters)
-            LAMBDA.addMethod(method)
+            let method = new PreJavaTypeCallSignature(null, typeParameters[0], null, parameters)
+            LAMBDA.callSignatures.push(method)
 
             this.typeMap.set(`prebuilt-function-${i}`, LAMBDA)
             LAMBDAS.push(LAMBDA)
@@ -484,42 +490,43 @@ export class TsToPreJavaTypemap {
                     type: typeParameters[j],
                     name: `p${j + 1}`
                 })
-            let method = new PreJavaTypeCallSignature(null, BUILTIN_TYPE_UNIT, 'execute', parameters)
-            PROC.addMethod(method)
+            let method = new PreJavaTypeCallSignature(null, BUILTIN_TYPE_UNIT, null, parameters)
+            PROC.callSignatures.push(method)
 
             this.typeMap.set(`prebuilt-action-${i}`, PROC)
             PROCS.push(PROC)
         }
 
-        this.substituteType(type => {
+        while (this.substituteType(type => {
             return Visit.visitPreJavaType(type, {
                 caseClassOrInterfaceType: type => {
                     if (PROCS.indexOf(type) >= 0 || LAMBDAS.indexOf(type) >= 0)
                         return type
 
-                    if (type.isAnonymousSourceType) {
-                        if (type.methods && type.methods.length == 1) {
-                            let functionalMethod = type.methods[0]
-                            if (functionalMethod.returnType != BUILTIN_TYPE_UNIT && (!functionalMethod.parameters || functionalMethod.parameters.length < NB_PARAMS)) {
-                                let returnType = functionalMethod.returnType
-                                let nbParameters = functionalMethod.parameters && functionalMethod.parameters.length
+                    if (type.callSignatures && type.callSignatures.length == 1 && type.isAnonymousSourceType && typeTools.hasOnlyCallSignatures(type)) {
+                        if (type.getSimpleName(null) == 'AnonymousType734')
+                            console.log('DONC IL EST BIEN CENSE NE PLUS ETRE REFERNCE NULLE PART (voir AnimationViewContext)');
 
-                                if (returnType == BUILTIN_TYPE_UNIT) {
-                                    let ref = new PreJavaTypeReference()
-                                    ref.type = PROCS[nbParameters]
-                                    ref.typeParameters = []
-                                    for (let i = 0; i < nbParameters; i++)
-                                        ref.typeParameters.push(functionalMethod.parameters[i].type)
-                                    return ref
-                                }
-                                else {
-                                    let ref = new PreJavaTypeReference()
-                                    ref.type = LAMBDAS[nbParameters]
-                                    ref.typeParameters = [returnType]
-                                    for (let i = 0; i < nbParameters; i++)
-                                        ref.typeParameters.push(functionalMethod.parameters[i].type)
-                                    return ref
-                                }
+                        let functionalMethod = type.callSignatures[0]
+                        if (!functionalMethod.parameters || functionalMethod.parameters.length < NB_PARAMS) {
+                            let returnType = functionalMethod.returnType
+                            let nbParameters = functionalMethod.parameters && functionalMethod.parameters.length
+
+                            if (returnType == BUILTIN_TYPE_UNIT) {
+                                let ref = new PreJavaTypeReference()
+                                ref.type = PROCS[nbParameters]
+                                ref.typeParameters = []
+                                for (let i = 0; i < nbParameters; i++)
+                                    ref.typeParameters.push(functionalMethod.parameters[i].type)
+                                return ref
+                            }
+                            else {
+                                let ref = new PreJavaTypeReference()
+                                ref.type = LAMBDAS[nbParameters]
+                                ref.typeParameters = [returnType]
+                                for (let i = 0; i < nbParameters; i++)
+                                    ref.typeParameters.push(functionalMethod.parameters[i].type)
+                                return ref
                             }
                         }
                     }
@@ -528,7 +535,9 @@ export class TsToPreJavaTypemap {
 
                 onOther: type => type as PreJavaType
             })
-        })
+        })) {
+            console.log('trying another replacement pass')
+        }
     }
 
     checkNoDuplicateTypeNames() {

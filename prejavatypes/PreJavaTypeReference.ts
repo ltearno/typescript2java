@@ -51,7 +51,7 @@ export class PreJavaTypeTPEnvironnement extends PreJavaType {
     substituteTypeReal(replacer: TypeReplacer, cache: Map<PreJavaType, PreJavaType>, passThroughTypes: Set<PreJavaType>): PreJavaType {
         let stay = replacer(this)
         if (!stay || stay != this)
-            return null
+            return stay
 
         this.type = this.type.substituteType(replacer, cache, passThroughTypes)
         if (!this.type)
@@ -105,7 +105,7 @@ export class PreJavaTypeReference extends PreJavaType {
     substituteTypeReal(replacer: TypeReplacer, cache: Map<PreJavaType, PreJavaType>, passThroughTypes: Set<PreJavaType>): PreJavaType {
         let stay = replacer(this)
         if (!stay || stay != this)
-            return null
+            return stay
 
         this.type = replacer(this.type)
         if (!this.type)

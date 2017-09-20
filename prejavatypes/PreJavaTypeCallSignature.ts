@@ -63,7 +63,7 @@ export class PreJavaTypeCallSignature {
             if (this.returnType) {
                 this.returnType = this.returnType.substituteType(replacer, cache, passThroughTypes)
                 if (!this.returnType)
-                    return null
+                    return null // TODO return void instead
             }
 
             if (this.typeParameters)
