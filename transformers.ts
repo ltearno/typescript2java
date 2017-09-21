@@ -482,6 +482,12 @@ export function checkNoDuplicateTypeNames(typeMap: TsToPreJavaTypemap) {
     let hasDuplicate = false
     console.log(`duplicate types :`)
     for (let type of typeMap.typeSet()) {
+        Visit.visitPreJavaType(type, {
+            caseClassOrInterfaceType: type => {
+                if (type.constructorSignatures && type.constructorSignatures.length > 1)
+                    console.log(`WARNING : multiple constructors on type ${type.getParametrizedFullyQualifiedName(null)}`)
+            }
+        })
         if (Visit.visitPreJavaType(type, {
             caseReferenceType: type => false,
             caseTPEnvironnement: type => false,
