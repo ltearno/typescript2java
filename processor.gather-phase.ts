@@ -1,13 +1,9 @@
 import * as ts from "typescript";
 import * as path from "path";
-import { Identifier } from "typescript";
-import { type } from "os";
-import * as TypeMap from './type-map'
+import * as Transformers from './transformers'
 import { TsToPreJavaTypemap } from './type-map'
 
-import { PreJavaType, ProcessContext } from './prejavatypes/PreJavaType'
 import { PreJavaTypeClassOrInterface } from './prejavatypes/PreJavaTypeClassOrInterface'
-import { PreJavaTypeCallSignature } from './prejavatypes/PreJavaTypeCallSignature'
 
 function guessName(identifier: ts.Identifier | ts.BindingPattern): string {
     if (identifier.kind == ts.SyntaxKind.Identifier)
@@ -89,45 +85,42 @@ export class GatherPhase {
 
     sumup() {
         console.log(`removing unsupported types`)
-        this.typeMap.removeNotSupportedTypes()
+        Transformers.removeNotSupportedTypes(this.typeMap)
 
         console.log(`removing OverridingProperties`)
-        this.typeMap.removeOverridingProperties()
+        Transformers.removeOverridingProperties(this.typeMap)
 
         console.log(`reducing anonymous types`)
-        this.typeMap.reduceAnonymousTypes()
+        Transformers.reduceAnonymousTypes(this.typeMap)
 
         console.log(`unanonymising types`)
-        this.typeMap.ensureAllTypesHaveNameAndPackage(this.baseJavaPackage)
+        Transformers.ensureAllTypesHaveNameAndPackage(this.typeMap, this.baseJavaPackage)
 
         console.log(`simplifying unions`)
-        this.typeMap.simplifyUnions()
+        Transformers.simplifyUnions(this.typeMap)
 
         console.log(`removing duplicate overloads (with same type erasure)`)
-        this.typeMap.removeDuplicateOverloads()
+        Transformers.removeDuplicateOverloads(this.typeMap)
 
         console.log(`changing DTO interfaces into classes`)
-        this.typeMap.changeDtoInterfacesIntoClasses()
+        Transformers.changeDtoInterfacesIntoClasses(this.typeMap)
 
-        while (true) {
-            console.log(`transforming types inheriting multiple implementations`)
-            if (!this.typeMap.arrangeMultipleImplementationInheritance())
-                break
-        }
+        console.log(`transforming types inheriting multiple implementations`)
+        Transformers.arrangeMultipleImplementationInheritance(this.typeMap, 'Impl')
 
         console.log(`add missing methods from interface hierarchy in classes`)
-        this.typeMap.addMethodsFromInterfaceHierarchy()
+        Transformers.addMethodsFromInterfaceHierarchy(this.typeMap)
 
         console.log(`(todo) Array should be replaced by an externally provided type`)
 
         console.log(`replacing anonymous types`)
-        this.typeMap.replaceAnonymousTypes()
+        Transformers.replaceAnonymousTypes(this.typeMap)
 
         console.log(`developping methods with union parameters`)
-        this.typeMap.developMethodsWithUnionParameters()
+        Transformers.developMethodsWithUnionParameters(this.typeMap)
 
         console.log(`renaming duplicate fqns`)
-        this.typeMap.checkNoDuplicateTypeNames()
+        Transformers.checkNoDuplicateTypeNames(this.typeMap)
 
         console.log(`statistics:`)
         console.log(`${this.globalClasses.size} global scope classes`)

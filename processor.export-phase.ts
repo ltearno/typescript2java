@@ -5,6 +5,7 @@ import * as TypeMap from './type-map'
 import * as GatherPhase from './processor.gather-phase'
 import * as typeTools from './type-tools'
 import * as Signature from './signature'
+import * as BuiltIn from './builtin-types'
 import { mkdirRec } from './tools';
 import { visitPreJavaType } from './prejavatypes/PreJavaTypeVisit'
 import { TextFlow, JavaWriter } from './TextFlow'
@@ -333,7 +334,7 @@ export class ExportPhase {
                 let implementsTypes: PreJavaType[] = []
 
                 for (let baseType of type.baseTypes.values()) {
-                    if (baseType == TypeMap.BUILTIN_TYPE_OBJECT)
+                    if (baseType == BuiltIn.BUILTIN_TYPE_OBJECT)
                         continue
 
                     if (!isClass || baseType.isClassLike())
