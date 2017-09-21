@@ -510,7 +510,7 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
         if (!name)
             return
 
-        if (this.jsName || this.jsNamespace) {
+        if ((this.jsName || this.jsNamespace) && (this.jsNamespace != namespace || this.jsName != name)) {
             console.log(`MULTIPLE PROTOTYPES when adding ${namespace}.${name}`)
             return
         }

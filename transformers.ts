@@ -528,7 +528,6 @@ export function replaceAnonymousTypes(typeMap: TsToPreJavaTypemap) {
         let method = new PreJavaTypeCallSignature(null, typeParameters[0], null, parameters)
         LAMBDA.callSignatures.push(method)
 
-        typeMap.typeMap.set(`prebuilt-function-${i}`, LAMBDA)
         LAMBDAS.push(LAMBDA)
     }
 
@@ -553,7 +552,6 @@ export function replaceAnonymousTypes(typeMap: TsToPreJavaTypemap) {
         let method = new PreJavaTypeCallSignature(null, BuiltIn.BUILTIN_TYPE_UNIT, null, parameters)
         PROC.callSignatures.push(method)
 
-        typeMap.typeMap.set(`prebuilt-action-${i}`, PROC)
         PROCS.push(PROC)
     }
 
@@ -570,6 +568,8 @@ export function replaceAnonymousTypes(typeMap: TsToPreJavaTypemap) {
                         let nbParameters = functionalMethod.parameters && functionalMethod.parameters.length
 
                         if (returnType == BuiltIn.BUILTIN_TYPE_UNIT) {
+                            typeMap.typeMap.set(`prebuilt-action-${nbParameters}`, PROCS[nbParameters])
+
                             let ref = new PreJavaTypeReference()
                             ref.type = PROCS[nbParameters]
                             ref.typeParameters = []
@@ -578,6 +578,8 @@ export function replaceAnonymousTypes(typeMap: TsToPreJavaTypemap) {
                             return ref
                         }
                         else {
+                            typeMap.typeMap.set(`prebuilt-function-${nbParameters}`, LAMBDAS[nbParameters])
+
                             let ref = new PreJavaTypeReference()
                             ref.type = LAMBDAS[nbParameters]
                             ref.typeParameters = [returnType]

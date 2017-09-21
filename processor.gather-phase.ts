@@ -174,9 +174,10 @@ export class GatherPhase {
                 cs.forEach(constructorSignature => {
                     if (constructorSignature.getReturnType()) {
                         let preJava = this.typeMap.getOrCreatePreJavaTypeForTsType(constructorSignature.getReturnType())
-                        if (preJava instanceof PreJavaTypeClassOrInterface) {
-                            preJava.setPrototypeName(null, guessName(declaration.name))
-                            preJava.setSimpleName(guessName(declaration.name))
+                        // TODO the 'preJava.getSimpleName(null) == guessName(declaration.name)' is not 100% sufficient but should work most of the time...
+                        if (preJava instanceof PreJavaTypeClassOrInterface && preJava.getSimpleName(null) == guessName(declaration.name)) {
+                            preJava.constructorSignatures.push(this.typeMap.convertSignature(null, constructorSignature, null))
+                            preJava.setPrototypeName(this.typeMap.processContext.getJsPackage(declaration.getSourceFile()), guessName(declaration.name))
                         }
                     }
                 })

@@ -27,38 +27,12 @@ export class TsToPreJavaTypemap {
         getTypeMap: () => this
     }
 
-
-
     typeSet() {
         let result = new Set<PreJavaType>()
         for (let type of this.typeMap.values())
             result.add(type)
         return result
     }
-
-    /*private doesTypeUsesType(type: PreJavaType, usedType: PreJavaType) {
-        if (type === usedType)
-            return true
-
-        if (type instanceof PreJavaTypeReference) {
-            if (this.doesTypeUsesType(type.type, usedType))
-                return true
-            if (type.typeParameters && type.typeParameters.some(t => this.doesTypeUsesType(t, usedType)))
-                return true
-            return false
-        }
-
-        if (type instanceof PreJavaTypeUnion) {
-            return type.types && type.types.some(t => this.doesTypeUsesType(t, usedType))
-        }
-
-        if (type instanceof PreJavaTypeClassOrInterface) {
-            if (type.baseTypes && type.baseTypes.has(usedType))
-                return true
-        }
-
-        return false
-    }*/
 
     substituteType(replacer: TypeReplacer) {
         let nbPassLeft = 10
