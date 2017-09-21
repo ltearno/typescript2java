@@ -268,9 +268,6 @@ export class TsToPreJavaTypemap {
         this.substituteType(type => {
             return Visit.visitPreJavaType<PreJavaType>(type, {
                 caseClassOrInterfaceType: type => {
-                    if (type.getSimpleName(null) == 'AnonymousType734')
-                        console.log('DONC IL EST BIEN CENSE NE PLUS ETRE REFERNCE NULLE PART (voir AnimationViewContext)');
-
                     if (type.callSignatures && type.callSignatures.length)
                         return type
                     if (type.baseTypes && type.baseTypes.size)
