@@ -286,8 +286,6 @@ export class TsToPreJavaTypemap {
                         return type
                     if (type.numberIndexType || type.stringIndexType)
                         return type
-                    if (type.typeParameters && type.typeParameters.length)
-                        return type
                     return BUILTIN_TYPE_OBJECT
                 },
                 onOther: type => type

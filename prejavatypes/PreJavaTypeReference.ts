@@ -111,6 +111,10 @@ export class PreJavaTypeReference extends PreJavaType {
         if (!this.type)
             return null
 
+        let referencedTypeTypeParameters = this.type.getTypeParameters(null)
+        if ((!referencedTypeTypeParameters) || !referencedTypeTypeParameters.length)
+            return this.type
+
         if (this.typeParameters)
             this.typeParameters = this.typeParameters.map(p => p.substituteType(replacer, cache, passThroughTypes)).filter(p => p != null)
 
