@@ -139,7 +139,7 @@ export class ExportPhase {
         flow.push(`public abstract class ${type.getParametrizedSimpleName(null)} ${extendedBaseTypes.length ? `extends ${extendedBaseTypes.map(t => javaWriter.importTypeParametrized(t)).join()} ` : ''}${implementedBaseTypes.length ? `implements ${implementedBaseTypes.map(t => javaWriter.importTypeParametrized(t)).join()} ` : ''} {`).finishLine()
         flow.pushLineStart('    ')
 
-        let baseConstructors = typeTools.getSuperConstructors(type)
+        let baseConstructors = typeTools.getSuperConstructors(type, false)
         let baseConstructor = baseConstructors && baseConstructors.length && baseConstructors[0]
         let baseClassConstructorParameters = baseConstructor && baseConstructor.parameters
         if (baseClassConstructorParameters && baseClassConstructorParameters.length) {
@@ -360,32 +360,44 @@ export class ExportPhase {
 
             type.callSignatures && type.callSignatures.forEach(callSignature => flow.push(`/** SKIPPED CALL SIGNATURE ! */`).finishLine())
 
-            if (isClass && type.constructorSignatures && type.constructorSignatures.length) {
-                flow.blankLine().push('/*\n    Constructors\n*/').finishLine()
-
-                let baseConstructors = typeTools.getSuperConstructors(type)
+            if (isClass) {
+                let baseConstructors = typeTools.getSuperConstructors(type, false)
                 let baseConstructor = baseConstructors && baseConstructors.length && baseConstructors[0]
                 let theBaseClassConstructorParameters = baseConstructor && baseConstructor.parameters
 
-                type.constructorSignatures.forEach(constructor => {
-                    if (constructor.comments && constructor.comments.length) {
-                        flow.startJavaDocComments()
-                        flow.push(constructor.comments)
-                        flow.endJavaDocComments()
-                    }
+                if (theBaseClassConstructorParameters && theBaseClassConstructorParameters.length && (!type.constructorSignatures || !type.constructorSignatures.length)) {
+                    flow.blankLine().push('/*\n    Default constructor\n*/').finishLine()
 
-                    let escapedMethodName = type.getSimpleName(null)
-
-                    flow.push(`public ${type.getSimpleName(null)}(`)
-                    if (constructor.parameters)
-                        flow.push(constructor.parameters.map(p => `${javaWriter.importTypeParametrized(p.type)} ${this.escapePropertyName(p.name)}`).join(', ')).push(`)`)
-
+                    flow.push(`public ${type.getSimpleName(null)}()`)
                     flow.push(`{`).finishLine()
                     if (theBaseClassConstructorParameters && theBaseClassConstructorParameters.length) {
                         flow.pushLineStart('    ').push(`super(${theBaseClassConstructorParameters.map(p => 'null').join(', ')});`).finishLine().pullLineStart()
                     }
                     flow.push(`}`).finishLine()
-                })
+                }
+                else if (type.constructorSignatures && type.constructorSignatures.length) {
+                    flow.blankLine().push('/*\n    Constructors\n*/').finishLine()
+
+                    type.constructorSignatures.forEach(constructor => {
+                        if (constructor.comments && constructor.comments.length) {
+                            flow.startJavaDocComments()
+                            flow.push(constructor.comments)
+                            flow.endJavaDocComments()
+                        }
+
+                        let escapedMethodName = type.getSimpleName(null)
+
+                        flow.push(`public ${type.getSimpleName(null)}(`)
+                        if (constructor.parameters)
+                            flow.push(constructor.parameters.map(p => `${javaWriter.importTypeParametrized(p.type)} ${this.escapePropertyName(p.name)}`).join(', ')).push(`)`)
+
+                        flow.push(`{`).finishLine()
+                        if (theBaseClassConstructorParameters && theBaseClassConstructorParameters.length) {
+                            flow.pushLineStart('    ').push(`super(${theBaseClassConstructorParameters.map(p => 'null').join(', ')});`).finishLine().pullLineStart()
+                        }
+                        flow.push(`}`).finishLine()
+                    })
+                }
             }
 
             let nit = type.numberIndexType
@@ -477,37 +489,48 @@ export class ExportPhase {
                 flow.blankLine()
                     .push('/*\n    Static methods\n*/').finishLine()
 
-                type.staticMethods.filter(method => method.name != 'toString').forEach(method => {
-                    if (method.name.indexOf('@') >= 0) {
-                        flow.push(`// skipped static method ${method.name}`).blankLine().blankLine()
-                    }
-                    else {
-                        if (method.comments && method.comments.length) {
-                            flow.startJavaDocComments()
-                            flow.push(method.comments)
-                            flow.endJavaDocComments()
+                let fixBug = new Set<string>()
+
+                type.staticMethods
+                    .filter(method => {
+                        let sig = Signature.getCallSignatureSignature(method)
+                        let seen = fixBug.has(sig)
+                        fixBug.add(sig)
+                        return !seen
+                    })
+                    .forEach(method => {
+                        if (method.name.indexOf('@') >= 0) {
+                            flow.push(`// skipped static method ${method.name}`).blankLine().blankLine()
                         }
+                        else {
+                            flow.push(`// ${Signature.getCallSignatureSignature(method)}`).finishLine()
 
-                        let escapedMethodName = method.name
-                        if (type.methods && type.methods.some(m => m.name == escapedMethodName))
-                            escapedMethodName = '_' + escapedMethodName
-                        escapedMethodName = this.escapePropertyName(escapedMethodName)
-                        let methodNamespace = type.jsNamespace ? (type.jsNamespace + '.' + type.jsName) : type.jsName
-                        if (!methodNamespace)
-                            javaWriter.importType(this.JS_PACKAGE)
+                            if (method.comments && method.comments.length) {
+                                flow.startJavaDocComments()
+                                flow.push(method.comments)
+                                flow.endJavaDocComments()
+                            }
 
-                        javaWriter.importType(this.JS_METHOD)
-                        flow.push(`@JsMethod(namespace=${methodNamespace ? ('"' + methodNamespace + '"') : 'JsPackage.GLOBAL'}, name = "${method.name}")`).finishLine()
-                        flow.push(`public static native `)
-                        let typeParameters = method.typeParameters
-                        if (typeParameters && typeParameters.length)
-                            flow.push(`<${typeParameters.map(tp => tp.name).join(', ')}> `)
-                        flow.push(`${javaWriter.importTypeParametrized(method.returnType)} ${escapedMethodName}(`)
-                        if (method.parameters)
-                            flow.push(method.parameters.map(p => `${javaWriter.importTypeParametrized(p.type)}${p.dotdotdot ? '...' : ''} ${this.escapePropertyName(p.name)}${p.optional ? ' /* optional */' : ''}`).join(', '))
-                        flow.push(`);`).finishLine()
-                    }
-                })
+                            let escapedMethodName = method.name
+                            if (type.methods && type.methods.some(m => m.name == escapedMethodName))
+                                escapedMethodName = '_' + escapedMethodName
+                            escapedMethodName = this.escapePropertyName(escapedMethodName)
+                            let methodNamespace = type.jsNamespace ? (type.jsNamespace + '.' + type.jsName) : type.jsName
+                            if (!methodNamespace)
+                                javaWriter.importType(this.JS_PACKAGE)
+
+                            javaWriter.importType(this.JS_METHOD)
+                            flow.push(`@JsMethod(namespace=${methodNamespace ? ('"' + methodNamespace + '"') : 'JsPackage.GLOBAL'}, name = "${method.name}")`).finishLine()
+                            flow.push(`public static native `)
+                            let typeParameters = method.typeParameters
+                            if (typeParameters && typeParameters.length)
+                                flow.push(`<${typeParameters.map(tp => tp.name).join(', ')}> `)
+                            flow.push(`${javaWriter.importTypeParametrized(method.returnType)} ${escapedMethodName}(`)
+                            if (method.parameters)
+                                flow.push(method.parameters.map(p => `${javaWriter.importTypeParametrized(p.type)}${p.dotdotdot ? '...' : ''} ${this.escapePropertyName(p.name)}${p.optional ? ' /* optional */' : ''}`).join(', '))
+                            flow.push(`);`).finishLine()
+                        }
+                    })
             }
 
             if (type.properties && type.properties.length) {

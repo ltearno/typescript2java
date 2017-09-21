@@ -4,6 +4,7 @@ import { visitPreJavaType } from './prejavatypes/PreJavaTypeVisit'
 import { PreJavaTypeCallSignature, PreJavaTypeFormalParameter } from './prejavatypes/PreJavaTypeCallSignature'
 import { PreJavaTypeProperty } from './prejavatypes/PreJavaTypeClassOrInterface'
 import * as typeTools from './type-tools'
+import * as BuiltIn from './builtin-types'
 
 let nextObjectId = 1
 let objectMap = new WeakMap<any, number>()
@@ -69,13 +70,14 @@ export function getTypeSignature(type: PreJavaType, selfReflect: Map<PreJavaType
                 + ')'
         },
 
-        caseReferenceType: type => {
+        caseReferenceType: type => getTypeSignature(type.type, selfReflect),
+        /*{
             //return `R(${getTypeSignature(type.type, selfReflect)}${(type.typeParameters && type.typeParameters.length) ? type.typeParameters.map(tp => getTypeSignature(tp, selfReflect)).join() : '-'})`
             return `R(${getTypeSignature(type.type, selfReflect)})`
-        },
-
+        },*/
 
         caseTypeParameter: (type) => type.getSimpleName(null) + (type.constraint ? getTypeSignature(type.constraint, selfReflect) : '-'),
+        //caseTypeParameter: (type) => type.constraint ? getTypeSignature(type.constraint, selfReflect) : getObjectId(BuiltIn.BUILTIN_TYPE_OBJECT),
 
         caseTPEnvironnement: type => getTypeSignature(type.type, selfReflect),
 

@@ -264,21 +264,23 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
                 let staticTypeProperties = declaredType.getProperties()
                 staticTypeProperties && staticTypeProperties.forEach(property => {
                     if (property['parent'] == declaredType.symbol && property.name != 'prototype') {
-                        let comments = this.getCommentFromSymbol(property)
+                        let comments = this.getCommentFromSymbol(property) || []
                         let propertyType = context.getProgram().getTypeChecker().getTypeAtLocation(property.valueDeclaration)
                         let callSignatures = propertyType.getCallSignatures()
                         if (callSignatures && callSignatures.length && !(property.name.startsWith('on'))) {
                             for (let callSignature of callSignatures) {
                                 let method = context.getTypeMap().convertSignature(property.name, callSignature, this.typeParameters)
                                 if (method) {
+                                    // TODO could reduce number of type paramaters, if some are not used
                                     if (this.typeParameters && this.typeParameters.length) {
                                         let toAdd = []
                                         for (let tp of this.typeParameters)
-                                            if (toAdd.indexOf(tp.name) < 0)
+                                            if (!method.typeParameters || !method.typeParameters.some(p => p.name == tp.name))
                                                 toAdd.push(tp.name)
                                         method.typeParameters = toAdd.map(name => new PreJavaTypeParameter(name)).concat(method.typeParameters ? method.typeParameters : [])
                                     }
 
+                                    comments.push(`source : ${callSignature.declaration.getSourceFile().fileName}:${callSignature.declaration.getStart()}`)
                                     method.addComments(comments)
                                     this.addStaticMethod(method)
                                 }
@@ -336,7 +338,7 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
         callSignatures && callSignatures.forEach(callSignature => {
             let signature = context.getTypeMap().convertSignature(null, callSignature, this.typeParameters)
             if (signature)
-                this.callSignatures.push(signature)
+                this.addCallSignature(signature)
         })
     }
 
@@ -349,15 +351,16 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
 
         if (this.methods && this.methods.length)
             return false
+        if (this.staticMethods && this.staticMethods.length)
+            return false
+        if (this.staticProperties && this.staticProperties.length)
+            return false
 
         return true
     }
 
     substituteTypeReal(replacer: TypeReplacer, cache: Map<PreJavaType, PreJavaType>, passThroughTypes: Set<PreJavaType>): PreJavaType {
         let stay = replacer(this)
-
-        if (stay != this && this.getSimpleName(null) == 'GlobalScope')
-            replacer(this)
 
         if (!stay || stay != this)
             return stay
@@ -390,8 +393,17 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
             }).filter(p => p != null)
         }
 
-        if (this.staticMethods)
+        if (this.staticMethods) {
+            /*let olds = this.staticMethods
+            this.staticMethods = []
+            olds.forEach(old => {
+                let subst = old.substituteType(replacer, cache, passThroughTypes)
+                if (subst)
+                    this.addStaticMethod(subst)
+            })*/
+            // TODO : this could make the different call signatures
             this.staticMethods = this.staticMethods.map(s => s.substituteType(replacer, cache, passThroughTypes)).filter(s => s != null)
+        }
 
         if (this.properties) {
             this.properties = this.properties.map(p => {
@@ -531,34 +543,33 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
     }
 
     addConstructorSignature(signature: PreJavaTypeCallSignature) {
-        this.constructorSignatures.push(signature)
+        this.addMethodInCollection(signature, this.constructorSignatures)
+    }
+
+    addCallSignature(signature: PreJavaTypeCallSignature) {
+        this.addMethodInCollection(signature, this.callSignatures)
     }
 
     addProperty(property: PreJavaTypeProperty) {
         this.properties.push(property)
     }
 
-    private methodSignatures = new Set<string>()
-
     cleanAndCheckMethods() {
-        this.methodSignatures.clear()
-        this.methods.forEach(m => this.methodSignatures.add(Signature.getCallSignatureSignature(m)))
     }
 
     addMethod(method: PreJavaTypeCallSignature) {
-        if (!method)
-            return
+        this.addMethodInCollection(method, this.methods)
+    }
 
-        if (this.methodSignatures.size != this.methods.length)
-            this.cleanAndCheckMethods()
+    addMethodInCollection(method: PreJavaTypeCallSignature, methods: PreJavaTypeCallSignature[]) {
+        if (!method || method.name == 'toString')
+            return
 
         let sig = Signature.getCallSignatureSignature(method)
-
-        if (this.methodSignatures.has(sig))
+        if (methods.some(m => Signature.getCallSignatureSignature(m) == sig))
             return
-        this.methodSignatures.add(sig)
 
-        this.methods.push(method)
+        methods.push(method)
     }
 
     addStaticProperty(property: PreJavaTypeProperty) {
@@ -568,9 +579,10 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
     }
 
     addStaticMethod(method: PreJavaTypeCallSignature) {
-        if (this.staticMethods && this.staticMethods.some(m => m.name == method.name))
-            return // bug where static methods are duplicated
-        this.staticMethods.push(method)
+        if (!method)
+            return
+
+        this.addMethodInCollection(method, this.staticMethods)
     }
 
     setNumberIndexType(type: PreJavaType) {

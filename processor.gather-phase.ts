@@ -122,6 +122,9 @@ export class GatherPhase {
         console.log(`renaming duplicate fqns`)
         Transformers.checkNoDuplicateTypeNames(this.typeMap)
 
+        console.log(`checking constructors`)
+        Transformers.ensureCorrectConstructors(this.typeMap)
+
         console.log(`statistics:`)
         console.log(`${this.globalClasses.size} global scope classes`)
         console.log(`${this.typeMap.typeSet().size} jsinterop types`)
@@ -176,7 +179,7 @@ export class GatherPhase {
                         let preJava = this.typeMap.getOrCreatePreJavaTypeForTsType(constructorSignature.getReturnType())
                         // TODO the 'preJava.getSimpleName(null) == guessName(declaration.name)' is not 100% sufficient but should work most of the time...
                         if (preJava instanceof PreJavaTypeClassOrInterface && preJava.getSimpleName(null) == guessName(declaration.name)) {
-                            preJava.constructorSignatures.push(this.typeMap.convertSignature(null, constructorSignature, null))
+                            preJava.addConstructorSignature(this.typeMap.convertSignature(null, constructorSignature, null))
                             preJava.setPrototypeName(this.typeMap.processContext.getJsPackage(declaration.getSourceFile()), guessName(declaration.name))
                         }
                     }

@@ -59,7 +59,7 @@ export function getConstructors(type: PreJavaType): PreJavaTypeCallSignature[] {
  * 
  * if no explicit constructor is found, null is returned
  */
-export function getSuperConstructors(type: PreJavaType): PreJavaTypeCallSignature[] {
+export function getSuperConstructors(type: PreJavaType, browseHierarchy: boolean): PreJavaTypeCallSignature[] {
     let baseTypes = getBaseTypes(type)
     if (!baseTypes)
         return null
@@ -80,7 +80,8 @@ export function getSuperConstructors(type: PreJavaType): PreJavaTypeCallSignatur
     if (constructors && constructors.length)
         return constructors
 
-    return getSuperConstructors(implementationBaseType)
+    if (browseHierarchy)
+        return getSuperConstructors(implementationBaseType, true)
 }
 
 export function skipReferencingTypes(type: PreJavaType) {

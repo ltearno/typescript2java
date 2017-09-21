@@ -408,6 +408,9 @@ export function changeDtoInterfacesIntoClasses(typeMap: TsToPreJavaTypemap) {
     let nb = 0
     for (let type of typeMap.typeSet()) {
         if (type instanceof PreJavaTypeClassOrInterface && (!type.isClass) && type.hasOnlyProperties() && !typeMap.hasSubType(type) && (!type.staticMethods || !type.staticMethods.length) && (!type.staticProperties || !type.staticProperties.length)) {
+            if (!type.comments)
+                type.comments = []
+            type.comments.push(`*** changed to class to reflect the possible DTO use of this type ***`)
             type.isClass = true
             nb++
         }
@@ -601,4 +604,16 @@ export function replaceAnonymousTypes(typeMap: TsToPreJavaTypemap) {
             onOther: type => type as PreJavaType
         })
     })
+}
+
+
+export function ensureCorrectConstructors(typeMap: TsToPreJavaTypemap) {
+    for (let type of typeMap.typeSet()) {
+        Visit.visitPreJavaType(type, {
+            caseClassOrInterfaceType: type => {
+                if (!type.isClass)
+                    return
+            }
+        })
+    }
 }
