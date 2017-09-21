@@ -28,6 +28,9 @@ export class GatherPhase {
     }
 
     private getJSPackage(sourceFile: ts.SourceFile) {
+        if (!sourceFile)
+            return null
+
         let relative = path.relative(this.program.getCurrentDirectory(), sourceFile.fileName)
 
         for (let pathPrefix in this.javaPackages) {
@@ -134,24 +137,39 @@ export class GatherPhase {
     // maps js package names to global element holder java classes
     private globalClasses = new Map<string, PreJavaTypeClassOrInterface>()
 
-    private getGlobalClass(jsPackage: string): PreJavaTypeClassOrInterface {
-        if (!jsPackage)
-            jsPackage = this.baseJavaPackage + '.global'
+    private getGlobalClass(sourceFile: ts.SourceFile): PreJavaTypeClassOrInterface {
+        let jsPackage = this.getJSPackage(sourceFile)
+        let key = jsPackage ? jsPackage : '-'
 
-        if (!this.globalClasses.has(jsPackage)) {
+        if (!this.globalClasses.has(key)) {
+            let javaPackage = this.getJavaPackage(sourceFile)
+
             let globalClass = new PreJavaTypeClassOrInterface()
-            globalClass.comments = [`Wrapper class for all global definition of ${jsPackage} package`]
+            globalClass.comments = [`Wrapper class for all global definition of ${jsPackage} (java ${javaPackage}) package`]
             globalClass.isClass = true
-            globalClass.name = "GlobalScope"
-            globalClass.packageName = jsPackage
 
-            this.globalClasses.set(jsPackage, globalClass)
-            this.typeMap.typeMap.set('global-declarations-class-' + jsPackage, globalClass)
+            globalClass.name = "GlobalScope"
+            globalClass.packageName = javaPackage
+            if (jsPackage)
+                globalClass.name = "GlobalScope_" + jsPackage.split('.').map(each => each ? (each.substring(0, 1).toUpperCase() + each.substring(1)) : '').join('')
+
+            let dotIndex = jsPackage && jsPackage.indexOf('.')
+            if (dotIndex > 0) {
+                globalClass.jsNamespace = jsPackage.substring(0, dotIndex)
+                globalClass.jsName = jsPackage.substring(dotIndex + 1)
+            }
+            else {
+                globalClass.jsNamespace = null
+                globalClass.jsName = jsPackage
+            }
+
+            this.globalClasses.set(key, globalClass)
+            this.typeMap.typeMap.set('global-declarations-class-' + javaPackage, globalClass)
 
             return globalClass
         }
 
-        return this.globalClasses.get(jsPackage)
+        return this.globalClasses.get(key)
     }
 
     private registerVariableStatement(statement: ts.VariableStatement) {
@@ -164,14 +182,12 @@ export class GatherPhase {
                     if (constructorSignature.getReturnType()) {
                         let preJava = this.typeMap.getOrCreatePreJavaTypeForTsType(constructorSignature.getReturnType())
                         if (preJava instanceof PreJavaTypeClassOrInterface) {
-                            preJava.addPrototypeName(null, guessName(declaration.name))
+                            preJava.setPrototypeName(null, guessName(declaration.name))
                             preJava.setSimpleName(guessName(declaration.name))
                         }
                     }
                 })
             }
-
-            let javaPackage = this.getJavaPackage(declaration.getSourceFile())
 
             let callSignatures = t.getCallSignatures()
             if (callSignatures && callSignatures.length) {
@@ -179,7 +195,7 @@ export class GatherPhase {
                     if (declaration && declaration.name && declaration.name.getText()) {
                         let signature = this.typeMap.convertSignature(declaration.name.getText(), tsSignature, null)
                         if (signature)
-                            this.getGlobalClass(javaPackage).addStaticMethod(signature)
+                            this.getGlobalClass(declaration.getSourceFile()).addStaticMethod(signature)
                     }
                 })
             }
@@ -189,7 +205,7 @@ export class GatherPhase {
                 || (t.getProperties() && t.getProperties().some(p => p.name != 'prototype'))) {
                 let variableType = this.typeMap.getOrCreatePreJavaTypeForTsType(t, false)
 
-                this.getGlobalClass(javaPackage).addStaticProperty({ name: guessName(declaration.name), comments: null, type: variableType, writable: true })
+                this.getGlobalClass(declaration.getSourceFile()).addStaticProperty({ name: guessName(declaration.name), comments: null, type: variableType, writable: true })
             }
         })
     }
@@ -201,14 +217,12 @@ export class GatherPhase {
         if (!name)
             return
 
-        let javaPackage = this.getJavaPackage(declaration.getSourceFile())
-
         let callSignatures = t.getCallSignatures()
         if (callSignatures && callSignatures.length) {
             callSignatures.forEach(tsSignature => {
                 let signature = this.typeMap.convertSignature(name, tsSignature, null)
                 if (signature) {
-                    this.getGlobalClass(javaPackage).addStaticMethod(signature)
+                    this.getGlobalClass(declaration.getSourceFile()).addStaticMethod(signature)
                 }
             })
         }

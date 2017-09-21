@@ -231,7 +231,7 @@ export class ExportPhase {
         flow.push(`public abstract class ${type.getParametrizedSimpleName(null)} extends Number {`).finishLine()
         flow.pushLineStart('    ')
         for (let member of type.members)
-            flow.push(`public static ${type.getParametrizedSimpleName(null)} ${member.name} = Js.uncheckedCast( ${member.value} );`).finishLine()
+            flow.push(`public static final ${type.getParametrizedSimpleName(null)} ${member.name} = Js.uncheckedCast( ${member.value} );`).finishLine()
         flow.pullLineStart()
         flow.push(`}`).finishLine()
 
@@ -270,18 +270,6 @@ export class ExportPhase {
             name = value
         }
         return { namespace, name }
-    }
-
-    private findPrototypeInfo(type: PreJavaTypeClassOrInterface) {
-        if (type.prototypeNames) {
-            for (let name of type.prototypeNames.values()) {
-                return this.splitNamespace(name)
-            }
-        }
-        return {
-            namespace: null,
-            name: null
-        }
     }
 
     private exportClassOrInterface(type: PreJavaTypeClassOrInterface, program: ts.Program, baseDirectory: string) {
@@ -329,11 +317,10 @@ export class ExportPhase {
 
             let isClass = type.isClassLike()
 
-            let { name: prototypeName, namespace: prototypeNamespace } = this.findPrototypeInfo(type)
-            if (!prototypeNamespace)
+            if (!type.jsNamespace)
                 javaWriter.importType(this.JS_PACKAGE)
 
-            flow.push(`@JsType(isNative=true, namespace=${prototypeNamespace ? ('"' + prototypeNamespace + '"') : 'JsPackage.GLOBAL'}, name=${prototypeName ? ('"' + prototypeName + '"') : '"Object"'})`)
+            flow.push(`@JsType(isNative=true, namespace=${type.jsNamespace ? ('"' + type.jsNamespace + '"') : 'JsPackage.GLOBAL'}, name=${type.jsName ? ('"' + type.jsName + '"') : '"Object"'})`)
             flow.finishLine()
             flow.push(`public ${isClass ? 'class' : 'interface'} ${type.getSimpleName(null)}`)
 
@@ -474,7 +461,7 @@ export class ExportPhase {
                         }
 
                         let escapedPropertyName = this.escapePropertyName(property.name)
-                        let propertyNamespace = prototypeNamespace ? (prototypeNamespace + '.' + prototypeName) : prototypeName
+                        let propertyNamespace = type.jsNamespace ? (type.jsNamespace + '.' + type.jsName) : type.jsName
                         if (!propertyNamespace)
                             javaWriter.importType(this.JS_PACKAGE)
 
@@ -504,7 +491,7 @@ export class ExportPhase {
                         if (type.methods && type.methods.some(m => m.name == escapedMethodName))
                             escapedMethodName = '_' + escapedMethodName
                         escapedMethodName = this.escapePropertyName(escapedMethodName)
-                        let methodNamespace = prototypeNamespace ? (prototypeNamespace + '.' + prototypeName) : prototypeName
+                        let methodNamespace = type.jsNamespace ? (type.jsNamespace + '.' + type.jsName) : type.jsName
                         if (!methodNamespace)
                             javaWriter.importType(this.JS_PACKAGE)
 

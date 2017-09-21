@@ -18,30 +18,29 @@ export interface PreJavaTypeProperty {
 }
 
 export class PreJavaTypeClassOrInterface extends PreJavaType {
+    // javascript information
     sourceTypes: Set<ts.Type> = new Set()
     isAnonymousSourceType = true
+    jsNamespace: string = null
+    jsName: string = null
 
+    // java information
     name: string = null
     packageName: string
-
+    isClass: boolean
     typeParameters: PreJavaTypeParameter[] = null
-
     baseTypes = new Set<PreJavaType>()
-    prototypeNames = new Set<string>()
+    comments: string[]
 
+    // content description
     constructorSignatures: PreJavaTypeCallSignature[] = []
     callSignatures: PreJavaTypeCallSignature[] = []
     properties: PreJavaTypeProperty[] = []
     methods: PreJavaTypeCallSignature[] = []
     staticProperties: PreJavaTypeProperty[] = []
     staticMethods: PreJavaTypeCallSignature[] = []
-
     numberIndexType: PreJavaType
     stringIndexType: PreJavaType
-
-    comments: string[]
-
-    isClass: boolean
 
     getSourceTypes(): Set<ts.Type> { return this.sourceTypes }
 
@@ -216,6 +215,13 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
     }
 
     private extractPrototypeAndNamespace(type: ts.Type, context: ProcessContext) {
+        if (this.isAnonymousSourceType) {
+            this.setPackageName(context.getJavaPackage(null))
+            this.jsName = null
+            this.jsNamespace = null
+            return
+        }
+
         let symbol = type.getSymbol()
         if (!symbol)
             return
@@ -228,7 +234,7 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
 
             let sourceFile = declaration.getSourceFile()
             this.setPackageName(context.getJavaPackage(sourceFile))
-            this.addPrototypeName(context.getJsPackage(sourceFile), jsName)
+            this.setPrototypeName(context.getJsPackage(sourceFile), jsName)
         }
     }
 
@@ -467,10 +473,7 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
             this.comments.map(c => `/* ${c} */`).forEach(c => console.log(c))
         }
 
-        if (this.prototypeNames && this.prototypeNames.size) {
-            console.log(`prototypes:`)
-            this.prototypeNames.forEach(name => console.log(name))
-        }
+        console.log(`js name : ${this.jsNamespace} / ${this.jsName}`)
 
         if (this.constructorSignatures && this.constructorSignatures.length) {
             console.log(`constructors:`)
@@ -503,17 +506,19 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
         }
     }
 
-    addPrototypeName(namespace: string, name: string) {
-        name = namespace ? `${namespace}.${name}` : name
+    setPrototypeName(namespace: string, name: string) {
+        if (!name)
+            return
 
-        if (this.prototypeNames.size && !this.prototypeNames.has(name)) {
-            console.log(`MULTIPLE PROTOTYPES when adding ${name}`)
-            this.prototypeNames.forEach(p => console.log(`- ${p}`))
+        if (this.jsName || this.jsNamespace) {
+            console.log(`MULTIPLE PROTOTYPES when adding ${namespace}.${name}`)
+            return
         }
 
-        this.isClass = true
+        this.jsNamespace = namespace
+        this.jsName = name
 
-        this.prototypeNames.add(name)
+        this.isClass = true
     }
 
     setTypeParameters(typeParameters: PreJavaTypeParameter[]) {

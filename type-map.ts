@@ -285,7 +285,7 @@ export class TsToPreJavaTypemap {
                         return type
                     if ((type.properties && type.properties.length) || (type.staticProperties && type.staticProperties.length))
                         return type
-                    if (type.prototypeNames && type.prototypeNames.size)
+                    if (type.jsName)
                         return type
                     if (type.numberIndexType || type.stringIndexType)
                         return type
@@ -645,25 +645,22 @@ export class TsToPreJavaTypemap {
                     newType.comments = superType.comments && superType.comments.slice()
                     newType.constructorSignatures = superType.constructorSignatures
                     newType.methods = superType.methods && superType.methods.slice()
-                    /*newType.methods && newType.methods.forEach(m => {
-                        if (!m.comments)
-                            m.comments = []
-                        m.comments.push('//FROM ARRANGEMULtiple...')
-                    })*/
                     newType.callSignatures = superType.callSignatures && superType.callSignatures.slice()
                     newType.name = superType.name + CONFIGURATION_IMPLEMENTATION_SUFFIX
                     newType.numberIndexType = superType.numberIndexType
                     newType.stringIndexType = superType.stringIndexType
                     newType.packageName = superType.packageName
                     newType.properties = superType.properties && superType.properties.slice()
-                    newType.prototypeNames = superType.prototypeNames
+                    newType.jsNamespace = superType.jsNamespace
+                    newType.jsName = superType.jsName
                     newType.isClass = true
                     newType.typeParameters = superType.typeParameters && superType.typeParameters.slice()
                     newType.sourceTypes = superType.sourceTypes
 
                     superType.isClass = false
                     superType.constructorSignatures = null
-                    superType.prototypeNames = null
+                    superType.jsName = null
+                    superType.jsNamespace = null
 
                     newType.cleanAndCheckMethods()
 
@@ -800,6 +797,8 @@ export class TsToPreJavaTypemap {
         let typeKey: any = type
         if (type.flags & ts.TypeFlags.Void) {
             typeKey = 'void-' + preferNothingVoid
+        } else if (type.flags & ts.TypeFlags.Enum && type.getSymbol()) {
+            typeKey = 'enum-' + type['id']
         } else if (objectType && objectType.objectFlags & ts.ObjectFlags.Tuple) {
             typeKey = 'tuple-' + referenceType.typeArguments.length
         } else if (objectType && objectType.objectFlags & ts.ObjectFlags.Anonymous) {
@@ -877,6 +876,9 @@ export class TsToPreJavaTypemap {
                 return new PreJavaTypeReference()
         }
 
+        if (type.flags & ts.TypeFlags.Enum && type.getSymbol())
+            return new PreJavaTypeEnum()
+
         if (type.flags & ts.TypeFlags.Union)
             return new PreJavaTypeUnion()
 
@@ -886,9 +888,6 @@ export class TsToPreJavaTypemap {
             else
                 return new PreJavaTypeClassOrInterface()
         }
-
-        if (type.flags & ts.TypeFlags.Enum && type.getSymbol())
-            return new PreJavaTypeEnum()
 
         if (type.flags & ts.TypeFlags.StringLike)
             return BUILTIN_TYPE_STRING
