@@ -6,6 +6,7 @@ import { PreJavaTypeParameter } from './PreJavaTypeParameter'
 export interface ProcessContext {
     createAnonymousTypeName(): string
     getJavaPackage(sourceFile: ts.SourceFile): string
+    getJsPackage(sourceFile: ts.SourceFile): string
     getProgram: () => ts.Program
     getTypeMap: () => TsToPreJavaTypemap
 }
@@ -22,6 +23,7 @@ export abstract class PreJavaType {
     abstract getSimpleName(typeParametersEnv: TypeEnvironment): string
 
     abstract getPackageName(): string
+    
     abstract setPackageName(name: string)
 
     abstract getTypeParameters(typeParametersEnv: { [key: string]: PreJavaType }): PreJavaType[]

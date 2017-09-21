@@ -34,11 +34,14 @@ export class TsToPreJavaTypemap {
 
     typeMap = new Map<any, PreJavaType>()
 
-    constructor(private program: ts.Program, private javaPackageGuesser: { (sourceFile: ts.SourceFile): string }) { }
+    constructor(private program: ts.Program,
+        private javaPackageGuesser: { (sourceFile: ts.SourceFile): string },
+        private jsPackageGuesser: { (sourceFile: ts.SourceFile): string }) { }
 
     processContext: ProcessContext = {
         createAnonymousTypeName: () => `AnonymousType${this.currentIdAnonymousTypes++}`,
         getJavaPackage: this.javaPackageGuesser,
+        getJsPackage: this.jsPackageGuesser,
         getProgram: () => this.program,
         getTypeMap: () => this
     }

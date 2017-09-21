@@ -24,10 +24,10 @@ export class GatherPhase {
         private defaultJavaPackage: string,
         private javaPackages: { [key: string]: string },
         private program: ts.Program) {
-        this.typeMap = new TsToPreJavaTypemap(program, sourceFile => this.getJavaPackage(sourceFile))
+        this.typeMap = new TsToPreJavaTypemap(program, sourceFile => this.getJavaPackage(sourceFile), sourceFile => this.getJSPackage(sourceFile))
     }
 
-    private getJavaPackage(sourceFile: ts.SourceFile) {
+    private getJSPackage(sourceFile: ts.SourceFile) {
         let relative = path.relative(this.program.getCurrentDirectory(), sourceFile.fileName)
 
         for (let pathPrefix in this.javaPackages) {
@@ -40,12 +40,15 @@ export class GatherPhase {
                 .replace(new RegExp('\\/', 'g'), '.')
                 .replace(new RegExp('-', 'g'), '.')
 
-            let packagePrefix = this.javaPackages[pathPrefix]// + (dirRelativePackagePath == '.' ? '' : ('.' + dirRelativePackagePath))
-
-            return this.baseJavaPackage + '.' + packagePrefix
+            return this.javaPackages[pathPrefix]
         }
 
-        return this.baseJavaPackage + '.' + this.defaultJavaPackage
+        return null
+    }
+
+    private getJavaPackage(sourceFile: ts.SourceFile) {
+        let jsPackage = this.getJSPackage(sourceFile)
+        return `${this.baseJavaPackage}.${jsPackage ? jsPackage : this.defaultJavaPackage}`
     }
 
     addTypesFromSourceFile(sourceFile: ts.SourceFile, onlyExportedSymbols: boolean) {
