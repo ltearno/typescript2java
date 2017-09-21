@@ -352,6 +352,10 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
 
     substituteTypeReal(replacer: TypeReplacer, cache: Map<PreJavaType, PreJavaType>, passThroughTypes: Set<PreJavaType>): PreJavaType {
         let stay = replacer(this)
+
+        if (stay != this && this.getSimpleName(null) == 'GlobalScope')
+            replacer(this)
+
         if (!stay || stay != this)
             return stay
 

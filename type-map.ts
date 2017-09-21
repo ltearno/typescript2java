@@ -317,21 +317,27 @@ export class TsToPreJavaTypemap {
         return false
     }
 
-    private substituteType(replacer: TypeReplacer): boolean {
-        let cache = new Map<PreJavaType, PreJavaType>()
-        let somethingChanged = false
+    private substituteType(replacer: TypeReplacer) {
+        let nbPassLeft = 10
+        while (nbPassLeft-- >= 0) {
+            let cache = new Map<PreJavaType, PreJavaType>()
+            let somethingChanged = false
+            for (let [typeKey, type] of this.typeMap.entries()) {
+                let substitute = type.substituteType(replacer, cache, new Set())
 
-        for (let [typeKey, type] of this.typeMap.entries()) {
-            let substitute = type.substituteType(replacer, cache, new Set())
-            if (!substitute)
-                this.typeMap.delete(typeKey)
-            else if (substitute != type)
-                this.typeMap.set(typeKey, substitute)
+                if (!substitute)
+                    this.typeMap.delete(typeKey)
+                else if (substitute != type)
+                    this.typeMap.set(typeKey, substitute)
 
-            somethingChanged = somethingChanged || (substitute != type)
+                somethingChanged = somethingChanged || (substitute != type)
+            }
+            if (!somethingChanged)
+                break
         }
 
-        return somethingChanged
+        if (!nbPassLeft)
+            console.log(`WARNING : substituteType did not manage to finish in 10 passes !`)
     }
 
     hasSubType(type: PreJavaType) {
@@ -492,16 +498,13 @@ export class TsToPreJavaTypemap {
             PROCS.push(PROC)
         }
 
-        while (this.substituteType(type => {
+        this.substituteType(type => {
             return Visit.visitPreJavaType(type, {
                 caseClassOrInterfaceType: type => {
                     if (PROCS.indexOf(type) >= 0 || LAMBDAS.indexOf(type) >= 0)
                         return type
 
                     if (type.callSignatures && type.callSignatures.length == 1 && type.isAnonymousSourceType && typeTools.hasOnlyCallSignatures(type)) {
-                        if (type.getSimpleName(null) == 'AnonymousType734')
-                            console.log('DONC IL EST BIEN CENSE NE PLUS ETRE REFERNCE NULLE PART (voir AnimationViewContext)');
-
                         let functionalMethod = type.callSignatures[0]
                         if (!functionalMethod.parameters || functionalMethod.parameters.length < NB_PARAMS) {
                             let returnType = functionalMethod.returnType
@@ -530,9 +533,7 @@ export class TsToPreJavaTypemap {
 
                 onOther: type => type as PreJavaType
             })
-        })) {
-            console.log('trying another replacement pass')
-        }
+        })
     }
 
     checkNoDuplicateTypeNames() {
@@ -626,14 +627,10 @@ export class TsToPreJavaTypemap {
                     }
                 }
 
-                console.log(`maybe arrange ${type.getSimpleName(null)}`)
-
                 if ((type.isClassLike() && implementationSuperTypes.length <= 1) || (!type.isClassLike() && implementationSuperTypes.length == 0))
                     continue
 
                 somethingDone = true
-
-                console.log(`arrange from ${type.getSimpleName(null)} with ${implementationSuperTypes.length} super implementations`)
 
                 let nbConstructors = type.constructorSignatures && type.constructorSignatures.length
 

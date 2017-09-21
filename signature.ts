@@ -57,6 +57,8 @@ export function getTypeSignature(type: PreJavaType, selfReflect: Map<PreJavaType
                 + ((type.stringIndexType) ? getTypeSignature(type.stringIndexType, selfReflect) : '-')
                 + ((type.methods && type.methods.length) ? type.methods.map(sig => getCallSignatureSignature(sig, selfReflect)).join() : '-')
                 + ((type.properties && type.properties.length) ? type.properties.map(ppty => getPropertySignature(ppty, selfReflect)).join() : '-')
+                + ((type.staticMethods && type.staticMethods.length) ? type.staticMethods.map(sig => getCallSignatureSignature(sig, selfReflect)).join() : '-')
+                + ((type.staticProperties && type.staticProperties.length) ? type.staticProperties.map(ppty => getPropertySignature(ppty, selfReflect)).join() : '-')
                 + ')'
         },
 

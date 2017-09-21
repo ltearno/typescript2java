@@ -7,6 +7,7 @@ import * as ExportPhase from './processor.export-phase'
 interface Configuration {
     sourceRootDir: string
     baseJavaPackage: string
+    defaultJavaPackage: string,
     javaPackages: { [key: string]: string }
     processInternalTypes: boolean
 }
@@ -15,8 +16,17 @@ let configuration: Configuration
 
 configuration = {
     sourceRootDir: './tests',
-    baseJavaPackage: 'fr.lteconsulting.angular2gwt.interop',
+    baseJavaPackage: 'fr.lteconsulting.jsinterop',
+    defaultJavaPackage: 'env',
     javaPackages: {
+        "tests/@angular/platform-browser-dynamic/src": "ng.platformBrowserDynamic",
+        "tests/@angular/platform-browser/src": "ng.platformBrowser",
+        "tests/@angular/http/src": "ng.http",
+        "tests/@angular/forms/src": "ng.forms",
+        "tests/@angular/router/src": "ng.router",
+        "tests/@angular/core/src": "ng.core",
+        "tests/@angular/common/src": "ng.common",
+        "tests/@angular/compiler/src": "ng.compiler",
         "tests/@angular/": "ng",
         "tests/rxjs": "rxjs",
         "tests": "fr.lteconsulting.test"
@@ -27,6 +37,7 @@ if (2 * 3 < 4) {
     configuration = {
         sourceRootDir: './tests.mini',
         baseJavaPackage: 'fr.lteconsulting.angular2gwt.interop',
+        defaultJavaPackage: 'env',
         javaPackages: {
             "tests/@angular/": "ng",
             "tests/rxjs": "rxjs",
@@ -45,17 +56,17 @@ if (2 * 3 < 4) {
  */
 
 let walkSync = function (dir, filelist = []) {
-    let files = fs.readdirSync(dir);
+    let files = fs.readdirSync(dir)
     filelist = filelist || [];
     files.forEach(function (file) {
         if (fs.statSync(path.join(dir, file)).isDirectory()) {
-            filelist = walkSync(path.join(dir, file), filelist);
+            filelist = walkSync(path.join(dir, file), filelist)
         }
         else if (file.endsWith('.d.ts')) {
-            filelist.push(path.join(dir, file));
+            filelist.push(path.join(dir, file))
         }
     });
-    return filelist;
+    return filelist
 };
 
 let files = walkSync(configuration.sourceRootDir)
@@ -82,44 +93,44 @@ let program = ts.createProgram(files, compilerOptions)
 
 console.log(`Emitting result...`)
 
-let emitResult = program.emit();
+let emitResult = program.emit()
 
 console.log(`Compiling diagnostics...`)
 
 let allDiagnostics = ts.getPreEmitDiagnostics(program).concat(emitResult.diagnostics);
 
 allDiagnostics.forEach(diagnostic => {
-    let message = ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n');
+    let message = ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n')
 
     if (diagnostic.file) {
         let { line, character } = diagnostic.file.getLineAndCharacterOfPosition(diagnostic.start)
-        console.error(`${diagnostic.file.fileName} (${line + 1},${character + 1}): ${message}`);
+        console.error(`${diagnostic.file.fileName} (${line + 1},${character + 1}): ${message}`)
     }
     else {
-        console.error(`${message}`);
+        console.error(`${message}`)
     }
 });
 
 if (emitResult.emitSkipped) {
-    console.log(`emit has been skipped, exit.`);
+    console.log(`emit has been skipped, exit.`)
 }
 
-console.log(`Adding exportable nodes...`);
+console.log(`Adding exportable nodes...`)
 
-let syncPhase = new GatherPhase(configuration.baseJavaPackage, configuration.javaPackages, program)
+let syncPhase = new GatherPhase(configuration.baseJavaPackage, configuration.defaultJavaPackage, configuration.javaPackages, program)
 
 program.getSourceFiles().forEach(sourceFile => {
-    console.log(`source ${sourceFile.fileName}`);
+    console.log(`source ${sourceFile.fileName}`)
 
-    let isInternalFile = !files.find(file => path.normalize(file) === path.normalize(sourceFile.fileName));
+    let isInternalFile = !files.find(file => path.normalize(file) === path.normalize(sourceFile.fileName))
     if (configuration.processInternalTypes || !isInternalFile)
-        syncPhase.addTypesFromSourceFile(sourceFile, !isInternalFile);
+        syncPhase.addTypesFromSourceFile(sourceFile, !isInternalFile)
 });
 
 syncPhase.sumup()
 
-console.log(`Exporting nodes...`);
+console.log(`Exporting nodes...`)
 let exportPhase = new ExportPhase.ExportPhase(syncPhase)
 exportPhase.exportNodes(program, './out/src/main/java')
 
-console.log(`Finished.`);
+console.log(`Finished.`)

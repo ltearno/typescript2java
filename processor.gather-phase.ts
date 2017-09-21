@@ -21,26 +21,37 @@ export class GatherPhase {
     private ignoredSyntaxKinds: Set<ts.SyntaxKind> = new Set()
 
     constructor(private baseJavaPackage: string,
+        private defaultJavaPackage: string,
         private javaPackages: { [key: string]: string },
         private program: ts.Program) {
         this.typeMap = new TsToPreJavaTypemap(program, sourceFile => this.getJavaPackage(sourceFile))
     }
 
     private getJavaPackage(sourceFile: ts.SourceFile) {
-        let relative = path.relative(this.program.getCurrentDirectory(), sourceFile.fileName);
+        let relative = path.relative(this.program.getCurrentDirectory(), sourceFile.fileName)
+
         for (let pathPrefix in this.javaPackages) {
             let sourceRelativePath = path.relative(pathPrefix, relative)
-            if (!sourceRelativePath.startsWith('..')) {
-                let dirRelativePackagePath = path.dirname(sourceRelativePath).replace(new RegExp('\\\\', 'g'), '.').replace(new RegExp('-', 'g'), '.').replace(new RegExp('\\/', 'g'), '.')
-                let packagePrefix = this.javaPackages[pathPrefix] + (dirRelativePackagePath == '.' ? '' : ('.' + dirRelativePackagePath))
+            if (sourceRelativePath.startsWith('..'))
+                continue
 
-                return packagePrefix
-            }
+            let dirRelativePackagePath = path.dirname(sourceRelativePath)
+                .replace(new RegExp('\\\\', 'g'), '.')
+                .replace(new RegExp('\\/', 'g'), '.')
+                .replace(new RegExp('-', 'g'), '.')
+
+            let packagePrefix = this.javaPackages[pathPrefix]// + (dirRelativePackagePath == '.' ? '' : ('.' + dirRelativePackagePath))
+
+            return this.baseJavaPackage + '.' + packagePrefix
         }
-        return null
+
+        return this.baseJavaPackage + '.' + this.defaultJavaPackage
     }
 
     addTypesFromSourceFile(sourceFile: ts.SourceFile, onlyExportedSymbols: boolean) {
+        if (sourceFile.fileName.indexOf('testing') >= 0)
+            return
+
         ts.forEachChild(sourceFile, (node) => {
             if (node.kind == ts.SyntaxKind.VariableStatement) {
                 this.registerVariableStatement(node as ts.VariableStatement)
@@ -122,7 +133,7 @@ export class GatherPhase {
 
     private getGlobalClass(jsPackage: string): PreJavaTypeClassOrInterface {
         if (!jsPackage)
-            jsPackage = 'global'
+            jsPackage = this.baseJavaPackage + '.global'
 
         if (!this.globalClasses.has(jsPackage)) {
             let globalClass = new PreJavaTypeClassOrInterface()
@@ -157,13 +168,25 @@ export class GatherPhase {
                 })
             }
 
-            if (t.getNumberIndexType()
+            let javaPackage = this.getJavaPackage(declaration.getSourceFile())
+
+            let callSignatures = t.getCallSignatures()
+            if (callSignatures && callSignatures.length) {
+                callSignatures.forEach(tsSignature => {
+                    if (declaration && declaration.name && declaration.name.getText()) {
+                        let signature = this.typeMap.convertSignature(declaration.name.getText(), tsSignature, null)
+                        if (signature)
+                            this.getGlobalClass(javaPackage).addStaticMethod(signature)
+                    }
+                })
+            }
+            else if (t.getNumberIndexType()
                 || t.getStringIndexType()
                 || (t.getCallSignatures() && t.getCallSignatures().some(s => s.declaration && s.declaration.name && s.declaration.name.getText() != '__call'))
                 || (t.getProperties() && t.getProperties().some(p => p.name != 'prototype'))) {
                 let variableType = this.typeMap.getOrCreatePreJavaTypeForTsType(t, false)
 
-                this.getGlobalClass(this.getJavaPackage(declaration.getSourceFile())).addStaticProperty({ name: guessName(declaration.name), comments: null, type: variableType, writable: true })
+                this.getGlobalClass(javaPackage).addStaticProperty({ name: guessName(declaration.name), comments: null, type: variableType, writable: true })
             }
         })
     }
