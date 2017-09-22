@@ -122,7 +122,7 @@ program.getSourceFiles().forEach(sourceFile => {
 
     let isInternalFile = !files.find(file => path.normalize(file) === path.normalize(sourceFile.fileName))
     if (configuration.processInternalTypes || !isInternalFile)
-        syncPhase.addTypesFromSourceFile(sourceFile, !isInternalFile)
+        syncPhase.addTypesFromSourceFile(sourceFile)
 });
 
 syncPhase.sumup()

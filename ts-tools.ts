@@ -43,10 +43,23 @@ export function getSignaturesOfSymbol(symbol: ts.Symbol, typeChecker: ts.TypeChe
 export function getConstructorSymbolOfType(type: ts.Type, typeChecker: ts.TypeChecker) {
     if (!type || !type.symbol || !type.symbol.members)
         return null
-    let constructorSymbol = type.symbol.members.get("__constructor")
-    let signatures = getSignaturesOfSymbol(constructorSymbol, typeChecker)
-    if (signatures && signatures.length)
-        return signatures[0]
+    if (type.symbol.members) {
+        let constructorSymbol = type.symbol.members.get("__constructor")
+        let signatures = getSignaturesOfSymbol(constructorSymbol, typeChecker)
+        if (signatures && signatures.length)
+            return signatures[0]
+    }
+
+    if (type.symbol.valueDeclaration) {
+        let valueDeclarationType = typeChecker.getTypeOfSymbolAtLocation(type.symbol, type.symbol.valueDeclaration)
+        if (valueDeclarationType && valueDeclarationType.symbol && valueDeclarationType.symbol.members) {
+            let constructorSymbol = valueDeclarationType.symbol.members.get("__new")
+            let signatures = getSignaturesOfSymbol(constructorSymbol, typeChecker)
+            if (signatures && signatures.length)
+                return signatures[0]
+        }
+    }
+
     return null
 }
 

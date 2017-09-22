@@ -314,10 +314,13 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
                 // TODO : generating property accessors for callable types should be configurable
                 let callSignatures = propertyType.getCallSignatures()
                 if (callSignatures && callSignatures.length && !(propertyName.startsWith('on'))) {
+                    let c = 0
                     for (let callSignature of callSignatures) {
                         let method = context.getTypeMap().convertSignature(propertyName, callSignature, this.typeParameters)
                         if (method) {
                             method.addComments(comments)
+                            if (c++ > 0)
+                                method.comments.push(`VERSION ${c - 1}`)
                             this.addMethod(method)
                         }
                     }
@@ -565,8 +568,8 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
         if (!method || method.name == 'toString')
             return
 
-        let sig = Signature.getCallSignatureSignature(method)
-        if (methods.some(m => Signature.getCallSignatureSignature(m) == sig))
+        let sig = Signature.getCallSignatureTypeErasedSignature(method)
+        if (methods.some(m => Signature.getCallSignatureTypeErasedSignature(m) == sig))
             return
 
         methods.push(method)

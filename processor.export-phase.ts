@@ -493,7 +493,7 @@ export class ExportPhase {
 
                 type.staticMethods
                     .filter(method => {
-                        let sig = Signature.getCallSignatureSignature(method)
+                        let sig = Signature.getCallSignatureTypeErasedSignature(method)
                         let seen = fixBug.has(sig)
                         fixBug.add(sig)
                         return !seen
@@ -503,8 +503,6 @@ export class ExportPhase {
                             flow.push(`// skipped static method ${method.name}`).blankLine().blankLine()
                         }
                         else {
-                            flow.push(`// ${Signature.getCallSignatureSignature(method)}`).finishLine()
-
                             if (method.comments && method.comments.length) {
                                 flow.startJavaDocComments()
                                 flow.push(method.comments)
@@ -540,6 +538,7 @@ export class ExportPhase {
                     .push('/*\n    Properties\n*/').finishLine()
 
                 type.properties
+                    .sort((a, b) => a.name == b.name ? 0 : (a.name < b.name ? -1 : 1))
                     .filter(property => !type.staticProperties || !type.staticProperties.some(p => p.name == property.name))
                     .forEach(property => {
                         flow.blankLine()
@@ -605,32 +604,54 @@ export class ExportPhase {
                 flow.blankLine()
                     .push('/*\n    Methods\n*/').finishLine()
 
-                type.methods.filter(method => method.name != 'toString').forEach(method => {
-                    if (method.name.indexOf('@') >= 0) {
-                        flow.push(`// skipped method ${method.name}`).blankLine().blankLine()
-                    }
-                    else {
-                        if (method.comments && method.comments.length) {
+                let fixBug = new Set<string>()
+
+                type.methods
+                    .filter(method => {
+                        let sig = Signature.getCallSignatureTypeErasedSignature(method)
+                        let seen = fixBug.has(sig)
+                        fixBug.add(sig)
+                        return !seen
+                    })
+                    .sort((a, b) => {
+                        let sa = Signature.getCallSignatureTypeErasedSignature(a)
+                        let sb = Signature.getCallSignatureTypeErasedSignature(b)
+
+                        if (sa == sb)
+                            return 0
+                        return sa > sb ? 1 : -1
+                    })
+                    .forEach(method => {
+                        if (method.name.indexOf('@') >= 0) {
+                            flow.push(`// skipped method ${method.name}`).blankLine().blankLine()
+                        }
+                        else {
                             flow.startJavaDocComments()
-                            flow.push(method.comments)
+                            flow.push(`Std Signature : ${Signature.getCallSignatureStandardSignature(method)}`).finishLine()
+                            flow.push(`TE Signature : ${Signature.getCallSignatureTypeErasedSignature(method)}`).finishLine()
                             flow.endJavaDocComments()
-                        }
 
-                        let escapedMethodName = this.escapePropertyName(method.name)
+                            if (method.comments && method.comments.length) {
+                                flow.startJavaDocComments()
+                                flow.push(method.comments)
+                                flow.endJavaDocComments()
+                            }
 
-                        if (escapedMethodName != method.name) {
-                            javaWriter.importType(this.JS_METHOD)
-                            flow.push(`@JsMethod(name = "${method.name}")`).finishLine()
+                            let escapedMethodName = this.escapePropertyName(method.name)
+
+                            if (escapedMethodName != method.name) {
+                                javaWriter.importType(this.JS_METHOD)
+                                flow.push(`@JsMethod(name = "${method.name}")`).finishLine()
+                            }
+                            flow.push(`${isClass ? 'public native ' : ''}`)
+                            if (method.typeParameters && method.typeParameters.length)
+                                flow.push(`<${method.typeParameters.map(tp => tp.name).join(', ')}> `)
+                            flow.push(`${javaWriter.importTypeParametrized(method.returnType)} ${escapedMethodName}(`)
+                            if (method.parameters)
+                                flow.push(method.parameters.map(p => `${javaWriter.importTypeParametrized(p.type)}${p.dotdotdot ? '...' : ''} ${this.escapePropertyName(p.name)}${p.optional ? ' /* optional */' : ''}`).join(', '))
+                            flow.push(`);`).finishLine()
                         }
-                        flow.push(`${isClass ? 'public native ' : ''}`)
-                        if (method.typeParameters && method.typeParameters.length)
-                            flow.push(`<${method.typeParameters.map(tp => tp.name).join(', ')}> `)
-                        flow.push(`${javaWriter.importTypeParametrized(method.returnType)} ${escapedMethodName}(`)
-                        if (method.parameters)
-                            flow.push(method.parameters.map(p => `${javaWriter.importTypeParametrized(p.type)} ${this.escapePropertyName(p.name)}${p.dotdotdot ? ' /* ... */' : ''}${p.optional ? ' /* optional */' : ''}`).join(', '))
-                        flow.push(`);`).finishLine()
-                    }
-                })
+                    })
             }
 
             flow.pullLineStart()

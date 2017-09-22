@@ -1,5 +1,6 @@
 import * as ts from "typescript"
 import * as BuiltIn from './builtin-types'
+import * as Visit from './prejavatypes/PreJavaTypeVisit'
 
 import { PreJavaType, TypeReplacer, ProcessContext } from './prejavatypes/PreJavaType'
 import { PreJavaTypeReference } from './prejavatypes/PreJavaTypeReference'
@@ -29,8 +30,17 @@ export class TsToPreJavaTypemap {
 
     typeSet() {
         let result = new Set<PreJavaType>()
-        for (let type of this.typeMap.values())
-            result.add(type)
+        for (let type of this.typeMap.values()) {
+            Visit.visitPreJavaType(type, {
+                caseBuiltinType: type => null,
+                caseFakeType: type => null,
+                caseReferenceType: type => null,
+                caseTPEnvironnement: type => null,
+                caseTypeParameter: type => null,
+
+                onOther: type => result.add(type)
+            })
+        }
         return result
     }
 

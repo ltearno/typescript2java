@@ -48,12 +48,6 @@ export function removeOverridingProperties(typeMap: TsToPreJavaTypemap) {
             onOther: type => getObjectId(type)
         })
     }
-    function getMethodFootprint(method: PreJavaTypeCallSignature) {
-        let res = method.name ? method.name : '?'
-        if (method.parameters && method.parameters.length)
-            res += '-' + method.parameters.map(p => getTypeFootprint(p.type)).join('-')
-        return res
-    }
     typeMap.typeSet().forEach(type => {
         Visit.visitPreJavaType(type, {
             caseClassOrInterfaceType: type => {
@@ -72,11 +66,11 @@ export function removeOverridingProperties(typeMap: TsToPreJavaTypemap) {
 
                 if (type.methods && type.methods.length) {
                     let methodsByFootprint = new Map<string, PreJavaTypeCallSignature>()
-                    type.methods.forEach(m => methodsByFootprint.set(getMethodFootprint(m), m))
+                    type.methods.forEach(m => methodsByFootprint.set(Signature.getCallSignatureTypeErasedSignature(m), m))
 
                     typeTools.browseTypeHierarchy(type, visitedType => {
                         visitedType.methods && visitedType.methods
-                            .forEach(m => methodsByFootprint.delete(getMethodFootprint(m)))
+                            .forEach(m => methodsByFootprint.delete(Signature.getCallSignatureTypeErasedSignature(m)))
                     })
 
                     type.methods = []
@@ -88,7 +82,7 @@ export function removeOverridingProperties(typeMap: TsToPreJavaTypemap) {
 }
 
 
-function developMethod(method: PreJavaTypeCallSignature, nbMethodsMax: number): PreJavaTypeCallSignature[] {
+function developMethodWithUnionParameters(method: PreJavaTypeCallSignature, nbMethodsMax: number): PreJavaTypeCallSignature[] {
     if (!method.parameters || !method.parameters.length)
         return null
 
@@ -143,34 +137,45 @@ function developMethod(method: PreJavaTypeCallSignature, nbMethodsMax: number): 
     return res
 }
 
-export function developMethodsWithUnionParameters(typeMap: TsToPreJavaTypemap) {
-    let maxCounter = 0
-    let maxType = null
+function developMethodWithOptionalParameters(method: PreJavaTypeCallSignature): PreJavaTypeCallSignature[] {
+    if (!method.parameters || !method.parameters.length)
+        return null
 
+    let res: PreJavaTypeCallSignature[] = []
+
+    for (let i = method.parameters.length - 1; i >= 0; i--) {
+        if (method.parameters[i].optional || method.parameters[i].dotdotdot) {
+            res.push(new PreJavaTypeCallSignature(method.typeParameters, method.returnType, method.name, method.parameters.slice(0, i)))
+        }
+    }
+
+    return res.length ? res : null
+}
+
+export function developMethodsWithUnionParameters(typeMap: TsToPreJavaTypemap) {
+    let counter = 0
     for (let type of typeMap.typeSet()) {
         Visit.visitPreJavaType(type, {
             caseClassOrInterfaceType: type => {
-                let counter = 0
                 let functionalInterface = typeTools.hasOnlyCallSignatures(type)
                 if (functionalInterface && type.callSignatures.length == 1)
                     return
 
                 type.methods && type.methods.forEach(m => {
-                    let dups = developMethod(m, 5)
-                    counter += dups && dups.length
-
+                    let dups = developMethodWithUnionParameters(m, 5)
                     dups && dups.forEach(dup => type.addMethod(dup))
+                    counter += dups && dups.length
                 })
 
-                if (maxType == null || maxCounter < counter) {
-                    maxType = type
-                    maxCounter = counter
-                }
+                type.methods && type.methods.forEach(m => {
+                    let dups = developMethodWithOptionalParameters(m)
+                    dups && dups.forEach(dup => type.addMethod(dup))
+                    counter += dups && dups.length
+                })
             }
         })
     }
-
-    console.log(`${maxCounter} on ${maxType} developped methods with union parameters`)
+    console.log(`added ${counter} developped methods`)
 }
 
 
@@ -190,7 +195,7 @@ export function reduceAnonymousTypes(typeMap: TsToPreJavaTypemap) {
                 if (!classType.isAnonymousSourceType)
                     return
 
-                let footprint = Signature.getTypeSignature(classType, null)
+                let footprint = Signature.getTypeSignature(classType)
                 let list = typeDuplicates.get(footprint)
                 if (list == null) {
                     list = []
@@ -200,7 +205,7 @@ export function reduceAnonymousTypes(typeMap: TsToPreJavaTypemap) {
             },
 
             caseUnion: unionType => {
-                let footprint = Signature.getTypeSignature(unionType, null)
+                let footprint = Signature.getTypeSignature(unionType)
                 let list = typeDuplicates.get(footprint)
                 if (list == null) {
                     list = []
@@ -297,7 +302,7 @@ export function addMethodsFromInterfaceHierarchy(typeMap: TsToPreJavaTypemap) {
             caseClassOrInterfaceType: type => {
                 if (type.isClassLike()) {
                     let methodsSignatures = new Set<string>()
-                    type.methods && type.methods.forEach(m => methodsSignatures.add(Signature.getCallSignatureSignature(m)))
+                    type.methods && type.methods.forEach(m => methodsSignatures.add(Signature.getCallSignatureTypeErasedSignature(m)))
 
                     typeTools.browseTypeHierarchy(type, (visitedInterface, typeVariableEnv) => {
                         if (visitedInterface.isClassLike())

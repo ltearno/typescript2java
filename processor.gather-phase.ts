@@ -50,7 +50,7 @@ export class GatherPhase {
         return `${this.baseJavaPackage}.${jsPackage ? jsPackage : this.defaultJavaPackage}`
     }
 
-    addTypesFromSourceFile(sourceFile: ts.SourceFile, onlyExportedSymbols: boolean) {
+    addTypesFromSourceFile(sourceFile: ts.SourceFile) {
         if (sourceFile.fileName.indexOf('testing') >= 0)
             return
 
