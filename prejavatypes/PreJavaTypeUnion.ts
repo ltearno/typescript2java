@@ -12,7 +12,7 @@ export class PreJavaTypeUnion extends PreJavaType {
     packageName: string
     types: PreJavaType[]
     typeParameters: PreJavaTypeParameter[]
-    baseTypes: Set<PreJavaType>
+    baseTypes: Set<PreJavaType> = undefined
     aliasName: string = null
 
     unionId = currentUnionId++
@@ -52,6 +52,29 @@ export class PreJavaTypeUnion extends PreJavaType {
 
         if (type && type.symbol && type.symbol.valueDeclaration)
             this.packageName = context.getJavaPackage(type.symbol.valueDeclaration.getSourceFile())
+
+        // let all the ClassOrInterface implement the Union
+        // if Union type and Class type have the same type parameters
+        /*if (!this.getBaseTypes().size) {
+            let typeParametersCount = this.typeParameters && this.typeParameters.length
+            this.types && this.types.forEach(unionedType => {
+                Visit.visitPreJavaType(unionedType, {
+                    caseClassOrInterfaceType: unionedType => {
+                        let baseTypeTypeParametersCount = unionedType.typeParameters && unionedType.typeParameters.length
+                        if (baseTypeTypeParametersCount != typeParametersCount)
+                            return
+
+                        if (typeParametersCount) {
+                            for (let i = 0; i < typeParametersCount; i++)
+                                if (this.typeParameters[i].name != unionedType.typeParameters[i].name)
+                                    return
+                        }
+
+                        unionedType.addBaseType(this)
+                    }
+                })
+            })
+        }*/
     }
 
     // Free Type variable names used in this Union
@@ -156,7 +179,14 @@ export class PreJavaTypeUnion extends PreJavaType {
             this.packageName = name
     }
 
-    isClassLike() { return true }
+    isClassLike() {
+        if (!this.getBaseTypes())
+            return false
+        for (let baseType of this.getBaseTypes())
+            if (baseType.isClassLike())
+                return true
+        return false
+    }
 
     isCompletablePreJavaType() { return null }
 
@@ -186,25 +216,27 @@ export class PreJavaTypeUnion extends PreJavaType {
 
     private addBaseTypesOf(type: PreJavaType, set: Set<PreJavaType>) {
         Visit.visitPreJavaType(type, {
-            onOther: type => null,
-
             caseReferenceType: type => this.addBaseTypesOf(type.type, set),
 
             caseClassOrInterfaceType: type => type.baseTypes && type.baseTypes.forEach(baseType => {
-                set.add(baseType)
-                this.addBaseTypesOf(baseType, set)
+                if (!set.has(baseType)) {
+                    set.add(baseType)
+                    this.addBaseTypesOf(baseType, set)
+                }
             }),
 
             caseTypeParameter: type => {
-                if (type.constraint) {
+                if (type.constraint && !set.has(type.constraint)) {
                     set.add(type.constraint)
                     this.addBaseTypesOf(type.constraint, set)
                 }
             },
 
             caseUnion: type => type.getBaseTypes() && type.getBaseTypes().forEach(baseType => {
-                set.add(baseType)
-                this.addBaseTypesOf(baseType, set)
+                if (!set.has(baseType)) {
+                    set.add(baseType)
+                    this.addBaseTypesOf(baseType, set)
+                }
             })
         })
     }
@@ -216,31 +248,29 @@ export class PreJavaTypeUnion extends PreJavaType {
     }
 
     getBaseTypes(): Set<PreJavaType> {
-        if (this.baseTypes)
-            return this.baseTypes
+        if (this.baseTypes === undefined) {
+            this.baseTypes = null
 
-        let baseTypes: Set<PreJavaType> = null
-        for (let type of this.types) {
-            if (!baseTypes) {
-                baseTypes = this.getBaseTypesOf(type)
+            for (let type of this.types) {
+                if (!this.baseTypes) {
+                    this.baseTypes = this.getBaseTypesOf(type)
+                }
+                else {
+                    let unionedBaseTypes = this.getBaseTypesOf(type)
+                    let typesToRemove: PreJavaType[] = []
+                    this.baseTypes.forEach(baseType => { if (!unionedBaseTypes.has(baseType)) typesToRemove.push(baseType) })
+                    typesToRemove.forEach(t => this.baseTypes.delete(t))
+                }
             }
-            else {
-                let unionedBaseTypes = this.getBaseTypesOf(type)
-                let typesToRemove: PreJavaType[] = []
-                baseTypes.forEach(baseType => unionedBaseTypes.has(baseType) || typesToRemove.push(baseType))
-                typesToRemove.forEach(t => baseTypes.delete(t))
+
+            if (this.baseTypes && this.baseTypes.size) {
+                // keep only leaf types
+                let toRemove = new Set<PreJavaType>()
+                this.baseTypes.forEach(type => this.getBaseTypesOf(type).forEach(t => toRemove.add(t)))
+                toRemove.forEach(type => this.baseTypes.delete(type))
             }
         }
 
-        if (baseTypes.size == 0)
-            return null
-
-        let toRemove = new Set<PreJavaType>()
-        baseTypes.forEach(type => this.getBaseTypesOf(type).forEach(t => toRemove.add(t)))
-        toRemove.forEach(type => baseTypes.delete(type))
-
-        this.baseTypes = baseTypes
-
-        return baseTypes
+        return this.baseTypes
     }
 }

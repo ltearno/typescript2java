@@ -134,41 +134,73 @@ export class ExportPhase {
         flow.startJavaDocComments()
         flow.push(`Union adapter`).finishLine()
         flow.endJavaDocComments()
-        javaWriter.importType(this.JS_PACKAGE)
-        flow.push(`@JsType(isNative=true, namespace=JsPackage.GLOBAL, name="Object")`).finishLine()
-        flow.push(`public abstract class ${type.getParametrizedSimpleName(null)} ${extendedBaseTypes.length ? `extends ${extendedBaseTypes.map(t => javaWriter.importTypeParametrized(t)).join()} ` : ''}${implementedBaseTypes.length ? `implements ${implementedBaseTypes.map(t => javaWriter.importTypeParametrized(t)).join()} ` : ''} {`).finishLine()
-        flow.pushLineStart('    ')
 
-        let baseConstructors = typeTools.getSuperConstructors(type, false)
-        let baseConstructor = baseConstructors && baseConstructors.length && baseConstructors[0]
-        let baseClassConstructorParameters = baseConstructor && baseConstructor.parameters
-        if (baseClassConstructorParameters && baseClassConstructorParameters.length) {
-            flow.push(`public ${type.getSimpleName()}() {`).finishLine()
-            flow.pushLineStart('    ').push(`super(${baseClassConstructorParameters.map(p => 'null').join(', ')});`).finishLine().pullLineStart()
-            flow.push(`}`).finishLine()
-        }
-
-        for (let unionedType of type.types) {
-            javaWriter.importType(this.JS_OVERLAY)
-
-            flow.push(`@JsOverlay`).finishLine()
-            flow.push(`public final ${javaWriter.importTypeParametrized(unionedType)} as${unionedType.getHumanizedName(null)}() {`).finishLine()
+        let exportUnionAsAbstractClass = extendedBaseTypes.length > 0
+        if (type.isClassLike()) {
+            javaWriter.importType(this.JS_PACKAGE)
+            flow.push(`@JsType(isNative=true, namespace=JsPackage.GLOBAL, name="Object")`).finishLine()
+            flow.push(`public abstract class ${type.getParametrizedSimpleName(null)} ${extendedBaseTypes.length ? `extends ${extendedBaseTypes.map(t => javaWriter.importTypeParametrized(t)).join()} ` : ''}${implementedBaseTypes.length ? `implements ${implementedBaseTypes.map(t => javaWriter.importTypeParametrized(t)).join()} ` : ''} {`).finishLine()
             flow.pushLineStart('    ')
-            flow.push(`return Js.uncheckedCast( this );`).finishLine()
+
+            let baseConstructors = typeTools.getSuperConstructors(type, false)
+            let baseConstructor = baseConstructors && baseConstructors.length && baseConstructors[0]
+            let baseClassConstructorParameters = baseConstructor && baseConstructor.parameters
+            if (baseClassConstructorParameters && baseClassConstructorParameters.length) {
+                flow.push(`public ${type.getSimpleName()}() {`).finishLine()
+                flow.pushLineStart('    ').push(`super(${baseClassConstructorParameters.map(p => 'null').join(', ')});`).finishLine().pullLineStart()
+                flow.push(`}`).finishLine()
+            }
+
+            for (let unionedType of type.types) {
+                javaWriter.importType(this.JS_OVERLAY)
+
+                flow.push(`@JsOverlay`).finishLine()
+                flow.push(`public final ${javaWriter.importTypeParametrized(unionedType)} as${unionedType.getHumanizedName(null)}() {`).finishLine()
+                flow.pushLineStart('    ')
+                flow.push(`return Js.uncheckedCast( this );`).finishLine()
+                flow.pullLineStart()
+                flow.push(`}`).finishLine()
+                flow.finishLine()
+
+                flow.push(`@JsOverlay`).finishLine()
+                flow.push(`public static ${type.getParametrization(null)} ${type.getParametrizedSimpleName(null)} of${unionedType.getHumanizedName(null)}(${unionedType.getSimpleName(null)} value) {`).finishLine()
+                flow.pushLineStart('    ')
+                flow.push(`return Js.uncheckedCast( value );`).finishLine()
+                flow.pullLineStart()
+                flow.push(`}`).finishLine()
+                flow.finishLine()
+            }
             flow.pullLineStart()
             flow.push(`}`).finishLine()
-            flow.finishLine()
-
-            flow.push(`@JsOverlay`).finishLine()
-            flow.push(`public static ${type.getParametrization(null)} ${type.getParametrizedSimpleName(null)} of${unionedType.getHumanizedName(null)}(${unionedType.getSimpleName(null)} value) {`).finishLine()
+        }
+        else {
+            javaWriter.importType(this.JS_PACKAGE)
+            flow.push(`@JsType(isNative=true, namespace=JsPackage.GLOBAL, name="?")`).finishLine()
+            flow.push(`public interface ${type.getParametrizedSimpleName(null)} ${implementedBaseTypes.length ? `extends ${implementedBaseTypes.map(t => javaWriter.importTypeParametrized(t)).join()} ` : ''} {`).finishLine()
             flow.pushLineStart('    ')
-            flow.push(`return Js.uncheckedCast( value );`).finishLine()
+
+            for (let unionedType of type.types) {
+                javaWriter.importType(this.JS_OVERLAY)
+
+                flow.push(`@JsOverlay`).finishLine()
+                flow.push(`default ${javaWriter.importTypeParametrized(unionedType)} as${unionedType.getHumanizedName(null)}() {`).finishLine()
+                flow.pushLineStart('    ')
+                flow.push(`return Js.cast( this );`).finishLine()
+                flow.pullLineStart()
+                flow.push(`}`).finishLine()
+                flow.finishLine()
+
+                flow.push(`@JsOverlay`).finishLine()
+                flow.push(`static ${type.getParametrization(null)} ${type.getParametrizedSimpleName(null)} of${unionedType.getHumanizedName(null)}(${unionedType.getSimpleName(null)} value) {`).finishLine()
+                flow.pushLineStart('    ')
+                flow.push(`return Js.cast( value );`).finishLine()
+                flow.pullLineStart()
+                flow.push(`}`).finishLine()
+                flow.finishLine()
+            }
             flow.pullLineStart()
             flow.push(`}`).finishLine()
-            flow.finishLine()
         }
-        flow.pullLineStart()
-        flow.push(`}`).finishLine()
 
         this.exportJavaUnit(type, javaWriter, flow, baseDirectory)
     }

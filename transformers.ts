@@ -287,6 +287,35 @@ export function simplifyUnions(typeMap: TsToPreJavaTypemap) {
         },
         onOther: type => type
     }))
+
+    // let all the ClassOrInterface implement the Union
+    // if Union type and Class type have the same type parameters
+    typeMap.typeSet().forEach(type => {
+        Visit.visitPreJavaType(type, {
+            caseUnion: type => {
+                if (!type.getBaseTypes() || !type.getBaseTypes().size) {
+                    let typeParametersCount = type.typeParameters && type.typeParameters.length
+                    type.types && type.types.forEach(unionedType => {
+                        Visit.visitPreJavaType(unionedType, {
+                            caseClassOrInterfaceType: unionedType => {
+                                let baseTypeTypeParametersCount = unionedType.typeParameters && unionedType.typeParameters.length
+                                if (baseTypeTypeParametersCount != typeParametersCount)
+                                    return
+
+                                if (typeParametersCount) {
+                                    for (let i = 0; i < typeParametersCount; i++)
+                                        if (type.typeParameters[i].name != unionedType.typeParameters[i].name)
+                                            return
+                                }
+
+                                unionedType.addBaseType(type)
+                            }
+                        })
+                    })
+                }
+            }
+        })
+    })
 }
 
 export function removeNotSupportedTypes(typeMap: TsToPreJavaTypemap) {
