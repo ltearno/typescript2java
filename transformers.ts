@@ -526,9 +526,10 @@ export function replaceAnonymousTypes(typeMap: TypescriptToJavaTypemap) {
         let LAMBDA = new PreJavaTypeClassOrInterface()
         LAMBDA.setSimpleName(`Function${i ? i : ''}`)
         LAMBDA.setPackageName('fr.lteconsulting.prebuilt')
-        let typeParameters = [new PreJavaTypeParameter('R')]
+        let typeParameters = []
         for (let j = 0; j < i; j++)
             typeParameters.push(new PreJavaTypeParameter(PARAMETER_NAMES[j]))
+        typeParameters.push(new PreJavaTypeParameter('R'))
         LAMBDA.setTypeParameters(typeParameters)
 
         let parameters: PreJavaTypeFormalParameter[] = []
@@ -536,10 +537,10 @@ export function replaceAnonymousTypes(typeMap: TypescriptToJavaTypemap) {
             parameters.push({
                 dotdotdot: false,
                 optional: false,
-                type: typeParameters[j + 1],
+                type: typeParameters[j],
                 name: `p${j + 1}`
             })
-        let method = new PreJavaTypeCallSignature(null, typeParameters[0], null, parameters)
+        let method = new PreJavaTypeCallSignature(null, typeParameters[i], null, parameters)
         LAMBDA.callSignatures.push(method)
 
         LAMBDAS.push(LAMBDA)
@@ -596,9 +597,10 @@ export function replaceAnonymousTypes(typeMap: TypescriptToJavaTypemap) {
 
                             let ref = new PreJavaTypeReference()
                             ref.type = LAMBDAS[nbParameters]
-                            ref.typeParameters = [returnType]
+                            ref.typeParameters = []
                             for (let i = 0; i < nbParameters; i++)
                                 ref.typeParameters.push(functionalMethod.parameters[i].type)
+                            ref.typeParameters.push(returnType)
                             return ref
                         }
                     }

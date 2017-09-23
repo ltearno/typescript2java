@@ -7,7 +7,8 @@
     "moduleResolution": "node",
     "typeRoots": [
       "typings/index.d.ts"
-    ]
+    ],
+    "outDir": "target"
   },
   "exclude": [
     "node_modules",
