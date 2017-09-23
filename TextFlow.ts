@@ -21,14 +21,16 @@ export class TextFlow {
     private shouldInsertBlankLine = false
 
     startJavaDocComments() {
-        this.push('/** ').finishLine()
+        this.push('/** ')
+            .finishLine()
             .pushLineStart('  * ')
     }
 
     endJavaDocComments() {
         this.finishLine()
             .pullLineStart()
-            .push(' */').finishLine()
+            .push(' */')
+            .finishLine()
     }
 
     content(): string {

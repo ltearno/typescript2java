@@ -1,4 +1,5 @@
 import * as ts from "typescript"
+import * as tsTools from './ts-tools'
 import * as BuiltIn from './builtin-types'
 import * as Visit from './prejavatypes/PreJavaTypeVisit'
 
@@ -11,21 +12,26 @@ import { PreJavaTypeEnum } from './prejavatypes/PreJavaTypeEnum'
 import { PreJavaTypeParameter } from './prejavatypes/PreJavaTypeParameter'
 import { PreJavaTypeCallSignature, PreJavaTypeFormalParameter } from './prejavatypes/PreJavaTypeCallSignature'
 
-export class TsToPreJavaTypemap {
+export class TypescriptToJavaTypemap {
     private currentIdAnonymousTypes = 1
+    private typeMap = new Map<any, PreJavaType>()
+    // maps js package names to global element holder java classes
+    private globalClasses = new Map<string, PreJavaTypeClassOrInterface>()
 
-    typeMap = new Map<any, PreJavaType>()
-
-    constructor(private program: ts.Program,
-        private javaPackageGuesser: { (sourceFile: ts.SourceFile): string },
-        private jsPackageGuesser: { (sourceFile: ts.SourceFile): string }) { }
-
-    processContext: ProcessContext = {
+    private processContext: ProcessContext = {
         createAnonymousTypeName: () => `AnonymousType${this.currentIdAnonymousTypes++}`,
         getJavaPackage: this.javaPackageGuesser,
         getJsPackage: this.jsPackageGuesser,
         getProgram: () => this.program,
         getTypeMap: () => this
+    }
+
+    constructor(private program: ts.Program,
+        private javaPackageGuesser: { (sourceFile: ts.SourceFile): string },
+        private jsPackageGuesser: { (sourceFile: ts.SourceFile): string }) { }
+
+    nbGlobalClasses() {
+        return this.globalClasses.size
     }
 
     typeSet() {
@@ -42,6 +48,10 @@ export class TsToPreJavaTypemap {
             })
         }
         return result
+    }
+
+    registerType(typeKey: any, type: PreJavaType) {
+        this.typeMap.set(typeKey, type)
     }
 
     substituteType(replacer: TypeReplacer) {
@@ -193,6 +203,63 @@ export class TsToPreJavaTypemap {
         return preJavaType
     }
 
+    registerVariableStatement(statement: ts.VariableStatement) {
+        statement.declarationList.declarations.forEach((declaration) => {
+            let t = this.program.getTypeChecker().getTypeFromTypeNode(declaration.type)
+
+            let cs = t.getConstructSignatures()
+            if (cs && cs.length) {
+                cs.forEach(constructorSignature => {
+                    if (constructorSignature.getReturnType() && constructorSignature.parameters && constructorSignature.parameters.length > 0) {
+                        let preJava = this.getOrCreatePreJavaTypeForTsType(constructorSignature.getReturnType())
+                        // TODO the 'preJava.getSimpleName(null) == guessName(declaration.name)' is not 100% sufficient but should work most of the time...
+                        if (preJava instanceof PreJavaTypeClassOrInterface && preJava.getSimpleName(null) == tsTools.guessName(declaration.name)) {
+                            preJava.addConstructorSignature(this.convertSignature(null, constructorSignature, null))
+                            preJava.setPrototypeName(this.processContext.getJsPackage(declaration.getSourceFile()), tsTools.guessName(declaration.name))
+                        }
+                    }
+                })
+            }
+
+            let callSignatures = t.getCallSignatures()
+            if (callSignatures && callSignatures.length) {
+                callSignatures.forEach(tsSignature => {
+                    if (declaration && declaration.name && declaration.name.getText()) {
+                        let signature = this.convertSignature(declaration.name.getText(), tsSignature, null)
+                        if (signature)
+                            this.getGlobalClass(declaration.getSourceFile()).addStaticMethod(signature)
+                    }
+                })
+            }
+            else if (t.getNumberIndexType()
+                || t.getStringIndexType()
+                || (t.getCallSignatures() && t.getCallSignatures().some(s => s.declaration && s.declaration.name && s.declaration.name.getText() != '__call'))
+                || (t.getProperties() && t.getProperties().some(p => p.name != 'prototype'))) {
+                let variableType = this.getOrCreatePreJavaTypeForTsType(t, false)
+
+                this.getGlobalClass(declaration.getSourceFile()).addStaticProperty({ name: tsTools.guessName(declaration.name), comments: null, type: variableType, writable: true })
+            }
+        })
+    }
+
+    registerFunctionDeclaration(declaration: ts.FunctionDeclaration) {
+        let t = this.program.getTypeChecker().getTypeAtLocation(declaration)
+
+        let name = declaration && declaration.name && declaration.name.text
+        if (!name)
+            return
+
+        let callSignatures = t.getCallSignatures()
+        if (callSignatures && callSignatures.length) {
+            callSignatures.forEach(tsSignature => {
+                let signature = this.convertSignature(name, tsSignature, null)
+                if (signature) {
+                    this.getGlobalClass(declaration.getSourceFile()).addStaticMethod(signature)
+                }
+            })
+        }
+    }
+
     private findTypeKey(type: ts.Type, preferNothingVoid: boolean, typeParametersToApplyToAnonymousTypes: PreJavaTypeParameter[]) {
         let objectType = (type.flags & ts.TypeFlags.Object) && type as ts.ObjectType
         let interfaceType = (objectType.objectFlags & ts.ObjectFlags.ClassOrInterface) && type as ts.InterfaceType
@@ -302,5 +369,40 @@ export class TsToPreJavaTypemap {
 
         console.warn(`no mapping for ts type ${type} `)
         return BuiltIn.BUILTIN_TYPE_OBJECT
+    }
+
+    private getGlobalClass(sourceFile: ts.SourceFile): PreJavaTypeClassOrInterface {
+        let jsPackage = this.processContext.getJsPackage(sourceFile)
+        let key = jsPackage ? jsPackage : '-'
+
+        if (!this.globalClasses.has(key)) {
+            let javaPackage = this.processContext.getJavaPackage(sourceFile)
+
+            let globalClass = new PreJavaTypeClassOrInterface()
+            globalClass.comments = [`Wrapper class for all global definition of ${jsPackage} (java ${javaPackage}) package`]
+            globalClass.isClass = true
+
+            globalClass.name = "GlobalScope"
+            globalClass.packageName = javaPackage
+            if (jsPackage)
+                globalClass.name = "GlobalScope_" + jsPackage.split('.').map(each => each ? (each.substring(0, 1).toUpperCase() + each.substring(1)) : '').join('')
+
+            let dotIndex = jsPackage && jsPackage.indexOf('.')
+            if (dotIndex > 0) {
+                globalClass.jsNamespace = jsPackage.substring(0, dotIndex)
+                globalClass.jsName = jsPackage.substring(dotIndex + 1)
+            }
+            else {
+                globalClass.jsNamespace = null
+                globalClass.jsName = jsPackage
+            }
+
+            this.globalClasses.set(key, globalClass)
+            this.typeMap.set('global-declarations-class-' + javaPackage, globalClass)
+
+            return globalClass
+        }
+
+        return this.globalClasses.get(key)
     }
 }

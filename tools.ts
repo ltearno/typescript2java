@@ -56,3 +56,17 @@ export function dumpObject(o: any) {
         }
     }
 }
+
+export function browseTypescriptDefinitionFilesRecursively(dir, filelist = []) {
+    let files = fs.readdirSync(dir)
+    filelist = filelist || []
+    files.forEach(function (file) {
+        if (fs.statSync(path.join(dir, file)).isDirectory()) {
+            filelist = browseTypescriptDefinitionFilesRecursively(path.join(dir, file), filelist)
+        }
+        else if (file.endsWith('.d.ts')) {
+            filelist.push(path.join(dir, file))
+        }
+    })
+    return filelist
+}

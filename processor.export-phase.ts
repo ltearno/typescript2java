@@ -23,36 +23,6 @@ import { PreJavaTypeCallSignature, PreJavaTypeFormalParameter } from './prejavat
 
 export class ExportPhase {
     private exportedFqns = new Set<string>()
-
-    constructor(public gatherPhase: GatherPhase.GatherPhase) { }
-
-    exportJavaUnit(type: PreJavaType, javaWriter: JavaWriter, flow: TextFlow, baseDirectory: string) {
-        let fqn = type.getParametrizedFullyQualifiedName(null)
-
-        if (this.exportedFqns.has(fqn))
-            console.log(`WARNING, already exported !`)
-        else
-            this.exportedFqns.add(fqn)
-
-        let content = ''
-        content += `package ${type.getPackageName()};\n`
-        content += '\n'
-        let importedNames = new Set<string>()
-        javaWriter.imports.forEach((value, type) => importedNames.add(type.getFullyQualifiedName(null)))
-        let sortedImportedNames: string[] = []
-        importedNames.forEach(name => sortedImportedNames.push(name))
-        sortedImportedNames = sortedImportedNames.sort()
-        sortedImportedNames.forEach(name => content += `import ${name};\n`)
-        content += '\n'
-        content += flow.content()
-
-        let fileDirectory = path.join(baseDirectory, type.getPackageName().replace(new RegExp('\\.', 'g'), '/'))
-        mkdirRec(fileDirectory)
-
-        let fileName = path.join(fileDirectory, `${type.getSimpleName(null)}.java`)
-        fs.writeFileSync(fileName, content, 'utf8')
-    }
-
     private reservedWords: { [key: string]: string } = {
         '_': '_underscore_',
         'public': '_public_',
@@ -76,26 +46,6 @@ export class ExportPhase {
         'className': 'cssClassName'
     }
 
-    escapePropertyName(symbolName: string) {
-        if (symbolName.indexOf('@') >= 0)
-            symbolName = symbolName.replace(new RegExp('@', 'g'), '_at_')
-        if (symbolName.indexOf('-') >= 0)
-            symbolName = symbolName.replace(new RegExp('-', 'g'), '_dash_')
-        if (symbolName.indexOf('[') >= 0)
-            symbolName = symbolName.replace(new RegExp('\\[', 'g'), '_open_bracket_')
-        if (symbolName.indexOf(']') >= 0)
-            symbolName = symbolName.replace(new RegExp('\\]', 'g'), '_close_bracket_')
-        if (symbolName.indexOf('.') >= 0)
-            symbolName = symbolName.replace(new RegExp('\\.', 'g'), '_dot_')
-        if (symbolName in this.reservedWords && typeof this.reservedWords[symbolName] === 'string')
-            return this.reservedWords[symbolName]
-        return symbolName
-    }
-
-    escapeMethodName(symbolName: string) {
-        return this.escapePropertyName(symbolName)
-    }
-
     JS_TYPE = new PreJavaTypeBuiltinJavaType('jsinterop.annotations', 'JsType')
     JS_OVERLAY = new PreJavaTypeBuiltinJavaType('jsinterop.annotations', 'JsOverlay')
     JS_PROPERTY = new PreJavaTypeBuiltinJavaType('jsinterop.annotations', 'JsProperty')
@@ -105,8 +55,8 @@ export class ExportPhase {
     JS_FUNCTION = new PreJavaTypeBuiltinJavaType('jsinterop.annotations', 'JsFunction')
     JS = new PreJavaTypeBuiltinJavaType('jsinterop.base', 'Js')
 
-    exportNodes(program: ts.Program, baseDirectory: string) {
-        for (let type of this.gatherPhase.typeMap.typeSet()) {
+    exportNodes(types: Set<PreJavaType>, program: ts.Program, baseDirectory: string) {
+        for (let type of types) {
             let fqn = type.getParametrizedFullyQualifiedName(null)
             console.log(`exporting ${fqn}`)
 
@@ -692,6 +642,53 @@ export class ExportPhase {
         }
 
         this.exportJavaUnit(type, javaWriter, flow, baseDirectory)
+    }
+
+    private exportJavaUnit(type: PreJavaType, javaWriter: JavaWriter, flow: TextFlow, baseDirectory: string) {
+        let fqn = type.getParametrizedFullyQualifiedName(null)
+
+        if (this.exportedFqns.has(fqn))
+            console.log(`WARNING, already exported !`)
+        else
+            this.exportedFqns.add(fqn)
+
+        let content = ''
+        content += `package ${type.getPackageName()};\n`
+        content += '\n'
+        let importedNames = new Set<string>()
+        javaWriter.imports.forEach((value, type) => importedNames.add(type.getFullyQualifiedName(null)))
+        let sortedImportedNames: string[] = []
+        importedNames.forEach(name => sortedImportedNames.push(name))
+        sortedImportedNames = sortedImportedNames.sort()
+        sortedImportedNames.forEach(name => content += `import ${name};\n`)
+        content += '\n'
+        content += flow.content()
+
+        let fileDirectory = path.join(baseDirectory, type.getPackageName().replace(new RegExp('\\.', 'g'), '/'))
+        mkdirRec(fileDirectory)
+
+        let fileName = path.join(fileDirectory, `${type.getSimpleName(null)}.java`)
+        fs.writeFileSync(fileName, content, 'utf8')
+    }
+
+    private escapePropertyName(symbolName: string) {
+        if (symbolName.indexOf('@') >= 0)
+            symbolName = symbolName.replace(new RegExp('@', 'g'), '_at_')
+        if (symbolName.indexOf('-') >= 0)
+            symbolName = symbolName.replace(new RegExp('-', 'g'), '_dash_')
+        if (symbolName.indexOf('[') >= 0)
+            symbolName = symbolName.replace(new RegExp('\\[', 'g'), '_open_bracket_')
+        if (symbolName.indexOf(']') >= 0)
+            symbolName = symbolName.replace(new RegExp('\\]', 'g'), '_close_bracket_')
+        if (symbolName.indexOf('.') >= 0)
+            symbolName = symbolName.replace(new RegExp('\\.', 'g'), '_dot_')
+        if (symbolName in this.reservedWords && typeof this.reservedWords[symbolName] === 'string')
+            return this.reservedWords[symbolName]
+        return symbolName
+    }
+
+    private escapeMethodName(symbolName: string) {
+        return this.escapePropertyName(symbolName)
     }
 }
 

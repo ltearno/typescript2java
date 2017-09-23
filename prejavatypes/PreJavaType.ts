@@ -1,5 +1,5 @@
 import * as ts from "typescript"
-import { TsToPreJavaTypemap } from '../type-map'
+import { TypescriptToJavaTypemap } from '../type-map'
 import { visitPreJavaType } from './PreJavaTypeVisit'
 import { PreJavaTypeParameter } from './PreJavaTypeParameter'
 
@@ -8,7 +8,7 @@ export interface ProcessContext {
     getJavaPackage(sourceFile: ts.SourceFile): string
     getJsPackage(sourceFile: ts.SourceFile): string
     getProgram: () => ts.Program
-    getTypeMap: () => TsToPreJavaTypemap
+    getTypeMap: () => TypescriptToJavaTypemap
 }
 
 export type TypeReplacer = { (type: PreJavaType): PreJavaType }

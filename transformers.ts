@@ -12,13 +12,13 @@ import { PreJavaTypeClassOrInterface, PreJavaTypeProperty } from './prejavatypes
 import { PreJavaTypeCallSignature, PreJavaTypeFormalParameter } from './prejavatypes/PreJavaTypeCallSignature'
 import { PreJavaTypeParameter } from "./prejavatypes/PreJavaTypeParameter";
 
-import { TsToPreJavaTypemap } from './type-map'
+import { TypescriptToJavaTypemap } from './type-map'
 
 const MAX_NB_DEVELOPPED_METHODS = 5
 
 let currentIdAnonymousTypes = 1
 
-export function ensureAllTypesHaveNameAndPackage(typeMap: TsToPreJavaTypemap, defaultPackageName: string) {
+export function ensureAllTypesHaveNameAndPackage(typeMap: TypescriptToJavaTypemap, defaultPackageName: string) {
     for (let type of typeMap.typeSet()) {
         if (type instanceof PreJavaTypeClassOrInterface) {
             if (type.getParametrizedSimpleName(null) == null)
@@ -29,7 +29,7 @@ export function ensureAllTypesHaveNameAndPackage(typeMap: TsToPreJavaTypemap, de
     }
 }
 
-export function removeOverridingProperties(typeMap: TsToPreJavaTypemap) {
+export function removeOverridingProperties(typeMap: TypescriptToJavaTypemap) {
     let nextObjectId = 1
     let objectMap = new WeakMap<any, number>()
     function getObjectId(o) {
@@ -152,7 +152,7 @@ function developMethodWithOptionalParameters(method: PreJavaTypeCallSignature): 
     return res.length ? res : null
 }
 
-export function developMethodsWithUnionParameters(typeMap: TsToPreJavaTypemap) {
+export function developMethodsWithUnionParameters(typeMap: TypescriptToJavaTypemap) {
     let counter = 0
     for (let type of typeMap.typeSet()) {
         Visit.visitPreJavaType(type, {
@@ -183,7 +183,7 @@ export function developMethodsWithUnionParameters(typeMap: TsToPreJavaTypemap) {
 
 
 
-export function reduceAnonymousTypes(typeMap: TsToPreJavaTypemap) {
+export function reduceAnonymousTypes(typeMap: TypescriptToJavaTypemap) {
     let types = typeMap.typeSet()
 
     let typeDuplicates = new Map<string, PreJavaType[]>()
@@ -276,7 +276,7 @@ export function reduceAnonymousTypes(typeMap: TsToPreJavaTypemap) {
 
 
 
-export function simplifyUnions(typeMap: TsToPreJavaTypemap) {
+export function simplifyUnions(typeMap: TypescriptToJavaTypemap) {
     typeMap.substituteType(type => Visit.visitPreJavaType(type, {
         caseUnion: type => {
             if (!type.types || !type.types.length)
@@ -289,14 +289,14 @@ export function simplifyUnions(typeMap: TsToPreJavaTypemap) {
     }))
 }
 
-export function removeNotSupportedTypes(typeMap: TsToPreJavaTypemap) {
+export function removeNotSupportedTypes(typeMap: TypescriptToJavaTypemap) {
     typeMap.substituteType((type) => type instanceof PreJavaTypeFakeType ? null : type)
     typeMap.substituteType((type) => type.getSimpleName(null) == '?' ? BuiltIn.BUILTIN_TYPE_OBJECT : type)
     typeMap.substituteType((type) => type.getSimpleName(null) == '' ? null : type)
 }
 
 // TODO : for classes : add methods from interface hierarchy which are not in the method list
-export function addMethodsFromInterfaceHierarchy(typeMap: TsToPreJavaTypemap) {
+export function addMethodsFromInterfaceHierarchy(typeMap: TypescriptToJavaTypemap) {
     for (let type of typeMap.typeSet()) {
         Visit.visitPreJavaType(type, {
             caseClassOrInterfaceType: type => {
@@ -348,7 +348,7 @@ export function addMethodsFromInterfaceHierarchy(typeMap: TsToPreJavaTypemap) {
 
 
 
-export function removeDuplicateOverloads(typeMap: TsToPreJavaTypemap) {
+export function removeDuplicateOverloads(typeMap: TypescriptToJavaTypemap) {
     for (let type of typeMap.typeSet()) {
         if (type instanceof PreJavaTypeClassOrInterface && type.methods && type.methods.length) {
             let classOrInterface = type as PreJavaTypeClassOrInterface
@@ -409,7 +409,7 @@ function groupBy<K, V>(items: V[], keySelector: { (value: V): K }) {
 
 
 
-export function changeDtoInterfacesIntoClasses(typeMap: TsToPreJavaTypemap) {
+export function changeDtoInterfacesIntoClasses(typeMap: TypescriptToJavaTypemap) {
     let nb = 0
     for (let type of typeMap.typeSet()) {
         if (type instanceof PreJavaTypeClassOrInterface && (!type.isClass) && type.hasOnlyProperties() && !typeMap.hasSubType(type) && (!type.staticMethods || !type.staticMethods.length) && (!type.staticProperties || !type.staticProperties.length)) {
@@ -425,7 +425,7 @@ export function changeDtoInterfacesIntoClasses(typeMap: TsToPreJavaTypemap) {
 
 
 
-export function arrangeMultipleImplementationInheritance(typeMap: TsToPreJavaTypemap, implementationSuffix: string) {
+export function arrangeMultipleImplementationInheritance(typeMap: TypescriptToJavaTypemap, implementationSuffix: string) {
     let maxPasses = 10
 
     while (maxPasses-- >= 0) {
@@ -475,7 +475,7 @@ export function arrangeMultipleImplementationInheritance(typeMap: TsToPreJavaTyp
 
                     newType.cleanAndCheckMethods()
 
-                    typeMap.typeMap.set({} as ts.Type, newType)
+                    typeMap.registerType({} as ts.Type, newType)
                 }
             }
         }
@@ -485,7 +485,7 @@ export function arrangeMultipleImplementationInheritance(typeMap: TsToPreJavaTyp
     }
 }
 
-export function checkNoDuplicateTypeNames(typeMap: TsToPreJavaTypemap) {
+export function checkNoDuplicateTypeNames(typeMap: TypescriptToJavaTypemap) {
     let typeFqnCache: Map<string, PreJavaType> = new Map()
     let hasDuplicate = false
     console.log(`duplicate types :`)
@@ -518,7 +518,7 @@ export function checkNoDuplicateTypeNames(typeMap: TsToPreJavaTypemap) {
         console.log(`no duplicate found`)
 }
 
-export function replaceAnonymousTypes(typeMap: TsToPreJavaTypemap) {
+export function replaceAnonymousTypes(typeMap: TypescriptToJavaTypemap) {
     let PARAMETER_NAMES = ['P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7', 'P8', 'P9', 'P10', 'P11', 'P12', 'P13']
     let NB_PARAMS = PARAMETER_NAMES.length
     let LAMBDAS: PreJavaTypeClassOrInterface[] = []
@@ -582,7 +582,7 @@ export function replaceAnonymousTypes(typeMap: TsToPreJavaTypemap) {
                         let nbParameters = functionalMethod.parameters && functionalMethod.parameters.length
 
                         if (returnType == BuiltIn.BUILTIN_TYPE_UNIT) {
-                            typeMap.typeMap.set(`prebuilt-action-${nbParameters}`, PROCS[nbParameters])
+                            typeMap.registerType(`prebuilt-action-${nbParameters}`, PROCS[nbParameters])
 
                             let ref = new PreJavaTypeReference()
                             ref.type = PROCS[nbParameters]
@@ -592,7 +592,7 @@ export function replaceAnonymousTypes(typeMap: TsToPreJavaTypemap) {
                             return ref
                         }
                         else {
-                            typeMap.typeMap.set(`prebuilt-function-${nbParameters}`, LAMBDAS[nbParameters])
+                            typeMap.registerType(`prebuilt-function-${nbParameters}`, LAMBDAS[nbParameters])
 
                             let ref = new PreJavaTypeReference()
                             ref.type = LAMBDAS[nbParameters]
@@ -612,7 +612,7 @@ export function replaceAnonymousTypes(typeMap: TsToPreJavaTypemap) {
 }
 
 
-export function ensureCorrectConstructors(typeMap: TsToPreJavaTypemap) {
+export function ensureCorrectConstructors(typeMap: TypescriptToJavaTypemap) {
     for (let type of typeMap.typeSet()) {
         Visit.visitPreJavaType(type, {
             caseClassOrInterfaceType: type => {
