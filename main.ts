@@ -34,7 +34,7 @@ if (2 * 3 < 4) {
         javaPackages: {
             "tests.mini": "mini"
         },
-        processInternalTypes: true,
+        processInternalTypes: false,
         outputDirectory: './out/src/main/java'
     }
 }

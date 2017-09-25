@@ -257,6 +257,9 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
     }
 
     private extractPropertiesAndMethods(type: ts.InterfaceTypeWithDeclaredMembers, context: ProcessContext) {
+        if (this.getSimpleName(null) == 'Subscribable')
+            console.log(`yop`)
+
         // static properties and methods
         if (type.symbol && type.symbol.valueDeclaration) {
             let declaredType = context.getProgram().getTypeChecker().getTypeOfSymbolAtLocation(type.symbol, type.symbol.valueDeclaration)
@@ -318,9 +321,11 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
                     for (let callSignature of callSignatures) {
                         let method = context.getTypeMap().convertSignature(propertyName, callSignature, this.typeParameters)
                         if (method) {
+                            method.addComments(`${callSignature.declaration.getSourceFile().fileName}@${callSignature.declaration.getStart()}`)
                             method.addComments(comments)
                             if (c++ > 0)
                                 method.comments.push(`VERSION ${c - 1}`)
+
                             this.addMethod(method)
                         }
                     }
@@ -417,8 +422,9 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
             }).filter(p => p != null)
         }
 
-        if (this.methods)
+        if (this.methods) {
             this.methods = this.methods.map(s => s.substituteType(replacer, cache, passThroughTypes)).filter(s => s != null)
+        }
 
         if (this.numberIndexType)
             this.numberIndexType = this.numberIndexType.substituteType(replacer, cache, passThroughTypes)
@@ -561,26 +567,6 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
     }
 
     addMethod(method: PreJavaTypeCallSignature) {
-        if (Signature.getCallSignatureTypeErasedSignature(method) == 'S(next,P(d74))') {
-            let type = method.parameters[0].type
-            if (type instanceof PreJavaTypeClassOrInterface) {
-                type.sourceTypes && type.sourceTypes.forEach(source => {
-                    source.symbol.declarations.forEach(decl => console.log(`${decl.getSourceFile().fileName}@${decl.getStart()}`))
-                })
-            }
-            console.log('yop')
-        }
-
-        if (Signature.getCallSignatureTypeErasedSignature(method) == 'S(next,P(d3))') {
-            let type = method.parameters[0].type
-            if (type instanceof PreJavaTypeClassOrInterface) {
-                type.sourceTypes && type.sourceTypes.forEach(source => {
-                    source.symbol.declarations.forEach(decl => console.log(`${decl.getSourceFile().fileName}@${decl.getStart()}`))
-                })
-            }
-            console.log('yop')
-        }
-
         this.addMethodInCollection(method, this.methods)
     }
 

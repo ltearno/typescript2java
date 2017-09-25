@@ -57,6 +57,12 @@ export class GatherPhase {
         console.log(`removing unsupported types`)
         Transformers.removeNotSupportedTypes(this.typeMap)
 
+        console.log(`simplifying unions`)
+        Transformers.simplifyUnions(this.typeMap)
+
+        console.log(`replacing anonymous types`)
+        Transformers.replaceAnonymousTypes(this.typeMap)
+
         console.log(`removing OverridingProperties`)
         Transformers.removeOverridingProperties(this.typeMap)
 
@@ -66,11 +72,8 @@ export class GatherPhase {
         console.log(`unanonymising types`)
         Transformers.ensureAllTypesHaveNameAndPackage(this.typeMap, this.baseJavaPackage)
 
-        console.log(`simplifying unions`)
-        Transformers.simplifyUnions(this.typeMap)
-
-        console.log(`removing duplicate overloads (with same type erasure)`)
-        Transformers.removeDuplicateOverloads(this.typeMap)
+        //console.log(`removing duplicate overloads (with same type erasure)`)
+        //Transformers.removeDuplicateOverloads(this.typeMap)
 
         console.log(`changing DTO interfaces into classes`)
         Transformers.changeDtoInterfacesIntoClasses(this.typeMap)
@@ -83,11 +86,8 @@ export class GatherPhase {
 
         console.log(`(todo) Array should be replaced by an externally provided type`)
 
-        console.log(`replacing anonymous types`)
-        Transformers.replaceAnonymousTypes(this.typeMap)
-
         console.log(`developping methods with union parameters`)
-        //Transformers.developMethodsWithUnionParameters(this.typeMap)
+        Transformers.developMethodsWithUnionParameters(this.typeMap)
 
         console.log(`renaming duplicate fqns`)
         Transformers.checkNoDuplicateTypeNames(this.typeMap)

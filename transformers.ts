@@ -217,31 +217,14 @@ export function reduceAnonymousTypes(typeMap: TypescriptToJavaTypemap) {
     })
 
     console.log(`merging duplicate anonymous types`)
-    let totalDuplicates = 0
+    let replacements = new Map()
     typeDuplicates.forEach((list, footprint) => {
-        if (list.length < 2)
-            return
-
-        totalDuplicates += list.length - 1
-
-        let replacedTypes = list.slice(1, list.length - 1)
-        let replacementType = list[0] as PreJavaTypeClassOrInterface
-
-        replacedTypes
-            .filter(t => t instanceof PreJavaTypeClassOrInterface && t.comments && t.comments.length)
-            .forEach(t => {
-                if (!replacementType.comments)
-                    replacementType.comments = []
-                replacementType.comments.concat((t as PreJavaTypeClassOrInterface).comments)
-            })
-
-        typeMap.substituteType((type: PreJavaType): PreJavaType => {
-            if (replacedTypes.some(replacedType => replacedType === type))
-                return replacementType
-            return type
-        })
+        for (let i = 1; i < list.length; i++) {
+            console.log(`${list[i].getSimpleName(null)} => ${list[0].getSimpleName(null)}`)
+            replacements.set(list[i], list[0])
+        }
     })
-    console.log(`found and removed ${totalDuplicates} duplicates`)
+    typeMap.substituteType((type: PreJavaType): PreJavaType => replacements.get(type) || type)
 
     console.log(`replacing empty classes by Object`)
     typeMap.substituteType(type => {
@@ -318,6 +301,7 @@ export function addMethodsFromInterfaceHierarchy(typeMap: TypescriptToJavaTypema
                                     optional: p.optional,
                                     dotdotdot: p.dotdotdot
                                 }))
+                            method.addComments(`added from type hierarchy`)
                             type.addMethod(method)
                         })
 

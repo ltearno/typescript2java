@@ -22,10 +22,13 @@ export class PreJavaTypeCallSignature {
         this.parameters = parameters
     }
 
-    addComments(comments: string[]) {
+    addComments(comments: string[] | string) {
         if (!this.comments)
             this.comments = []
-        comments && comments.forEach(c => this.comments.push(c))
+        if (typeof comments === 'string')
+            this.comments.push(comments)
+        else
+            comments && comments.forEach(c => this.comments.push(c))
     }
 
     serializeSignature(defaultName: string = null) {

@@ -551,7 +551,18 @@ export class ExportPhase {
 
                         let getterName = `get${upcaseName}`
                         let setterName = `set${upcaseName}`
-                        if ((type as PreJavaTypeClassOrInterface).methods.some(m => m.name == getterName || m.name == setterName)) {
+                        let getterSig = Signature.getCallSignatureTypeErasedSignature(new PreJavaTypeCallSignature(null, property.type, getterName, null))
+                        let setterSig = Signature.getCallSignatureTypeErasedSignature(new PreJavaTypeCallSignature(null, BuiltIn.BUILTIN_TYPE_UNIT, setterName, [{
+                            dotdotdot: false,
+                            optional: false,
+                            type: property.type,
+                            name: setterName
+                        }]))
+                        //if (type.methods.some(m => m.name == getterName || m.name == setterName)) {
+                        if (type.methods.some(m => {
+                            let mSig = Signature.getCallSignatureTypeErasedSignature(m)
+                            return mSig == getterSig || mSig == setterSig
+                        })) {
                             getterName = getterName + '__'
                             setterName = setterName + '__'
                         }
@@ -585,6 +596,9 @@ export class ExportPhase {
             if (type.methods && type.methods.length) {
                 flow.blankLine()
                     .push('/*\n    Methods\n*/').finishLine()
+
+                if (type.name == 'Subscribable')
+                    console.log(`oo`)
 
                 let fixBug = new Set<string>()
 

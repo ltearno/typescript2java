@@ -22,42 +22,36 @@ export interface SignatureOptions {
 }
 
 export function getCallSignatureTypeErasedSignature(signature: PreJavaTypeCallSignature) {
-    return getCallSignatureSignature(signature, { onlyTypeErasure: true }, null)
+    return getCallSignatureSignature(signature, null, { onlyTypeErasure: true }, null)
 }
 
 export function getCallSignatureStandardSignature(signature: PreJavaTypeCallSignature) {
-    return getCallSignatureSignature(signature, { onlyTypeErasure: false }, null)
+    return getCallSignatureSignature(signature, null, { onlyTypeErasure: false }, null)
 }
 
 export function getTypeStandardSignature(type: PreJavaType): string {
-    return getTypeSignature(type, { onlyTypeErasure: false }, null)
+    return getTypeSignature(type, null, { onlyTypeErasure: false }, null)
 }
 
-export function getCallSignatureSignature(signature: PreJavaTypeCallSignature, options: SignatureOptions, selfReflect: Map<PreJavaType, string>) {
-    let res = 'S('
+export function getCallSignatureSignature(signature: PreJavaTypeCallSignature, typeEnvironment: TypeEnvironment, options: SignatureOptions, selfReflect: Map<PreJavaType, string>) {
+    return 'S('
         + (signature.name ? signature.name : '?')
-        + (options.onlyTypeErasure ? '' : ',' + getTypeSignature(signature.returnType, options, selfReflect))
-        + (options.onlyTypeErasure ? '' : ',' + ((signature.typeParameters && signature.typeParameters.length) ? signature.typeParameters.map(tp => getTypeSignature(tp, options, selfReflect)).join() : ''))
-        + ',' + ((signature.parameters && signature.parameters.length) ? signature.parameters.map(param => getParameterSignature(param, options, selfReflect)).join() : '')
+        + (options.onlyTypeErasure ? '' : ',' + getTypeSignature(signature.returnType, typeEnvironment, options, selfReflect))
+        + (options.onlyTypeErasure ? '' : ',' + ((signature.typeParameters && signature.typeParameters.length) ? signature.typeParameters.map(tp => getTypeSignature(tp, typeEnvironment, options, selfReflect)).join() : ''))
+        + ',' + ((signature.parameters && signature.parameters.length) ? signature.parameters.map(param => getParameterSignature(param, typeEnvironment, options, selfReflect)).join() : '')
         + ')'
-
-    if (res == 'S(next,P(d3))' || res == 'S(next,P(d74))')
-        console.log('yop');
-
-
-    return res
 }
 
-export function getParameterSignature(parameter: PreJavaTypeFormalParameter, options: SignatureOptions, selfReflect: Map<PreJavaType, string>) {
+function getParameterSignature(parameter: PreJavaTypeFormalParameter, typeEnvironment: TypeEnvironment, options: SignatureOptions, selfReflect: Map<PreJavaType, string>) {
     //return `P(${parameter.dotdotdot ? 'D' : 'd'}${parameter.optional ? 'O' : 'o'}${getTypeSignature(parameter.type, selfReflect)})`
-    return `P(${parameter.dotdotdot ? 'D' : 'd'}${getTypeSignature(parameter.type, options, selfReflect)})`
+    return `P(${parameter.dotdotdot ? 'D' : 'd'}${getTypeSignature(parameter.type, typeEnvironment, options, selfReflect)})`
 }
 
-export function getPropertySignature(property: PreJavaTypeProperty, options: SignatureOptions, selfReflect: Map<PreJavaType, string>) {
-    return `p(${property.name}|${getTypeSignature(property.type, options, selfReflect)})`
+function getPropertySignature(property: PreJavaTypeProperty, typeEnvironment: TypeEnvironment, options: SignatureOptions, selfReflect: Map<PreJavaType, string>) {
+    return `p(${property.name}|${getTypeSignature(property.type, typeEnvironment, options, selfReflect)})`
 }
 
-function getTypeSignature(type: PreJavaType, options: SignatureOptions = { onlyTypeErasure: false }, selfReflect: Map<PreJavaType, string>): string {
+function getTypeSignature(type: PreJavaType, typeEnvironment: TypeEnvironment, options: SignatureOptions = { onlyTypeErasure: false }, selfReflect: Map<PreJavaType, string>): string {
     if (selfReflect == null)
         selfReflect = new Map()
 
@@ -73,40 +67,49 @@ function getTypeSignature(type: PreJavaType, options: SignatureOptions = { onlyT
                 return getObjectId(type)
 
             return (isFunctional ? 'F' : (type.isAnonymousSourceType ? (type.isClass ? 'C(' : 'I(') : `_${type.name}(`))
-                + (options.onlyTypeErasure ? '-' : ((type.typeParameters && type.typeParameters.length) ? type.typeParameters.map(tp => getTypeSignature(tp, options, selfReflect)).join() : '-'))
-                + ((type.constructorSignatures && type.constructorSignatures.length) ? type.constructorSignatures.map(sig => getCallSignatureSignature(sig, options, selfReflect)).join() : '-')
-                + ((type.callSignatures && type.callSignatures.length) ? type.callSignatures.map(sig => getCallSignatureSignature(sig, options, selfReflect)).join() : '-')
-                + ((type.numberIndexType) ? getTypeSignature(type.numberIndexType, options, selfReflect) : '-')
-                + ((type.stringIndexType) ? getTypeSignature(type.stringIndexType, options, selfReflect) : '-')
-                + ((type.methods && type.methods.length) ? type.methods.map(sig => getCallSignatureSignature(sig, options, selfReflect)).join() : '-')
-                + ((type.properties && type.properties.length) ? type.properties.map(ppty => getPropertySignature(ppty, options, selfReflect)).join() : '-')
-                + ((type.staticMethods && type.staticMethods.length) ? type.staticMethods.map(sig => getCallSignatureSignature(sig, options, selfReflect)).join() : '-')
-                + ((type.staticProperties && type.staticProperties.length) ? type.staticProperties.map(ppty => getPropertySignature(ppty, options, selfReflect)).join() : '-')
+                + (options.onlyTypeErasure ? '-' : ((type.typeParameters && type.typeParameters.length) ? type.typeParameters.map(tp => getTypeSignature(tp, typeEnvironment, options, selfReflect)).join() : '-'))
+                + ((type.constructorSignatures && type.constructorSignatures.length) ? type.constructorSignatures.map(sig => getCallSignatureSignature(sig, typeEnvironment, options, selfReflect)).join() : '-')
+                + ((type.callSignatures && type.callSignatures.length) ? type.callSignatures.map(sig => getCallSignatureSignature(sig, typeEnvironment, options, selfReflect)).join() : '-')
+                + ((type.numberIndexType) ? getTypeSignature(type.numberIndexType, typeEnvironment, options, selfReflect) : '-')
+                + ((type.stringIndexType) ? getTypeSignature(type.stringIndexType, typeEnvironment, options, selfReflect) : '-')
+                + ((type.methods && type.methods.length) ? type.methods.map(sig => getCallSignatureSignature(sig, typeEnvironment, options, selfReflect)).join() : '-')
+                + ((type.properties && type.properties.length) ? type.properties.map(ppty => getPropertySignature(ppty, typeEnvironment, options, selfReflect)).join() : '-')
+                + ((type.staticMethods && type.staticMethods.length) ? type.staticMethods.map(sig => getCallSignatureSignature(sig, typeEnvironment, options, selfReflect)).join() : '-')
+                + ((type.staticProperties && type.staticProperties.length) ? type.staticProperties.map(ppty => getPropertySignature(ppty, typeEnvironment, options, selfReflect)).join() : '-')
                 + ')'
         },
 
         caseUnion: type => {
             return 'U('
-                + (options.onlyTypeErasure ? '-' : ((type.typeParameters && type.typeParameters.length) ? type.typeParameters.map(tp => getTypeSignature(tp, options, selfReflect)).join() : '-'))
-                + ((type.types && type.types.length) ? type.types.map(t => getTypeSignature(t, options, selfReflect)).join() : '-')
+                + (options.onlyTypeErasure ? '-' : ((type.typeParameters && type.typeParameters.length) ? type.typeParameters.map(tp => getTypeSignature(tp, typeEnvironment, options, selfReflect)).join() : '-'))
+                + ((type.types && type.types.length) ? type.types.map(t => getTypeSignature(t, typeEnvironment, options, selfReflect)).join() : '-')
                 + ')'
         },
 
-        caseReferenceType: type => getTypeSignature(type.type, options, selfReflect),
-        /*{
-            //return `R(${getTypeSignature(type.type, selfReflect)}${(type.typeParameters && type.typeParameters.length) ? type.typeParameters.map(tp => getTypeSignature(tp, selfReflect)).join() : '-'})`
-            return `R(${getTypeSignature(type.type, selfReflect)})`
-        },*/
-
-        caseTypeParameter: (type) => {
-            if (options.onlyTypeErasure)
-                return type.constraint ? getTypeSignature(type.constraint, options, selfReflect) : getTypeSignature(BuiltIn.BUILTIN_TYPE_OBJECT, options, selfReflect)
-            else
-                return type.getSimpleName(null) + (type.constraint ? getTypeSignature(type.constraint, options, selfReflect) : '-')
+        caseReferenceType: type => {
+            let res = getTypeSignature(type.type, typeEnvironment, options, selfReflect)
+            if (!options.onlyTypeErasure && type.typeParameters && type.typeParameters.length)
+                res += `<${type.typeParameters.map(tp => getTypeSignature(tp, typeEnvironment, options, selfReflect)).join()}>`
+            return res
         },
-        //caseTypeParameter: (type) => type.constraint ? getTypeSignature(type.constraint, selfReflect) : getObjectId(BuiltIn.BUILTIN_TYPE_OBJECT),
 
-        caseTPEnvironnement: type => getTypeSignature(type.type, options, selfReflect),
+        caseTypeParameter: type => {
+            if (typeEnvironment && (type.name in typeEnvironment))
+                return getTypeSignature(typeEnvironment[type.name], null, options, selfReflect)
+
+            if (options.onlyTypeErasure)
+                return type.constraint ? getTypeSignature(type.constraint, typeEnvironment, options, selfReflect) : getTypeSignature(BuiltIn.BUILTIN_TYPE_OBJECT, typeEnvironment, options, selfReflect)
+            else
+                return type.getSimpleName(null) + (type.constraint ? getTypeSignature(type.constraint, typeEnvironment, options, selfReflect) : '-')
+        },
+
+        caseTPEnvironnement: type => {
+            // TODO one day, really implement this concept of merging two type environments !
+            let env = type.environment || typeEnvironment
+            if (type.environment && typeEnvironment)
+                console.log(`FUCK !`)
+            return getTypeSignature(type.type, env, options, selfReflect)
+        },
 
         onOther: (type) => getObjectId(type)// type.getFullyQualifiedName(null)
     })
