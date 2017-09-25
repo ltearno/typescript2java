@@ -25,7 +25,7 @@ export class Engine {
             rootDir: this.configuration.sourceRootDir,
             moduleResolution: ts.ModuleResolutionKind.NodeJs,
             listFiles: true,
-            typeRoots: ["./typings/index.d.ts"],
+            //typeRoots: ["./typings/index.d.ts"],
             //traceResolution: true,
             //module: ts.ModuleKind.System,
             target: ts.ScriptTarget.ES2015,

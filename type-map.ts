@@ -129,24 +129,24 @@ export class TypescriptToJavaTypemap {
                 ? tsSignature.getParameters()
                     .filter(p => p.name != 'thisArg')
                     .map(p => {
-                        let parameteryType = this.program.getTypeChecker().getTypeAtLocation(p.valueDeclaration)
-                        if (parameteryType
-                            && parameteryType.symbol
-                            && parameteryType.symbol.declarations
-                            && parameteryType.symbol.declarations.length
-                            && parameteryType.symbol.declarations.some((d: any) => {
+                        let parameterType = this.program.getTypeChecker().getTypeAtLocation(p.valueDeclaration)
+                        if (parameterType
+                            && parameterType.symbol
+                            && parameterType.symbol.declarations
+                            && parameterType.symbol.declarations.length
+                            && parameterType.symbol.declarations.some((d: any) => {
                                 return d && d.locals && d.locals.length && d.locals.get && d.locals.get('this')
                             }))
                             return null
 
-                        let objectType = (parameteryType.flags & ts.TypeFlags.Object) && parameteryType as ts.ObjectType
-                        let referenceType = objectType && (objectType.objectFlags & ts.ObjectFlags.Reference) && parameteryType as ts.TypeReference
+                        let objectType = (parameterType.flags & ts.TypeFlags.Object) && parameterType as ts.ObjectType
+                        let referenceType = objectType && (objectType.objectFlags & ts.ObjectFlags.Reference) && parameterType as ts.TypeReference
                         let dotdotdot = false
 
                         let de = p.valueDeclaration as ts.ParameterDeclaration
                         if (de.dotDotDotToken) {
                             if (referenceType && referenceType.typeArguments && referenceType.typeArguments.length == 1) {
-                                parameteryType = referenceType.typeArguments[0]
+                                parameterType = referenceType.typeArguments[0]
                                 dotdotdot = true
                             }
                             else {
@@ -168,7 +168,7 @@ export class TypescriptToJavaTypemap {
                             }
                         }
                         else {
-                            let preJavaParameterType = this.getOrCreatePreJavaTypeForTsType(parameteryType, false, typeParametersToApplyToAnonymousTypes)
+                            let preJavaParameterType = this.getOrCreatePreJavaTypeForTsType(parameterType, false, typeParametersToApplyToAnonymousTypes)
 
                             result = {
                                 name: p.name,

@@ -8,7 +8,8 @@
     "typeRoots": [
       "typings/index.d.ts"
     ],
-    "outDir": "target"
+    "outDir": "target",
+    "sourceRoot": "./"
   },
   "exclude": [
     "node_modules",

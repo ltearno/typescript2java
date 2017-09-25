@@ -87,7 +87,7 @@ export class GatherPhase {
         Transformers.replaceAnonymousTypes(this.typeMap)
 
         console.log(`developping methods with union parameters`)
-        Transformers.developMethodsWithUnionParameters(this.typeMap)
+        //Transformers.developMethodsWithUnionParameters(this.typeMap)
 
         console.log(`renaming duplicate fqns`)
         Transformers.checkNoDuplicateTypeNames(this.typeMap)

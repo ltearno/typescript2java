@@ -32,7 +32,9 @@ export class PreJavaTypeUnion extends PreJavaType {
             unionType.types
                 .map(t => context.getTypeMap().getOrCreatePreJavaTypeForTsType(t, false, this.typeParameters))
                 .map(t => {
-                    if (t instanceof PreJavaTypeClassOrInterface && t.typeParameters && t.typeParameters.length) {
+                    if (t instanceof PreJavaTypeClassOrInterface
+                        && t.typeParameters
+                        && t.typeParameters.map(tp => tp.name).join() != this.typeParameters.map(tp => tp.name).join()) {
                         let res = new PreJavaTypeReference()
                         res.type = t
                         res.typeParameters = t.typeParameters.slice()
@@ -52,29 +54,6 @@ export class PreJavaTypeUnion extends PreJavaType {
 
         if (type && type.symbol && type.symbol.valueDeclaration)
             this.packageName = context.getJavaPackage(type.symbol.valueDeclaration.getSourceFile())
-
-        // let all the ClassOrInterface implement the Union
-        // if Union type and Class type have the same type parameters
-        /*if (!this.getBaseTypes().size) {
-            let typeParametersCount = this.typeParameters && this.typeParameters.length
-            this.types && this.types.forEach(unionedType => {
-                Visit.visitPreJavaType(unionedType, {
-                    caseClassOrInterfaceType: unionedType => {
-                        let baseTypeTypeParametersCount = unionedType.typeParameters && unionedType.typeParameters.length
-                        if (baseTypeTypeParametersCount != typeParametersCount)
-                            return
-
-                        if (typeParametersCount) {
-                            for (let i = 0; i < typeParametersCount; i++)
-                                if (this.typeParameters[i].name != unionedType.typeParameters[i].name)
-                                    return
-                        }
-
-                        unionedType.addBaseType(this)
-                    }
-                })
-            })
-        }*/
     }
 
     // Free Type variable names used in this Union

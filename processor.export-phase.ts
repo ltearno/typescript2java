@@ -113,7 +113,7 @@ export class ExportPhase {
                 flow.finishLine()
 
                 flow.push(`@JsOverlay`).finishLine()
-                flow.push(`public static ${type.getParametrization(null)} ${type.getParametrizedSimpleName(null)} of${unionedType.getHumanizedName(null)}(${unionedType.getSimpleName(null)} value) {`).finishLine()
+                flow.push(`public static ${type.getParametrization(null)} ${type.getParametrizedSimpleName(null)} of${unionedType.getHumanizedName(null)}(${javaWriter.importTypeParametrized(unionedType)} value) {`).finishLine()
                 flow.pushLineStart('    ')
                 flow.push(`return Js.uncheckedCast( value );`).finishLine()
                 flow.pullLineStart()
@@ -141,7 +141,7 @@ export class ExportPhase {
                 flow.finishLine()
 
                 flow.push(`@JsOverlay`).finishLine()
-                flow.push(`static ${type.getParametrization(null)} ${type.getParametrizedSimpleName(null)} of${unionedType.getHumanizedName(null)}(${unionedType.getSimpleName(null)} value) {`).finishLine()
+                flow.push(`static ${type.getParametrization(null)} ${type.getParametrizedSimpleName(null)} of${unionedType.getHumanizedName(null)}(${javaWriter.importTypeParametrized(unionedType)} value) {`).finishLine()
                 flow.pushLineStart('    ')
                 flow.push(`return Js.cast( value );`).finishLine()
                 flow.pullLineStart()
@@ -647,8 +647,12 @@ export class ExportPhase {
     private exportJavaUnit(type: PreJavaType, javaWriter: JavaWriter, flow: TextFlow, baseDirectory: string) {
         let fqn = type.getParametrizedFullyQualifiedName(null)
 
-        if (this.exportedFqns.has(fqn))
+        if (this.exportedFqns.has(fqn)) {
             console.log(`WARNING, already exported !`)
+            if (type.getHumanizedName(null) == 'UnionOfFunction1OfObjectAndRAndArrayLikeOfObjectAndPromiseLikeOfObjectAndSubscribableOfObject')
+                console.log('holly cow');
+
+        }
         else
             this.exportedFqns.add(fqn)
 

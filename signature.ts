@@ -30,12 +30,18 @@ export function getCallSignatureStandardSignature(signature: PreJavaTypeCallSign
 }
 
 export function getCallSignatureSignature(signature: PreJavaTypeCallSignature, options: SignatureOptions, selfReflect: Map<PreJavaType, string>) {
-    return 'S('
+    let res = 'S('
         + (signature.name ? signature.name : '?')
         + (options.onlyTypeErasure ? '' : ',' + getTypeSignature(signature.returnType, options, selfReflect))
         + (options.onlyTypeErasure ? '' : ',' + ((signature.typeParameters && signature.typeParameters.length) ? signature.typeParameters.map(tp => getTypeSignature(tp, options, selfReflect)).join() : ''))
         + ',' + ((signature.parameters && signature.parameters.length) ? signature.parameters.map(param => getParameterSignature(param, options, selfReflect)).join() : '')
         + ')'
+
+    if (res == 'S(next,P(d3))' || res=='S(next,P(d74))')
+        console.log('yop');
+
+
+    return res
 }
 
 export function getParameterSignature(parameter: PreJavaTypeFormalParameter, options: SignatureOptions, selfReflect: Map<PreJavaType, string> = null) {

@@ -26,7 +26,7 @@ configuration = {
     processInternalTypes: true,
     outputDirectory: './out/src/main/java'
 }
-if (2 * 3 > 4) {
+if (2 * 3 < 4) {
     configuration = {
         sourceRootDir: './tests.mini',
         baseJavaPackage: 'fr.lteconsulting.jsinterop',

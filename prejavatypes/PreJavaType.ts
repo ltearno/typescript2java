@@ -23,7 +23,7 @@ export abstract class PreJavaType {
     abstract getSimpleName(typeParametersEnv: TypeEnvironment): string
 
     abstract getPackageName(): string
-    
+
     abstract setPackageName(name: string)
 
     abstract getTypeParameters(typeParametersEnv: { [key: string]: PreJavaType }): PreJavaType[]
@@ -55,17 +55,18 @@ export abstract class PreJavaType {
     }
 
     getHumanizedName(typeParametersEnv: { [key: string]: PreJavaType }): string {
-        let result = visitPreJavaType(this, {
+        return visitPreJavaType(this, {
             caseReferenceType: type => {
                 let res = type.type.getHumanizedName(typeParametersEnv)
                 if (type.typeParameters && type.typeParameters.length)
                     res += `Of${type.typeParameters.map(t => t.getHumanizedName(typeParametersEnv)).join('And')}`
                 return res
             },
-            caseUnion: type => `Union${type.aliasName ? `_${type.aliasName}_` : ''}Of${type.types.map(t => t.getHumanizedName(typeParametersEnv)).join('And')}`
-        })
 
-        return result || this.getSimpleName(typeParametersEnv)
+            caseUnion: type => `Union${(type.typeParameters && type.typeParameters.length) ? `With${type.typeParameters.map(tp => tp.getSimpleName(null)).join('And')}` : ''}${type.aliasName ? `_${type.aliasName}_` : ''}Of${type.types.map(t => t.getHumanizedName(typeParametersEnv)).join('And')}`,
+
+            onOther: type => this.getSimpleName(typeParametersEnv)
+        })
     }
 
     // means a class which extends it should print 'extends XXX'

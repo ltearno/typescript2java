@@ -561,6 +561,26 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
     }
 
     addMethod(method: PreJavaTypeCallSignature) {
+        if (Signature.getCallSignatureTypeErasedSignature(method) == 'S(next,P(d74))') {
+            let type = method.parameters[0].type
+            if (type instanceof PreJavaTypeClassOrInterface) {
+                type.sourceTypes && type.sourceTypes.forEach(source => {
+                    source.symbol.declarations.forEach(decl => console.log(`${decl.getSourceFile().fileName}@${decl.getStart()}`))
+                })
+            }
+            console.log('yop')
+        }
+
+        if (Signature.getCallSignatureTypeErasedSignature(method) == 'S(next,P(d3))') {
+            let type = method.parameters[0].type
+            if (type instanceof PreJavaTypeClassOrInterface) {
+                type.sourceTypes && type.sourceTypes.forEach(source => {
+                    source.symbol.declarations.forEach(decl => console.log(`${decl.getSourceFile().fileName}@${decl.getStart()}`))
+                })
+            }
+            console.log('yop')
+        }
+
         this.addMethodInCollection(method, this.methods)
     }
 
