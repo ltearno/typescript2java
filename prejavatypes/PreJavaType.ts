@@ -63,7 +63,13 @@ export abstract class PreJavaType {
                 return res
             },
 
-            caseUnion: type => `Union${(type.typeParameters && type.typeParameters.length) ? `With${type.typeParameters.map(tp => tp.getSimpleName(null)).join('And')}` : ''}${type.aliasName ? `_${type.aliasName}_` : ''}Of${type.types.map(t => t.getHumanizedName(typeParametersEnv)).join('And')}`,
+            caseUnion: type => {
+                let res = 'Union'
+                //res += `${(type.typeParameters && type.typeParameters.length) ? `With${type.typeParameters.map(tp => tp.getSimpleName(null)).join('And')}` : ''}`
+                res += `${type.aliasName ? `_${type.aliasName}_` : ''}`
+                res += `Of${type.types.map(t => t.getHumanizedName(typeParametersEnv)).join('And')}`
+                return res
+            },
 
             onOther: type => this.getSimpleName(typeParametersEnv)
         })

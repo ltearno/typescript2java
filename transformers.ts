@@ -189,6 +189,7 @@ export function reduceAnonymousTypes(typeMap: TypescriptToJavaTypemap) {
     let typeDuplicates = new Map<string, PreJavaType[]>()
 
     console.log(`finding duplicate anonymous types`)
+    let replacements = new Map()
     types.forEach(type => {
         Visit.visitPreJavaType(type, {
             caseClassOrInterfaceType: (classType) => {
@@ -217,10 +218,9 @@ export function reduceAnonymousTypes(typeMap: TypescriptToJavaTypemap) {
     })
 
     console.log(`merging duplicate anonymous types`)
-    let replacements = new Map()
     typeDuplicates.forEach((list, footprint) => {
         for (let i = 1; i < list.length; i++) {
-            console.log(`${list[i].getSimpleName(null)} => ${list[0].getSimpleName(null)}`)
+            //console.log(`${list[i].getSimpleName(null)} => ${list[0].getSimpleName(null)}`)
             replacements.set(list[i], list[0])
         }
     })

@@ -33,8 +33,8 @@ export class PreJavaTypeUnion extends PreJavaType {
                 .map(t => context.getTypeMap().getOrCreatePreJavaTypeForTsType(t, false, this.typeParameters))
                 .map(t => {
                     if (t instanceof PreJavaTypeClassOrInterface
-                        && t.typeParameters
-                        && t.typeParameters.map(tp => tp.name).join() != this.typeParameters.map(tp => tp.name).join()) {
+                        && t.typeParameters && t.typeParameters.length) {
+                        //&& t.typeParameters.map(tp => tp.name).join() != this.typeParameters.map(tp => tp.name).join()) {
                         let res = new PreJavaTypeReference()
                         res.type = t
                         res.typeParameters = t.typeParameters.slice()
