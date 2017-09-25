@@ -195,7 +195,7 @@ export function reduceAnonymousTypes(typeMap: TypescriptToJavaTypemap) {
                 if (!classType.isAnonymousSourceType)
                     return
 
-                let footprint = Signature.getTypeSignature(classType)
+                let footprint = Signature.getTypeStandardSignature(classType)
                 let list = typeDuplicates.get(footprint)
                 if (list == null) {
                     list = []
@@ -205,7 +205,7 @@ export function reduceAnonymousTypes(typeMap: TypescriptToJavaTypemap) {
             },
 
             caseUnion: unionType => {
-                let footprint = Signature.getTypeSignature(unionType)
+                let footprint = Signature.getTypeStandardSignature(unionType)
                 let list = typeDuplicates.get(footprint)
                 if (list == null) {
                     list = []

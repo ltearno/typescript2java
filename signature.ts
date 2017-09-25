@@ -1,5 +1,5 @@
 
-import { PreJavaType } from "./prejavatypes/PreJavaType"
+import { PreJavaType, TypeEnvironment } from "./prejavatypes/PreJavaType"
 import { visitPreJavaType } from './prejavatypes/PreJavaTypeVisit'
 import { PreJavaTypeCallSignature, PreJavaTypeFormalParameter } from './prejavatypes/PreJavaTypeCallSignature'
 import { PreJavaTypeProperty } from './prejavatypes/PreJavaTypeClassOrInterface'
@@ -29,6 +29,10 @@ export function getCallSignatureStandardSignature(signature: PreJavaTypeCallSign
     return getCallSignatureSignature(signature, { onlyTypeErasure: false }, null)
 }
 
+export function getTypeStandardSignature(type: PreJavaType): string {
+    return getTypeSignature(type, { onlyTypeErasure: false }, null)
+}
+
 export function getCallSignatureSignature(signature: PreJavaTypeCallSignature, options: SignatureOptions, selfReflect: Map<PreJavaType, string>) {
     let res = 'S('
         + (signature.name ? signature.name : '?')
@@ -37,23 +41,23 @@ export function getCallSignatureSignature(signature: PreJavaTypeCallSignature, o
         + ',' + ((signature.parameters && signature.parameters.length) ? signature.parameters.map(param => getParameterSignature(param, options, selfReflect)).join() : '')
         + ')'
 
-    if (res == 'S(next,P(d3))' || res=='S(next,P(d74))')
+    if (res == 'S(next,P(d3))' || res == 'S(next,P(d74))')
         console.log('yop');
 
 
     return res
 }
 
-export function getParameterSignature(parameter: PreJavaTypeFormalParameter, options: SignatureOptions, selfReflect: Map<PreJavaType, string> = null) {
+export function getParameterSignature(parameter: PreJavaTypeFormalParameter, options: SignatureOptions, selfReflect: Map<PreJavaType, string>) {
     //return `P(${parameter.dotdotdot ? 'D' : 'd'}${parameter.optional ? 'O' : 'o'}${getTypeSignature(parameter.type, selfReflect)})`
     return `P(${parameter.dotdotdot ? 'D' : 'd'}${getTypeSignature(parameter.type, options, selfReflect)})`
 }
 
-export function getPropertySignature(property: PreJavaTypeProperty, options: SignatureOptions, selfReflect: Map<PreJavaType, string> = null) {
+export function getPropertySignature(property: PreJavaTypeProperty, options: SignatureOptions, selfReflect: Map<PreJavaType, string>) {
     return `p(${property.name}|${getTypeSignature(property.type, options, selfReflect)})`
 }
 
-export function getTypeSignature(type: PreJavaType, options: SignatureOptions = { onlyTypeErasure: false }, selfReflect: Map<PreJavaType, string> = null): string {
+function getTypeSignature(type: PreJavaType, options: SignatureOptions = { onlyTypeErasure: false }, selfReflect: Map<PreJavaType, string>): string {
     if (selfReflect == null)
         selfReflect = new Map()
 
