@@ -200,6 +200,20 @@ export class TypescriptToJavaTypemap {
 
         preJavaType.processSourceType(tsType, typeParametersToApplyToAnonymousTypes, this.processContext)
 
+        let freeTPs = new Set()
+        tsTools.fetchUsedFreeTypeParameters(tsType, freeTPs, this.processContext.getProgram().getTypeChecker())
+        let tps = preJavaType.getTypeParameters(null)
+        let dump = ''
+        freeTPs.forEach(v => dump += ` '${v}'`)
+        dump += `  => ${tps ? tps.map(tp => tp.getSimpleName(null)).join() : ''}`
+        let nb = tps ? tps.length : 0
+        if (((freeTPs.size < nb) && (preJavaType instanceof PreJavaTypeUnion))) {
+            console.log(`${preJavaType.getFullyQualifiedName(null)} ${dump} vs ${preJavaType.getSimpleName()}`)
+            let tc = this.processContext.getProgram().getTypeChecker()
+            tsTools.fetchUsedFreeTypeParameters(tsType, freeTPs, tc)
+            this.instantiatePreJavaType(tsType, preferNothingVoid, typeParametersToApplyToAnonymousTypes)
+        }
+
         return preJavaType
     }
 

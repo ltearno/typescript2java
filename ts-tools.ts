@@ -111,3 +111,71 @@ export function debugNode(node: ts.Node, space: string, rec: boolean = true) {
     if (rec)
         ts.forEachChild(node, child => debugNode(child, ' ' + space));
 }
+
+export function fetchUsedFreeTypeParameters(type: ts.Type, usedTypeParameters: Set<string>, typeChecker: ts.TypeChecker) {
+    if (!type) {
+        return
+    }
+    else if (type.flags == ts.TypeFlags.TypeParameter) {
+        let typeParameter = type as ts.TypeParameter
+        if (typeParameter.constraint)
+            fetchUsedFreeTypeParameters(typeParameter.constraint, usedTypeParameters, typeChecker)
+        else
+            usedTypeParameters.add(type.symbol.name)
+    }
+    else if (type.flags == ts.TypeFlags.Object) {
+        let objectType = type as ts.ObjectType
+        if (objectType.objectFlags & ts.ObjectFlags.Reference) {
+            let typeReference = type as ts.TypeReference
+            if (typeReference.target != typeReference) {
+                //fetchUsedFreeTypeParameters(typeReference.target, usedTypeParameters, typeChecker)
+                if (typeReference.typeArguments)
+                    typeReference.typeArguments.forEach(typeArgument => fetchUsedFreeTypeParameters(typeArgument, usedTypeParameters, typeChecker))
+                return
+            }
+        }
+
+        if (objectType.objectFlags & ts.ObjectFlags.Class || objectType.objectFlags & ts.ObjectFlags.Interface) {
+            let interfaceType = objectType as ts.InterfaceType
+            interfaceType.typeParameters && interfaceType.typeParameters.forEach(tp => usedTypeParameters.add(tp.symbol.getName()))
+        }
+        else if (objectType.objectFlags & ts.ObjectFlags.Anonymous) {
+            // TODO visit constructor && indexers
+            let interfaceType = objectType as ts.InterfaceTypeWithDeclaredMembers
+            let properties = interfaceType.declaredProperties
+            if (properties && properties.length) {
+                properties.forEach(property => {
+                    let propertyType = typeChecker.getTypeAtLocation(property.valueDeclaration)
+                    fetchUsedFreeTypeParameters(propertyType, usedTypeParameters, typeChecker)
+                })
+            }
+
+            let callSignatures = type.getCallSignatures()
+            callSignatures && callSignatures.forEach(callSignature => {
+                callSignature.typeParameters && callSignature.typeParameters
+
+                let usedInSignature = new Set()
+                fetchUsedFreeTypeParameters(callSignature.getReturnType(), usedInSignature, typeChecker)
+                callSignature.parameters && callSignature.parameters.forEach(param => {
+                    let paramType = typeChecker.getTypeAtLocation(param.valueDeclaration)
+                    fetchUsedFreeTypeParameters(paramType, usedInSignature, typeChecker)
+                })
+
+                let signatureProvidedTypeParameters = new Set()
+                if (callSignature.typeParameters)
+                    callSignature.typeParameters.forEach(tp => signatureProvidedTypeParameters.add(tp.symbol.name))
+                usedInSignature.forEach(t => {
+                    if (!signatureProvidedTypeParameters.has(t))
+                        usedTypeParameters.add(t)
+                })
+            })
+        }
+    }
+    else if (type.flags & ts.TypeFlags.UnionOrIntersection) {
+        (type as ts.UnionOrIntersectionType).types.forEach(t => fetchUsedFreeTypeParameters(t, usedTypeParameters, typeChecker))
+    }
+    else {
+        // TODO StructuredType IndexedAccess, maybe little more...
+        //console.log(`IGNORED TYPE IN TYPEPARAMETER RESEARCH !`)
+    }
+}

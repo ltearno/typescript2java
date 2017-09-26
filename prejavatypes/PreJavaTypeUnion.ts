@@ -56,7 +56,6 @@ export class PreJavaTypeUnion extends PreJavaType {
             this.packageName = context.getJavaPackage(type.symbol.valueDeclaration.getSourceFile())
     }
 
-    // Free Type variable names used in this Union
     private fetchTypeParameters(type: ts.Type, typeParametersToApplyToAnonymousTypes: PreJavaTypeParameter[], typeParameters: string[]) {
         if (type.flags == ts.TypeFlags.TypeParameter) {
             if (typeParameters.indexOf(type.symbol.name) < 0)
@@ -81,37 +80,6 @@ export class PreJavaTypeUnion extends PreJavaType {
             }
         }
     }
-
-    /*private getAliasSymbolDeclarationTypeParametersList(type: ts.Type): string[] {
-        let res = []
-
-        if (!type.aliasSymbol)
-            return res
-
-        if (type.aliasSymbol.declarations && type.aliasSymbol.declarations.length) {
-            let declaration = type.aliasSymbol.declarations[0] as ts.TypeAliasDeclaration
-            if (declaration.kind == ts.SyntaxKind.TypeAliasDeclaration && declaration.typeParameters && declaration.typeParameters.length) {
-                for (let typeParameter of declaration.typeParameters) {
-                    if (typeParameter.kind == ts.SyntaxKind.TypeParameter && 'symbol' in typeParameter)
-                        res.push(typeParameter['symbol'].name)
-                    else
-                        res.push('ERROR')
-                }
-            }
-
-        }
-        return res
-    }
-
-    private getAliasTypeArgumentsDeclarationTypeParametersList(type: ts.Type, context: ProcessContext): string[] {
-        return type.aliasTypeArguments && type.aliasTypeArguments.map(t => {
-            let typeArgJavaType = context.getTypeMap().getOrCreatePreJavaTypeForTsType(t, false, null)
-            return Visit.visitPreJavaType(typeArgJavaType, {
-                caseClassOrInterfaceType: type => type.name,
-                onOther: type => type.getSimpleName(null)
-            })
-        })
-    }*/
 
     setTypes(types: PreJavaType[]) {
         this.types = []
