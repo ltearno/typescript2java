@@ -55,7 +55,7 @@ export abstract class PreJavaType {
     }
 
     getHumanizedName(typeParametersEnv: { [key: string]: PreJavaType }): string {
-        return visitPreJavaType(this, {
+        let res = visitPreJavaType(this, {
             caseReferenceType: type => {
                 let res = type.type.getHumanizedName(typeParametersEnv)
                 if (type.typeParameters && type.typeParameters.length)
@@ -64,15 +64,23 @@ export abstract class PreJavaType {
             },
 
             caseUnion: type => {
-                let res = 'Union'
+                let res = ''
+                res += `${type.aliasName ? `${type.aliasName}_` : ''}`
+                res += 'Union'
                 //res += `${(type.typeParameters && type.typeParameters.length) ? `With${type.typeParameters.map(tp => tp.getSimpleName(null)).join('And')}` : ''}`
-                res += `${type.aliasName ? `_${type.aliasName}_` : ''}`
                 res += `Of${type.types.map(t => t.getHumanizedName(typeParametersEnv)).join('And')}`
                 return res
             },
 
             onOther: type => this.getSimpleName(typeParametersEnv)
         })
+
+        if (!res)
+            console.log(`empp`)
+
+        res = res.replace(new RegExp('\\?', 'g'), 'UNKOWNTYPE')
+
+        return res
     }
 
     // means a class which extends it should print 'extends XXX'

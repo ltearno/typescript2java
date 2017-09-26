@@ -70,14 +70,17 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
 
         this.sourceTypes.add(type)
 
+        this.extractName(type, context)
         this.extractTypeParameters(type as ts.ObjectType, typeParametersToApplyToAnonymousTypes, context)
         this.extractBaseTypes(type, typeParametersToApplyToAnonymousTypes, context)
-        this.extractName(type, context)
         this.extractPrototypeAndNamespace(type, context)
         this.extractConstructor(type, context)
         this.extractComments(type)
         this.extractIndexTypes(type, context)
         this.extractPropertiesAndMethods(type as ts.InterfaceTypeWithDeclaredMembers, context)
+
+        if (!this.name)
+            console.log(`empty name`)
     }
 
     private extractTypeParameters(type: ts.Type, typeParametersToApplyToAnonymousTypes: PreJavaTypeParameter[], context: ProcessContext) {
@@ -87,17 +90,15 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
         let objectType = type as ts.ObjectType
 
         if (objectType.objectFlags & ts.ObjectFlags.Anonymous) {
-            let usedTypeParameters = new Set<string>()
-            tsTools.fetchUsedFreeTypeParameters(type, usedTypeParameters, context.getProgram().getTypeChecker())
-
-            this.typeParameters = []
-            usedTypeParameters.forEach(typeParameterName => {
-                let typeParameter = new PreJavaTypeParameter(typeParameterName)
-                let existing = typeParametersToApplyToAnonymousTypes && typeParametersToApplyToAnonymousTypes.find(tp => tp.name == typeParameterName)
-                if (existing && existing.constraint)
-                    typeParameter.constraint = existing.constraint
-                this.typeParameters.push(typeParameter)
-            })
+            let usedTypeParameters = tsTools.fetchUsedFreeTypeParameters(type, context.getProgram().getTypeChecker())
+            this.typeParameters = usedTypeParameters
+                .map(typeParameterName => {
+                    let typeParameter = new PreJavaTypeParameter(typeParameterName)
+                    let existing = typeParametersToApplyToAnonymousTypes && typeParametersToApplyToAnonymousTypes.find(tp => tp.name == typeParameterName)
+                    if (existing && existing.constraint)
+                        typeParameter.constraint = existing.constraint
+                    return typeParameter
+                })
         }
         else if (objectType.objectFlags & ts.ObjectFlags.Class || objectType.objectFlags & ts.ObjectFlags.Interface) {
             let interfaceType = objectType as ts.InterfaceType
@@ -558,7 +559,10 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
     }
 
     addBaseType(baseType: PreJavaType) {
-        this.baseTypes.add(baseType)
+        if (baseType)
+            this.baseTypes.add(baseType)
+        if (baseType == null)
+            console.log(`NULL BASE TYPE`)
     }
 
     addConstructorSignature(signature: PreJavaTypeCallSignature) {

@@ -14,6 +14,7 @@ export class PreJavaTypeUnion extends PreJavaType {
     typeParameters: PreJavaTypeParameter[]
     baseTypes: Set<PreJavaType> = undefined
     aliasName: string = null
+    sourceTypes: ts.Type[] = []
 
     unionId = currentUnionId++
 
@@ -21,12 +22,22 @@ export class PreJavaTypeUnion extends PreJavaType {
         if (type.aliasSymbol)
             this.aliasName = type.aliasSymbol.name
 
+        this.sourceTypes.push(type)
+
         let unionType = type as ts.UnionType
 
-        let typeParameters: string[] = []
-        unionType.types.forEach(t => this.fetchTypeParameters(t, typeParametersToApplyToAnonymousTypes, typeParameters))
-        if (typeParameters.length)
-            this.typeParameters = typeParameters.map(name => new PreJavaTypeParameter(name))
+        if (this.aliasName == 'PartialObserver')
+            tsTools.fetchUsedFreeTypeParameters(type, context.getProgram().getTypeChecker())
+
+        let usedTypeParameters = tsTools.fetchUsedFreeTypeParameters(type, context.getProgram().getTypeChecker())
+        this.typeParameters = usedTypeParameters
+            .map(typeParameterName => {
+                let typeParameter = new PreJavaTypeParameter(typeParameterName)
+                let existing = typeParametersToApplyToAnonymousTypes && typeParametersToApplyToAnonymousTypes.find(tp => tp.name == typeParameterName)
+                if (existing && existing.constraint)
+                    typeParameter.constraint = existing.constraint
+                return typeParameter
+            })
 
         this.setTypes(
             unionType.types
@@ -52,8 +63,19 @@ export class PreJavaTypeUnion extends PreJavaType {
                     return -1
                 }))
 
-        if (type && type.symbol && type.symbol.valueDeclaration)
-            this.packageName = context.getJavaPackage(type.symbol.valueDeclaration.getSourceFile())
+        if (type) {
+            if (type.aliasSymbol && type.aliasSymbol.valueDeclaration)
+                this.packageName = context.getJavaPackage(type.aliasSymbol.valueDeclaration.getSourceFile())
+            else if (type.symbol && type.symbol.valueDeclaration)
+                this.packageName = context.getJavaPackage(type.symbol.valueDeclaration.getSourceFile())
+        }
+
+        if (this.getSimpleName() == 'UnionWithROfFunction1OfObjectAndROfRAndArrayLikeOfObjectAndPromiseLikeOfObjectAndSubscribableOfObject') {
+            let tc = context.getProgram().getTypeChecker()
+            tsTools.fetchUsedFreeTypeParameters(type, tc)
+            unionType.types
+                .map(t => context.getTypeMap().getOrCreatePreJavaTypeForTsType(t, false, this.typeParameters))
+        }
     }
 
     private fetchTypeParameters(type: ts.Type, typeParametersToApplyToAnonymousTypes: PreJavaTypeParameter[], typeParameters: string[]) {
@@ -116,7 +138,7 @@ export class PreJavaTypeUnion extends PreJavaType {
         if ((!this.types) || this.types.length == 0)
             return 'EmptyUnion'// + '_id_' + this.unionId
 
-        return this.getHumanizedName(null).replace(new RegExp('\\?', 'g'), 'UNKOWNTYPE')// + '_id_' + this.unionId
+        return this.getHumanizedName(null)// + '_id_' + this.unionId
     }
 
     getPackageName(): string { return this.packageName }

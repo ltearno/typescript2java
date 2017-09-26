@@ -83,6 +83,14 @@ export class ExportPhase {
 
         flow.startJavaDocComments()
         flow.push(`Union adapter`).finishLine()
+        if (type.sourceTypes && type.sourceTypes.length) {
+            type.sourceTypes.forEach(sourceType => {
+                if (sourceType && sourceType.symbol && sourceType.symbol.declarations && sourceType.symbol.declarations.length)
+                    sourceType.symbol.declarations.forEach(declaration => flow.push(`declared in: ${declaration.getSourceFile().fileName}:${declaration.pos}`).finishLine())
+                if (sourceType && sourceType.aliasSymbol && sourceType.aliasSymbol.declarations && sourceType.aliasSymbol.declarations.length)
+                    sourceType.aliasSymbol.declarations.forEach(declaration => flow.push(`aliased in: ${declaration.getSourceFile().fileName}:${declaration.pos}`).finishLine())
+            })
+        }
         flow.endJavaDocComments()
 
         let exportUnionAsAbstractClass = extendedBaseTypes.length > 0
@@ -661,12 +669,8 @@ export class ExportPhase {
     private exportJavaUnit(type: PreJavaType, javaWriter: JavaWriter, flow: TextFlow, baseDirectory: string) {
         let fqn = type.getParametrizedFullyQualifiedName(null)
 
-        if (this.exportedFqns.has(fqn)) {
+        if (this.exportedFqns.has(fqn))
             console.log(`WARNING, already exported !`)
-            if (type.getHumanizedName(null) == 'UnionOfFunction1OfObjectAndRAndArrayLikeOfObjectAndPromiseLikeOfObjectAndSubscribableOfObject')
-                console.log('holly cow');
-
-        }
         else
             this.exportedFqns.add(fqn)
 

@@ -105,7 +105,8 @@ export class TypescriptToJavaTypemap {
         if (hasKeyOfInTypeParameters)
             return null
 
-        let signatureTypeParameters = tsSignature.getTypeParameters() ? tsSignature.getTypeParameters().map(t => {
+        let tsSignatureParameters = tsSignature.getTypeParameters()
+        let signatureTypeParameters = tsSignatureParameters ? tsSignatureParameters.map(t => {
             let res = this.getOrCreatePreJavaTypeForTsType(t, false, typeParametersToApplyToAnonymousTypes) as PreJavaTypeParameter
             if (!(res instanceof PreJavaTypeParameter))
                 console.error(`BLABLABLA`)
@@ -117,6 +118,15 @@ export class TypescriptToJavaTypemap {
             .filter(tp => !typeParametersToApplyToAnonymousTypes.some(tpIn => tpIn.name == tp.name))
         signatureTypeParameters && signatureTypeParameters
             .forEach(tp => typeParametersToApplyToAnonymousTypes.push(tp))
+
+        /*tsSignatureParameters && tsSignatureParameters.forEach(tp => {
+            let freeTypeNames = tsTools.fetchUsedFreeTypeParameters(tp, this.processContext.getProgram().getTypeChecker())
+            freeTypeNames && freeTypeNames.forEach(typeName => {
+                if (!signatureTypeParameters.some(tp => tp.name == typeName)
+                    && !typeParametersToApplyToAnonymousTypes.some(tpIn => tpIn.name == typeName))
+                    signatureTypeParameters.push(new PreJavaTypeParameter(typeName))
+            })
+        })*/
 
         let signatureReturnType = tsSignature.getReturnType()
         let returnType = this.getOrCreatePreJavaTypeForTsType(signatureReturnType, true, typeParametersToApplyToAnonymousTypes)
@@ -200,26 +210,21 @@ export class TypescriptToJavaTypemap {
 
         preJavaType.processSourceType(tsType, typeParametersToApplyToAnonymousTypes, this.processContext)
 
-        let freeTPs = new Set()
-        tsTools.fetchUsedFreeTypeParameters(tsType, freeTPs, this.processContext.getProgram().getTypeChecker())
-        let tps = preJavaType.getTypeParameters(null)
-        let dump = ''
-        freeTPs.forEach(v => dump += ` '${v}'`)
-        dump += `  => ${tps ? tps.map(tp => tp.getSimpleName(null)).join() : ''}`
-        let nb = tps ? tps.length : 0
-        if (((freeTPs.size < nb) && (preJavaType instanceof PreJavaTypeUnion))) {
-            console.log(`${preJavaType.getFullyQualifiedName(null)} ${dump} vs ${preJavaType.getSimpleName()}`)
-            let tc = this.processContext.getProgram().getTypeChecker()
-            tsTools.fetchUsedFreeTypeParameters(tsType, freeTPs, tc)
-            this.instantiatePreJavaType(tsType, preferNothingVoid, typeParametersToApplyToAnonymousTypes)
-        }
-
         return preJavaType
     }
 
     registerVariableStatement(statement: ts.VariableStatement) {
         statement.declarationList.declarations.forEach((declaration) => {
-            let t = this.program.getTypeChecker().getTypeFromTypeNode(declaration.type)
+            let t: ts.Type
+            if (declaration.type) {
+                t = this.program.getTypeChecker().getTypeFromTypeNode(declaration.type)
+            }
+            else {
+                let symbol = this.program.getTypeChecker().getSymbolAtLocation(declaration)
+                if (!symbol)
+                    return
+                t = this.program.getTypeChecker().getTypeOfSymbolAtLocation(symbol, declaration)
+            }
 
             let cs = t.getConstructSignatures()
             if (cs && cs.length) {

@@ -61,19 +61,20 @@ export class GatherPhase {
         Transformers.simplifyUnions(this.typeMap)
 
         console.log(`replacing anonymous types`)
-        Transformers.replaceAnonymousTypes(this.typeMap)
+        Transformers.replaceByFunctionAndProcsLambdaTypes(this.typeMap)
 
         console.log(`removing OverridingProperties`)
         Transformers.removeOverridingProperties(this.typeMap)
 
         console.log(`reducing anonymous types`)
-        Transformers.reduceAnonymousTypes(this.typeMap)
+        Transformers.deduplicateTypes(this.typeMap)
+        Transformers.removeEmptyTypes(this.typeMap)
 
         console.log(`unanonymising types`)
         Transformers.ensureAllTypesHaveNameAndPackage(this.typeMap, this.baseJavaPackage)
 
-        //console.log(`removing duplicate overloads (with same type erasure)`)
-        //Transformers.removeDuplicateOverloads(this.typeMap)
+        ///console.log(`removing duplicate overloads (with same type erasure)`)
+        ///Transformers.removeDuplicateOverloads(this.typeMap)
 
         console.log(`changing DTO interfaces into classes`)
         Transformers.changeDtoInterfacesIntoClasses(this.typeMap)

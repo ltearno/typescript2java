@@ -183,7 +183,7 @@ export function developMethodsWithUnionParameters(typeMap: TypescriptToJavaTypem
 
 
 
-export function reduceAnonymousTypes(typeMap: TypescriptToJavaTypemap) {
+export function deduplicateTypes(typeMap: TypescriptToJavaTypemap) {
     let types = typeMap.typeSet()
 
     let typeDuplicates = new Map<string, PreJavaType[]>()
@@ -225,7 +225,9 @@ export function reduceAnonymousTypes(typeMap: TypescriptToJavaTypemap) {
         }
     })
     typeMap.substituteType((type: PreJavaType): PreJavaType => replacements.get(type) || type)
+}
 
+export function removeEmptyTypes(typeMap: TypescriptToJavaTypemap) {
     console.log(`replacing empty classes by Object`)
     typeMap.substituteType(type => {
         return Visit.visitPreJavaType<PreJavaType>(type, {
@@ -502,7 +504,7 @@ export function checkNoDuplicateTypeNames(typeMap: TypescriptToJavaTypemap) {
         console.log(`no duplicate found`)
 }
 
-export function replaceAnonymousTypes(typeMap: TypescriptToJavaTypemap) {
+export function replaceByFunctionAndProcsLambdaTypes(typeMap: TypescriptToJavaTypemap) {
     let PARAMETER_NAMES = ['P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7', 'P8', 'P9', 'P10', 'P11', 'P12', 'P13']
     let NB_PARAMS = PARAMETER_NAMES.length
     let LAMBDAS: PreJavaTypeClassOrInterface[] = []
@@ -556,11 +558,26 @@ export function replaceAnonymousTypes(typeMap: TypescriptToJavaTypemap) {
 
     typeMap.substituteType(type => {
         return Visit.visitPreJavaType(type, {
+            caseReferenceType: type => {
+                // not really shure if there's no possibility of failure with that...
+                // WHY THIS FIX : 
+                // when a ref refs a type parametrized anonymous type that is replaced by a LAMBDA or PROC,
+                // the ref should be replaced because it will miss the LAMBDA or PROC type parameters
+                if (type.type instanceof PreJavaTypeReference
+                    && type.type.type instanceof PreJavaTypeClassOrInterface
+                    && (LAMBDAS.indexOf(type.type.type) >= 0 || PROCS.indexOf(type.type.type) >= 0))
+                    return type.type
+                return type
+            },
             caseClassOrInterfaceType: type => {
                 if (PROCS.indexOf(type) >= 0 || LAMBDAS.indexOf(type) >= 0)
                     return type
 
-                if (type.callSignatures && type.callSignatures.length == 1 && type.isAnonymousSourceType && typeTools.hasOnlyCallSignatures(type)) {
+                if (type.callSignatures
+                    && type.callSignatures.length == 1
+                    && (!(type.callSignatures[0].typeParameters && type.callSignatures[0].typeParameters.length))
+                    && type.isAnonymousSourceType
+                    && typeTools.hasOnlyCallSignatures(type)) {
                     let functionalMethod = type.callSignatures[0]
                     if (!functionalMethod.parameters || functionalMethod.parameters.length < NB_PARAMS) {
                         let returnType = functionalMethod.returnType
@@ -585,6 +602,7 @@ export function replaceAnonymousTypes(typeMap: TypescriptToJavaTypemap) {
                             for (let i = 0; i < nbParameters; i++)
                                 ref.typeParameters.push(functionalMethod.parameters[i].type)
                             ref.typeParameters.push(returnType)
+
                             return ref
                         }
                     }

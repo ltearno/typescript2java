@@ -112,25 +112,33 @@ export function debugNode(node: ts.Node, space: string, rec: boolean = true) {
         ts.forEachChild(node, child => debugNode(child, ' ' + space));
 }
 
-export function fetchUsedFreeTypeParameters(type: ts.Type, usedTypeParameters: Set<string>, typeChecker: ts.TypeChecker) {
+export function fetchUsedFreeTypeParameters(type: ts.Type, typeChecker: ts.TypeChecker) {
+    let usedTypeParameters = new Set<string>()
+    fetchUsedFreeTypeParametersInternal(type, usedTypeParameters, typeChecker)
+    let res = []
+    usedTypeParameters.forEach(name => res.push(name))
+    return res
+}
+
+function fetchUsedFreeTypeParametersInternal(type: ts.Type, usedTypeParameters: Set<string>, typeChecker: ts.TypeChecker) {
     if (!type) {
         return
     }
     else if (type.flags == ts.TypeFlags.TypeParameter) {
         let typeParameter = type as ts.TypeParameter
-        if (typeParameter.constraint)
-            fetchUsedFreeTypeParameters(typeParameter.constraint, usedTypeParameters, typeChecker)
-        else
-            usedTypeParameters.add(type.symbol.name)
+        /*if (typeParameter.constraint)
+            fetchUsedFreeTypeParametersInternal(typeParameter.constraint, usedTypeParameters, typeChecker)
+        else*/
+        usedTypeParameters.add(type.symbol.name)
     }
     else if (type.flags == ts.TypeFlags.Object) {
         let objectType = type as ts.ObjectType
         if (objectType.objectFlags & ts.ObjectFlags.Reference) {
             let typeReference = type as ts.TypeReference
             if (typeReference.target != typeReference) {
-                //fetchUsedFreeTypeParameters(typeReference.target, usedTypeParameters, typeChecker)
+                //fetchUsedFreeTypeParametersInternal(typeReference.target, usedTypeParameters, typeChecker)
                 if (typeReference.typeArguments)
-                    typeReference.typeArguments.forEach(typeArgument => fetchUsedFreeTypeParameters(typeArgument, usedTypeParameters, typeChecker))
+                    typeReference.typeArguments.forEach(typeArgument => fetchUsedFreeTypeParametersInternal(typeArgument, usedTypeParameters, typeChecker))
                 return
             }
         }
@@ -146,22 +154,22 @@ export function fetchUsedFreeTypeParameters(type: ts.Type, usedTypeParameters: S
             if (properties && properties.length) {
                 properties.forEach(property => {
                     let propertyType = typeChecker.getTypeAtLocation(property.valueDeclaration)
-                    fetchUsedFreeTypeParameters(propertyType, usedTypeParameters, typeChecker)
+                    fetchUsedFreeTypeParametersInternal(propertyType, usedTypeParameters, typeChecker)
                 })
             }
 
-            fetchUsedFreeTypeParameters(type.getNumberIndexType(), usedTypeParameters, typeChecker)
-            fetchUsedFreeTypeParameters(type.getStringIndexType(), usedTypeParameters, typeChecker)
+            fetchUsedFreeTypeParametersInternal(type.getNumberIndexType(), usedTypeParameters, typeChecker)
+            fetchUsedFreeTypeParametersInternal(type.getStringIndexType(), usedTypeParameters, typeChecker)
 
             let callSignatures = type.getCallSignatures()
             callSignatures && callSignatures.forEach(callSignature => {
                 callSignature.typeParameters && callSignature.typeParameters
 
                 let usedInSignature = new Set()
-                fetchUsedFreeTypeParameters(callSignature.getReturnType(), usedInSignature, typeChecker)
+                fetchUsedFreeTypeParametersInternal(callSignature.getReturnType(), usedInSignature, typeChecker)
                 callSignature.parameters && callSignature.parameters.forEach(param => {
                     let paramType = typeChecker.getTypeAtLocation(param.valueDeclaration)
-                    fetchUsedFreeTypeParameters(paramType, usedInSignature, typeChecker)
+                    fetchUsedFreeTypeParametersInternal(paramType, usedInSignature, typeChecker)
                 })
 
                 let signatureProvidedTypeParameters = new Set()
@@ -175,7 +183,7 @@ export function fetchUsedFreeTypeParameters(type: ts.Type, usedTypeParameters: S
         }
     }
     else if (type.flags & ts.TypeFlags.UnionOrIntersection) {
-        (type as ts.UnionOrIntersectionType).types.forEach(t => fetchUsedFreeTypeParameters(t, usedTypeParameters, typeChecker))
+        (type as ts.UnionOrIntersectionType).types.forEach(t => fetchUsedFreeTypeParametersInternal(t, usedTypeParameters, typeChecker))
     }
     else {
         // TODO StructuredType IndexedAccess, maybe little more...
