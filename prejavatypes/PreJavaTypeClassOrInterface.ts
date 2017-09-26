@@ -87,7 +87,17 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
         let objectType = type as ts.ObjectType
 
         if (objectType.objectFlags & ts.ObjectFlags.Anonymous) {
-            this.setTypeParameters((typeParametersToApplyToAnonymousTypes && typeParametersToApplyToAnonymousTypes.length) ? typeParametersToApplyToAnonymousTypes.slice() : null)
+            let usedTypeParameters = new Set<string>()
+            tsTools.fetchUsedFreeTypeParameters(type, usedTypeParameters, context.getProgram().getTypeChecker())
+
+            this.typeParameters = []
+            usedTypeParameters.forEach(typeParameterName => {
+                let typeParameter = new PreJavaTypeParameter(typeParameterName)
+                let existing = typeParametersToApplyToAnonymousTypes && typeParametersToApplyToAnonymousTypes.find(tp => tp.name == typeParameterName)
+                if (existing && existing.constraint)
+                    typeParameter.constraint = existing.constraint
+                this.typeParameters.push(typeParameter)
+            })
         }
         else if (objectType.objectFlags & ts.ObjectFlags.Class || objectType.objectFlags & ts.ObjectFlags.Interface) {
             let interfaceType = objectType as ts.InterfaceType

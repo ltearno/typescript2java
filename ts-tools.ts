@@ -150,6 +150,9 @@ export function fetchUsedFreeTypeParameters(type: ts.Type, usedTypeParameters: S
                 })
             }
 
+            fetchUsedFreeTypeParameters(type.getNumberIndexType(), usedTypeParameters, typeChecker)
+            fetchUsedFreeTypeParameters(type.getStringIndexType(), usedTypeParameters, typeChecker)
+
             let callSignatures = type.getCallSignatures()
             callSignatures && callSignatures.forEach(callSignature => {
                 callSignature.typeParameters && callSignature.typeParameters
