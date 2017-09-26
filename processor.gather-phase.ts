@@ -35,15 +35,16 @@ export class GatherPhase {
                 return
             }
 
-            if (node.kind == ts.SyntaxKind.InterfaceDeclaration || node.kind == ts.SyntaxKind.ClassDeclaration) {
+            if (node.kind == ts.SyntaxKind.InterfaceDeclaration
+                || node.kind == ts.SyntaxKind.ClassDeclaration) {
                 this.typeMap.getOrCreatePreJavaTypeForTsType(this.program.getTypeChecker().getTypeAtLocation(node))
-                return;
+                return
             }
 
             if (node.kind == ts.SyntaxKind.EnumDeclaration) {
                 let t = this.program.getTypeChecker().getTypeAtLocation(node)
                 this.typeMap.getOrCreatePreJavaTypeForTsType(t)
-                return;
+                return
             }
 
             if (!this.ignoredSyntaxKinds.has(node.kind)) {

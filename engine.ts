@@ -65,7 +65,7 @@ export class Engine {
         program.getSourceFiles().forEach(sourceFile => {
             let isInternalFile = !files.find(file => path.normalize(file) === path.normalize(sourceFile.fileName))
             if (this.configuration.processInternalTypes || !isInternalFile) {
-                console.log(`source ${sourceFile.fileName}`)
+                //console.log(`source ${sourceFile.fileName}`)
                 gatherPhase.addTypesFromSourceFile(sourceFile)
             }
         })
