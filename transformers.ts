@@ -304,7 +304,13 @@ export function addMethodsFromInterfaceHierarchy(typeMap: TypescriptToJavaTypema
                                     dotdotdot: p.dotdotdot
                                 }))
                             method.addComments(`added from type hierarchy`)
-                            type.addMethod(method)
+
+                            // optimization of type.addMethod(method)
+                            let sig = Signature.getCallSignatureTypeErasedSignature(method)
+                            if (!methodsSignatures.has(sig)) {
+                                methodsSignatures.add(sig)
+                                type.methods.push(method)
+                            }
                         })
 
                         visitedInterface.properties && visitedInterface.properties.forEach(visitedProperty => {
