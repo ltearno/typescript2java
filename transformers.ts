@@ -161,15 +161,25 @@ export function developMethodsWithUnionParameters(typeMap: TypescriptToJavaTypem
                 if (functionalInterface && type.callSignatures.length == 1)
                     return
 
+                let methodsSignatures = new Set<string>()
+                type.methods && type.methods.forEach(m => methodsSignatures.add(Signature.getCallSignatureTypeErasedSignature(m)))
+                let maybeAdd = method => {
+                    let sig = Signature.getCallSignatureTypeErasedSignature(method)
+                    if (methodsSignatures.has(sig))
+                        return
+                    methodsSignatures.add(sig)
+                    type.methods.push(method)
+                }
+
                 type.methods && type.methods.forEach(m => {
                     let dups = developMethodWithUnionParameters(m, 5)
-                    dups && dups.forEach(dup => type.addMethod(dup))
+                    dups && dups.forEach(dup => maybeAdd(dup))
                     counter += dups && dups.length
                 })
 
                 type.methods && type.methods.forEach(m => {
                     let dups = developMethodWithOptionalParameters(m)
-                    dups && dups.forEach(dup => type.addMethod(dup))
+                    dups && dups.forEach(dup => maybeAdd(dup))
                     counter += dups && dups.length
                 })
             }
