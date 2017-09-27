@@ -1,0 +1,8 @@
+{
+    "sourceRootDir": "./apis/browser-api/tsd",
+    "baseJavaPackage": "fr.lteconsulting.jsinterop",
+    "defaultJavaPackage": "browser",
+    "javaPackages": {},
+    "processInternalTypes": false,
+    "outputDirectory": "./out/src/main/java"
+}

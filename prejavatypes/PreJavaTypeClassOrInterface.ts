@@ -268,9 +268,6 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
     }
 
     private extractPropertiesAndMethods(type: ts.InterfaceTypeWithDeclaredMembers, context: ProcessContext) {
-        if (this.getSimpleName(null) == 'Subscribable')
-            console.log(`yop`)
-
         // static properties and methods
         if (type.symbol && type.symbol.valueDeclaration) {
             let declaredType = context.getProgram().getTypeChecker().getTypeOfSymbolAtLocation(type.symbol, type.symbol.valueDeclaration)

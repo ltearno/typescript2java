@@ -1,0 +1,10 @@
+{
+    "sourceRootDir": "./tests.mini",
+    "baseJavaPackage": "fr.lteconsulting.jsinterop",
+    "defaultJavaPackage": "env",
+    "javaPackages": {
+        "tests.mini": "mini"
+    },
+    "processInternalTypes": false,
+    "outputDirectory": "./out/src/main/java"
+}

@@ -605,9 +605,6 @@ export class ExportPhase {
                 flow.blankLine()
                     .push('/*\n    Methods\n*/').finishLine()
 
-                if (type.name == 'Subscribable')
-                    console.log(`oo`)
-
                 let fixBug = new Set<string>()
 
                 type.methods

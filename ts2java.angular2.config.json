@@ -1,0 +1,20 @@
+{
+    "sourceRootDir": "./tests.angular4",
+    "baseJavaPackage": "fr.lteconsulting.jsinterop",
+    "defaultJavaPackage": "env",
+    "javaPackages": {
+        "tests/@angular/platform-browser-dynamic/src": "ng.platformBrowserDynamic",
+        "tests/@angular/platform-browser/src": "ng.platformBrowser",
+        "tests/@angular/http/src": "ng.http",
+        "tests/@angular/forms/src": "ng.forms",
+        "tests/@angular/router/src": "ng.router",
+        "tests/@angular/core/src": "ng.core",
+        "tests/@angular/common/src": "ng.common",
+        "tests/@angular/compiler/src": "ng.compiler",
+        "tests/@angular/": "ng",
+        "tests/rxjs": "rxjs",
+        "tests": "fr.lteconsulting.test"
+    },
+    "processInternalTypes": true,
+    "outputDirectory": "./out/src/main/java"
+}

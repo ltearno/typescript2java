@@ -1,0 +1,27 @@
+{
+    "sourceRootDir": "./apis/angular4-api/tsd",
+    "baseJavaPackage": "fr.lteconsulting.jsinterop",
+    "defaultJavaPackage": "browser",
+    "javaPackages": {
+        "apis/angular4-api/tsd/@angular/platform-browser-dynamic/src": "ng.platformBrowserDynamic",
+        "apis/angular4-api/tsd/@angular/platform-browser/src": "ng.platformBrowser",
+        "apis/angular4-api/tsd/@angular/http/src": "ng.http",
+        "apis/angular4-api/tsd/@angular/forms/src": "ng.forms",
+        "apis/angular4-api/tsd/@angular/router/src": "ng.router",
+        "apis/angular4-api/tsd/@angular/core/src": "ng.core",
+        "apis/angular4-api/tsd/@angular/common/src": "ng.common",
+        "apis/angular4-api/tsd/@angular/compiler/src/i18n": "ng.compiler.i18n",
+        "apis/angular4-api/tsd/@angular/compiler/src/aot": "ng.compiler.aot",
+        "apis/angular4-api/tsd/@angular/compiler/src/comiler_util": "ng.compiler.util",
+        "apis/angular4-api/tsd/@angular/compiler/src/expression_parser": "ng.compiler.expression.parse",
+        "apis/angular4-api/tsd/@angular/compiler/src/jit": "ng.compiler.jit",
+        "apis/angular4-api/tsd/@angular/compiler/src/ml_parser": "ng.compiler.mlparser",
+        "apis/angular4-api/tsd/@angular/compiler/src/output": "ng.compiler.output",
+        "apis/angular4-api/tsd/@angular/compiler/src/schema": "ng.compiler.schema",
+        "apis/angular4-api/tsd/@angular/compiler/src": "ng.compiler",
+        "apis/angular4-api/tsd/@angular/": "ng",
+        "apis/angular4-api/tsd/rxjs": "rxjs"
+    },
+    "processInternalTypes": true,
+    "outputDirectory": "./out/src/main/java"
+}

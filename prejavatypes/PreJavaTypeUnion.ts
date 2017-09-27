@@ -68,6 +68,8 @@ export class PreJavaTypeUnion extends PreJavaType {
                 this.packageName = context.getJavaPackage(type.aliasSymbol.valueDeclaration.getSourceFile())
             else if (type.symbol && type.symbol.valueDeclaration)
                 this.packageName = context.getJavaPackage(type.symbol.valueDeclaration.getSourceFile())
+            else
+                this.packageName = this.findPackage(context)
         }
 
         if (this.getSimpleName() == 'UnionWithROfFunction1OfObjectAndROfRAndArrayLikeOfObjectAndPromiseLikeOfObjectAndSubscribableOfObject') {
@@ -76,6 +78,44 @@ export class PreJavaTypeUnion extends PreJavaType {
             unionType.types
                 .map(t => context.getTypeMap().getOrCreatePreJavaTypeForTsType(t, false, this.typeParameters))
         }
+    }
+
+    private findPackage(context: ProcessContext) {
+        let usableTypes = new Set<string>()
+        this.types
+            .filter(type => {
+                return Visit.visitPreJavaType(type, {
+                    caseTypeParameter: type => false,
+                    caseBuiltinType: type => false,
+                    caseFakeType: type => false,
+                    onOther: type => true
+                })
+            })
+            .forEach(type => type.getPackageName() && usableTypes.add(type.getPackageName()))
+
+        if (!usableTypes.size)
+            return context.getJavaPackage(null)
+
+        let minPackage: string = null
+        usableTypes.forEach(packageName => {
+            if (minPackage == null) {
+                minPackage = packageName
+            }
+            else {
+                let lastCaracterToKeep = 0
+                while (
+                    lastCaracterToKeep < minPackage.length
+                    && lastCaracterToKeep < packageName.length
+                    && minPackage.charCodeAt(lastCaracterToKeep) == packageName.charCodeAt(lastCaracterToKeep))
+                    lastCaracterToKeep++
+                minPackage = minPackage.substring(0, lastCaracterToKeep)
+                let dotIndex = minPackage.lastIndexOf('.')
+                if (dotIndex >= 0)
+                    minPackage = minPackage.substring(0, dotIndex)
+            }
+        })
+
+        return minPackage
     }
 
     private fetchTypeParameters(type: ts.Type, typeParametersToApplyToAnonymousTypes: PreJavaTypeParameter[], typeParameters: string[]) {
