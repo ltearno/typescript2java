@@ -71,7 +71,7 @@ export class ExportPhase {
     }
 
     private exportUnionType(type: PreJavaTypeUnion, program: ts.Program, baseDirectory: string) {
-        let javaWriter = new JavaWriter(type.getPackageName())
+        let javaWriter = new JavaWriter(type.getPackageName(), type.getSimpleName())
         let flow = new TextFlow()
 
         let baseTypes: PreJavaType[] = []
@@ -137,7 +137,7 @@ export class ExportPhase {
     }
 
     private exportTuple(type: PreJavaTypeTuple, program: ts.Program, baseDirectory: string) {
-        let javaWriter = new JavaWriter(type.getPackageName())
+        let javaWriter = new JavaWriter(type.getPackageName(), type.getSimpleName())
         let flow = new TextFlow()
 
         javaWriter.importType(this.JS_TYPE)
@@ -184,7 +184,7 @@ export class ExportPhase {
     }
 
     private exportEnum(type: PreJavaTypeEnum, program: ts.Program, baseDirectory: string) {
-        let javaWriter = new JavaWriter(type.getPackageName())
+        let javaWriter = new JavaWriter(type.getPackageName(), type.getSimpleName())
         let flow = new TextFlow()
 
         javaWriter.importType(this.JS)
@@ -237,7 +237,7 @@ export class ExportPhase {
     }
 
     private exportClassOrInterface(type: PreJavaTypeClassOrInterface, program: ts.Program, baseDirectory: string, adding: { [key: string]: { [key: string]: string } }, removing: { [key: string]: { [key: string]: string[] } }) {
-        let javaWriter = new JavaWriter(type.getPackageName())
+        let javaWriter = new JavaWriter(type.getPackageName(), type.getSimpleName(null))
         let flow = new TextFlow()
 
         this.exportComments(type, flow, program)

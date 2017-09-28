@@ -110,7 +110,7 @@ export class TextFlow {
 export class JavaWriter {
     imports: Map<PreJavaType, string> = new Map()
 
-    constructor(public unitPackageName: string) { }
+    constructor(public unitPackageName: string, public unitName: string) { }
 
     importType(type: PreJavaType): string {
         if (!type)
@@ -125,10 +125,14 @@ export class JavaWriter {
         let importedFqn = type.getFullyQualifiedName(null)
         let name = type.getSimpleName(null)
 
-        for (let [alreadyImportedType, alreadyImportedName] of this.imports) {
-            if (alreadyImportedName == name && alreadyImportedType.getFullyQualifiedName(null) != importedFqn) {
-                name = importedFqn
-                return importedFqn
+        if (name == this.unitName) {
+            return importedFqn
+        }
+        else {
+            for (let [alreadyImportedType, alreadyImportedName] of this.imports) {
+                if (alreadyImportedName == name && alreadyImportedType.getFullyQualifiedName(null) != importedFqn) {
+                    return importedFqn
+                }
             }
         }
 

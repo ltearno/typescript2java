@@ -113,6 +113,7 @@ interface JQueryStatic<TElement extends Node = HTMLElement> {
      * @since 1.4
      */
     (html: JQuery.htmlString, ownerDocument_attributes: Document | JQuery.PlainObject): JQuery<TElement>;
+    (selector: JQuery.Selector): JQuery<TElement>;
     /**
      * Accepts a string containing a CSS selector which is then used to match a set of elements.
      *

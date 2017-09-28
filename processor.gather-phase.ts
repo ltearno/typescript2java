@@ -62,7 +62,7 @@ export class GatherPhase {
 
     private getJavaPackage(symbol: ts.Symbol) {
         let jsPackage = this.getJSPackage(symbol)
-        return `${this.baseJavaPackage}.${jsPackage ? jsPackage : this.defaultJavaPackage}`
+        return `${this.baseJavaPackage}.${jsPackage ? jsPackage : this.defaultJavaPackage}`.toLocaleLowerCase()
     }
 
     private getJSPackage(symbol: ts.Symbol) {
