@@ -13,6 +13,7 @@ export interface Configuration {
     processInternalTypes: boolean
     outputDirectory: string
     renaming: { [key: string]: { [key: string]: string } }
+    adding: { [key: string]: { [key: string]: string } }
 }
 
 export class Engine {
@@ -79,7 +80,7 @@ export class Engine {
 
         console.log(`Exporting nodes...`)
         let exportPhase = new ExportPhase()
-        exportPhase.exportNodes(types, program, this.configuration.outputDirectory)
+        exportPhase.exportNodes(types, program, this.configuration.outputDirectory, this.configuration.adding)
 
         console.log(`Finished.`)
     }

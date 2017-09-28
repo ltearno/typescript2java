@@ -15,5 +15,10 @@
             "UnionOfDhImportKeyParamsAndEcKeyImportParamsAndHmacImportParamsAndRsaHashedImportParamsAndString": "UnionOfKeyParams",
             "UnionOfSVGCircleElementAndSVGEllipseElementAndSVGImageElementAndSVGLineElementAndSVGPathElementAndSVGPolygonElementAndSVGPolylineElementAndSVGRectElementAndSVGTextElementAndSVGUseElement": "UnionOfSeveralSVGElement"
         }
+    },
+    "adding": {
+        "fr.lteconsulting.jsinterop.browser": {
+            "Array": "added-to-array.txt"
+        }
     }
 }

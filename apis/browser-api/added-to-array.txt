@@ -1,0 +1,28 @@
+@JsOverlay
+public final static <T> Array<T> empty() {
+    return new Array<T>();
+}
+
+@JsOverlay
+public final java.lang.Iterable<T> iterate() {
+    return () -> new Iterator<T>() {
+        int index = 0;
+
+        @Override
+        public boolean hasNext() {
+            return index < length;
+        }
+
+        @Override
+        public T next() {
+            T result = getByIndex(index);
+            index++;
+            return result;
+        }
+
+        @Override
+        public void remove() {
+            throw new RuntimeException();
+        }
+    };
+}

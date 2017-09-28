@@ -56,7 +56,7 @@ export class ExportPhase {
     JS = new PreJavaTypeBuiltinJavaType('jsinterop.base', 'Js')
     DO_NOT_AUTOBOX = new PreJavaTypeBuiltinJavaType('javaemul.internal.annotations', 'DoNotAutobox')
 
-    exportNodes(types: Set<PreJavaType>, program: ts.Program, baseDirectory: string) {
+    exportNodes(types: Set<PreJavaType>, program: ts.Program, baseDirectory: string, adding: { [key: string]: { [key: string]: string } }) {
         for (let type of types) {
             let fqn = type.getParametrizedFullyQualifiedName(null)
             console.log(`exporting ${fqn}`)
@@ -65,7 +65,7 @@ export class ExportPhase {
                 caseUnion: type => this.exportUnionType(type, program, baseDirectory),
                 caseTuple: type => this.exportTuple(type, program, baseDirectory),
                 caseEnumType: type => this.exportEnum(type, program, baseDirectory),
-                caseClassOrInterfaceType: type => this.exportClassOrInterface(type, program, baseDirectory)
+                caseClassOrInterfaceType: type => this.exportClassOrInterface(type, program, baseDirectory, adding)
             })
         }
     }
@@ -236,7 +236,7 @@ export class ExportPhase {
         return { namespace, name }
     }
 
-    private exportClassOrInterface(type: PreJavaTypeClassOrInterface, program: ts.Program, baseDirectory: string) {
+    private exportClassOrInterface(type: PreJavaTypeClassOrInterface, program: ts.Program, baseDirectory: string, adding: { [key: string]: { [key: string]: string } }) {
         let javaWriter = new JavaWriter(type.getPackageName())
         let flow = new TextFlow()
 
@@ -361,6 +361,15 @@ export class ExportPhase {
                         flow.push(`}`).finishLine()
                     })
                 }
+            }
+
+            // added code
+            if (adding && (type.packageName in adding) && (type.name in adding[type.packageName])) {
+                flow.blankLine().push('/*\n    Added customized code\n*/').finishLine()
+
+                let fileName = adding[type.packageName][type.name]
+                let content = fs.readFileSync(fileName, 'utf8')
+                flow.finishLine().push(content).finishLine()
             }
 
             let nit = type.numberIndexType
