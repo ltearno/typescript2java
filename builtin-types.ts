@@ -4,6 +4,7 @@ import { PreJavaTypeBuiltinJavaType } from './prejavatypes/PreJavaTypeBuiltinJav
 export const BUILTIN_TYPE_OBJECT = new PreJavaTypeBuiltinJavaType('java.lang', 'Object')
 export const BUILTIN_TYPE_STRING = new PreJavaTypeBuiltinJavaType('java.lang', 'String')
 export const BUILTIN_TYPE_NUMBER = new PreJavaTypeBuiltinJavaType('java.lang', 'Number')
+export const BUILTIN_TYPE_INT = new PreJavaTypeBuiltinJavaType('java.lang', 'int')
 export const BUILTIN_TYPE_BOOLEAN = new PreJavaTypeBuiltinJavaType('java.lang', 'Boolean')
 export const BUILTIN_TYPE_UNIT = new PreJavaTypeBuiltinJavaType(null, 'void')
 export const BUILTIN_TYPE_VOID = new PreJavaTypeBuiltinJavaType('java.lang', 'Void')

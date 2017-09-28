@@ -1,4 +1,5 @@
 import * as ts from "typescript";
+import * as BuiltIn from '../builtin-types'
 import { PreJavaType, ProcessContext, TypeReplacer } from './PreJavaType'
 import { PreJavaTypeParameter } from './PreJavaTypeParameter'
 import { PreJavaTypeTPEnvironnement, PreJavaTypeReference } from './PreJavaTypeReference'
@@ -571,6 +572,10 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
     }
 
     addProperty(property: PreJavaTypeProperty) {
+        if (property.name == 'length' && property.type == BuiltIn.BUILTIN_TYPE_NUMBER)
+            property.type = BuiltIn.BUILTIN_TYPE_INT
+        if (property.name == 'size' && property.type == BuiltIn.BUILTIN_TYPE_NUMBER)
+            property.type = BuiltIn.BUILTIN_TYPE_INT
         this.properties.push(property)
     }
 
