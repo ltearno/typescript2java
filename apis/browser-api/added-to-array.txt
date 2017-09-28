@@ -5,7 +5,7 @@ public final static <T> Array<T> empty() {
 
 @JsOverlay
 public final java.lang.Iterable<T> iterate() {
-    return () -> new Iterator<T>() {
+    return () -> new java.util.Iterator<T>() {
         int index = 0;
 
         @Override

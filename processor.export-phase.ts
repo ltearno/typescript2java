@@ -42,6 +42,7 @@ export class ExportPhase {
         'default': 'default_',
         'continue': 'continue_',
         'for': 'for_',
+        'notify': 'notify_',
 
         'className': 'cssClassName'
     }
@@ -207,9 +208,9 @@ export class ExportPhase {
         if (type.sourceTypes && type.sourceTypes.size) {
             type.sourceTypes.forEach(sourceType => {
                 flow.push(`source type: ${sourceType.getSymbol() ? program.getTypeChecker().getFullyQualifiedName(sourceType.getSymbol()) : 'no symbol'}`).finishLine()
-                flow.push(`flags: ${sourceType.flags}`).finishLine()
+                flow.push(`flags: ${ts.TypeFlags[sourceType.flags]} (${sourceType.flags})`).finishLine()
                 if (sourceType && sourceType.symbol && sourceType.symbol && sourceType.symbol.declarations && sourceType.symbol.declarations.length)
-                    sourceType.symbol.declarations.forEach(declaration => flow.push(`declared in: ${declaration.getSourceFile().fileName} at char ${declaration.pos}`).finishLine())
+                    sourceType.symbol.declarations.forEach(declaration => flow.push(`declared in: ${declaration.getSourceFile().fileName} at pos ${declaration.pos}`).finishLine())
             })
         }
         if (type.constructorSignatures && type.constructorSignatures.length) {
@@ -236,6 +237,10 @@ export class ExportPhase {
         return { namespace, name }
     }
 
+    private typeParameterString(tp: PreJavaTypeParameter, javaWriter: JavaWriter): string {
+        return javaWriter.importType(tp) + (tp.constraint ? ` extends ${javaWriter.importType(tp.constraint) + tp.constraint.getParametrization(null)}` : '')
+    }
+
     private exportClassOrInterface(type: PreJavaTypeClassOrInterface, program: ts.Program, baseDirectory: string, adding: { [key: string]: { [key: string]: string } }, removing: { [key: string]: { [key: string]: string[] } }) {
         let javaWriter = new JavaWriter(type.getPackageName(), type.getSimpleName(null))
         let flow = new TextFlow()
@@ -251,7 +256,7 @@ export class ExportPhase {
             flow.push(`public interface ${type.getSimpleName(null)}`)
 
             if (type.typeParameters && type.typeParameters.length)
-                flow.push(`<${type.typeParameters.map(tp => javaWriter.importType(tp) + (tp.constraint ? ` extends ${javaWriter.importType(tp.constraint) + tp.constraint.getParametrization(null)}` : '')).join(', ')}>`)
+                flow.push(`<${type.typeParameters.map(tp => this.typeParameterString(tp, javaWriter)).join(', ')}>`)
 
             flow.push(`{`)
             flow.finishLine()
@@ -289,7 +294,7 @@ export class ExportPhase {
             flow.push(`public ${isClass ? 'class' : 'interface'} ${type.getSimpleName(null)}`)
 
             if (type.typeParameters && type.typeParameters.length)
-                flow.push(`<${type.typeParameters.map(tp => javaWriter.importType(tp) + (tp.constraint ? ` extends ${javaWriter.importType(tp.constraint) + tp.constraint.getParametrization(null)}` : '')).join(', ')}>`)
+                flow.push(`<${type.typeParameters.map(tp => this.typeParameterString(tp, javaWriter)).join(', ')}>`)
 
             let theClassBaseType: PreJavaType = null
             if (type.baseTypes) {
@@ -307,13 +312,13 @@ export class ExportPhase {
                 }
 
                 if (extendsTypes.length) {
-                    flow.push(` extends ${extendsTypes.map(t => javaWriter.importTypeParametrized(t)).join(', ')}`)
+                    flow.push(` extends ${extendsTypes.map(t => javaWriter.importTypeParametrized(t)).join(', ')} `)
                     if (type.isClassLike())
                         theClassBaseType = extendsTypes[0]
                 }
 
                 if (implementsTypes.length)
-                    flow.push(` implements ${implementsTypes.map(t => javaWriter.importTypeParametrized(t)).join(', ')}`)
+                    flow.push(` implements ${implementsTypes.map(t => javaWriter.importTypeParametrized(t)).join(', ')} `)
             }
             flow.finishLine()
 
@@ -331,12 +336,12 @@ export class ExportPhase {
                 if (theBaseClassConstructorParameters && theBaseClassConstructorParameters.length && (!type.constructorSignatures || !type.constructorSignatures.length)) {
                     flow.blankLine().push('/*\n    Default constructor\n*/').finishLine()
 
-                    flow.push(`public ${type.getSimpleName(null)}()`)
+                    flow.push(`public ${type.getSimpleName(null)}() `)
                     flow.push(`{`).finishLine()
                     if (theBaseClassConstructorParameters && theBaseClassConstructorParameters.length) {
-                        flow.pushLineStart('    ').push(`super(${theBaseClassConstructorParameters.map(p => 'null').join(', ')});`).finishLine().pullLineStart()
+                        flow.pushLineStart('    ').push(`super(${theBaseClassConstructorParameters.map(p => 'null').join(', ')}); `).finishLine().pullLineStart()
                     }
-                    flow.push(`}`).finishLine()
+                    flow.push(`} `).finishLine()
                 }
                 else if (type.constructorSignatures && type.constructorSignatures.length) {
                     flow.blankLine().push('/*\n    Constructors\n*/').finishLine()
@@ -350,15 +355,15 @@ export class ExportPhase {
 
                         let escapedMethodName = type.getSimpleName(null)
 
-                        flow.push(`public ${type.getSimpleName(null)}(`)
+                        flow.push(`public ${type.getSimpleName(null)} (`)
                         if (constructor.parameters)
-                            flow.push(constructor.parameters.map(p => this.formalParameterJavaString(p, javaWriter)).join(', ')).push(`)`)
+                            flow.push(constructor.parameters.map(p => this.formalParameterJavaString(p, javaWriter)).join(', ')).push(`) `)
 
                         flow.push(`{`).finishLine()
                         if (theBaseClassConstructorParameters && theBaseClassConstructorParameters.length) {
-                            flow.pushLineStart('    ').push(`super(${theBaseClassConstructorParameters.map(p => 'null').join(', ')});`).finishLine().pullLineStart()
+                            flow.pushLineStart('    ').push(`super(${theBaseClassConstructorParameters.map(p => 'null').join(', ')}); `).finishLine().pullLineStart()
                         }
-                        flow.push(`}`).finishLine()
+                        flow.push(`} `).finishLine()
                     })
                 }
             }
@@ -439,14 +444,14 @@ export class ExportPhase {
                     })
                     .forEach(method => {
                         if (method.name.indexOf('@') >= 0) {
-                            flow.push(`// skipped static method ${method.name}`).blankLine().blankLine()
+                            flow.push(`// skipped static method ${method.name}`).finishLine().blankLine()
                             return
                         }
 
                         if (removedMethods) {
                             let methodRemovingSignature = this.getMethodRemovingSignature(method, true)
                             if (removedMethods.indexOf(methodRemovingSignature) >= 0) {
-                                flow.push(`// removed static method ${method.name}`).blankLine().blankLine()
+                                flow.push(`// removed static method ${method.name}`).finishLine().blankLine()
                                 return
                             }
                         }
@@ -796,6 +801,8 @@ export class ExportPhase {
     }
 
     private exportStaticMethod(method: PreJavaTypeCallSignature, type: PreJavaTypeClassOrInterface, javaWriter: JavaWriter, flow: TextFlow) {
+        flow.blankLine()
+
         if (method.comments && method.comments.length) {
             flow.startJavaDocComments()
             flow.push(method.comments)
@@ -815,7 +822,7 @@ export class ExportPhase {
         flow.push(`public static native `)
         let typeParameters = method.typeParameters
         if (typeParameters && typeParameters.length)
-            flow.push(`<${typeParameters.map(tp => tp.name).join(', ')}> `)
+            flow.push(`<${typeParameters.map(tp => this.typeParameterString(tp, javaWriter)).join(', ')}> `)
         flow.push(`${javaWriter.importTypeParametrized(method.returnType)} ${escapedMethodName}(`)
         if (method.parameters)
             flow.push(method.parameters.map(p => this.formalParameterJavaString(p, javaWriter)).join(', '))
@@ -823,11 +830,6 @@ export class ExportPhase {
     }
 
     private exportClassMethod(method: PreJavaTypeCallSignature, type: PreJavaTypeClassOrInterface, isClass: boolean, javaWriter: JavaWriter, flow: TextFlow) {
-        flow.startJavaDocComments()
-        flow.push(`Std Signature : ${Signature.getCallSignatureStandardSignature(method)}`).finishLine()
-        flow.push(`TE Signature : ${Signature.getCallSignatureTypeErasedSignature(method)}`).finishLine()
-        flow.endJavaDocComments()
-
         if (method.comments && method.comments.length) {
             flow.startJavaDocComments()
             flow.push(method.comments)
@@ -842,7 +844,7 @@ export class ExportPhase {
         }
         flow.push(`${isClass ? 'public native ' : ''}`)
         if (method.typeParameters && method.typeParameters.length)
-            flow.push(`<${method.typeParameters.map(tp => tp.name).join(', ')}> `)
+            flow.push(`<${method.typeParameters.map(tp => this.typeParameterString(tp, javaWriter)).join(', ')}> `)
         flow.push(`${javaWriter.importTypeParametrized(method.returnType)} ${escapedMethodName}(`)
         if (method.parameters)
             flow.push(method.parameters.map(p => this.formalParameterJavaString(p, javaWriter)).join(', '))

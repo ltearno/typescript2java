@@ -246,7 +246,7 @@ export class TypescriptToJavaTypemap {
                     if (declaration && declaration.name && declaration.name.getText()) {
                         let signature = this.convertSignature(declaration.name.getText(), tsSignature, null)
                         if (signature)
-                            this.getGlobalClass(t.symbol/*declaration.getSourceFile()*/).addStaticMethod(signature)
+                            this.getGlobalClass(t.symbol).addStaticMethod(signature)
                     }
                 })
             }
@@ -256,7 +256,7 @@ export class TypescriptToJavaTypemap {
                 || (t.getProperties() && t.getProperties().some(p => p.name != 'prototype'))) {
                 let variableType = this.getOrCreatePreJavaTypeForTsType(t, false)
 
-                this.getGlobalClass(t.symbol/*declaration.getSourceFile()*/).addStaticProperty({ name: tsTools.guessName(declaration.name), comments: null, type: variableType, writable: true })
+                this.getGlobalClass(t.symbol).addStaticProperty({ name: tsTools.guessName(declaration.name), comments: null, type: variableType, writable: true })
             }
         })
     }
