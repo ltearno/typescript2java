@@ -7,10 +7,6 @@ export class PreJavaTypeTPEnvironnement extends PreJavaType {
     constructor(public type: PreJavaType,
         public environment: { [key: string]: PreJavaType }) {
         super()
-
-        if (!environment)
-            console.log('fuck');
-
     }
 
     processSourceType(type: ts.Type, typeParametersToApplyToAnonymousTypes: PreJavaTypeParameter[], context: ProcessContext) {
@@ -62,13 +58,18 @@ export class PreJavaTypeTPEnvironnement extends PreJavaType {
 }
 
 export class PreJavaTypeReference extends PreJavaType {
-    type: PreJavaType
-    typeParameters: PreJavaType[]
+    constructor(
+        public type: PreJavaType,
+        public typeParameters: PreJavaType[]) {
+        super()
+        if (this.type == null)
+            console.log(`fu`)
+    }
 
     processSourceType(type: ts.Type, typeParametersToApplyToAnonymousTypes: PreJavaTypeParameter[], context: ProcessContext) {
-        let reference = type as ts.TypeReference
+        /*let reference = type as ts.TypeReference
         this.type = context.getTypeMap().getOrCreatePreJavaTypeForTsType(reference.target, false, typeParametersToApplyToAnonymousTypes)
-        this.typeParameters = reference.typeArguments ? reference.typeArguments.map(typeArgument => context.getTypeMap().getOrCreatePreJavaTypeForTsType(typeArgument, false, typeParametersToApplyToAnonymousTypes)) : null
+        this.typeParameters = reference.typeArguments ? reference.typeArguments.map(typeArgument => context.getTypeMap().getOrCreatePreJavaTypeForTsType(typeArgument, false, typeParametersToApplyToAnonymousTypes)) : null*/
     }
 
     dump() { console.log(`TypeReference to ${this.type.getParametrizedSimpleName(null)}`) }
@@ -88,7 +89,9 @@ export class PreJavaTypeReference extends PreJavaType {
         })
     }
 
-    getSimpleName(typeParametersEnv: TypeEnvironment): string { return this.type.getSimpleName(typeParametersEnv) }
+    getSimpleName(typeParametersEnv: TypeEnvironment): string {
+        return this.type.getSimpleName(typeParametersEnv)
+    }
 
     getPackageName(): string { return this.type.getPackageName() }
 

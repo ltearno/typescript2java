@@ -362,8 +362,9 @@ export class TypescriptToJavaTypemap {
 
         if (objectType && objectType.objectFlags & ts.ObjectFlags.Reference) {
             let reference = type as ts.TypeReference
-            if (reference.target != type)
-                return new PreJavaTypeReference()
+            if (reference.target != type) {
+                return new PreJavaTypeReference(this.getOrCreatePreJavaTypeForTsType(reference.target, false, typeParametersToApplyToAnonymousTypes), reference.typeArguments ? reference.typeArguments.map(typeArgument => this.getOrCreatePreJavaTypeForTsType(typeArgument, false, typeParametersToApplyToAnonymousTypes)) : null)
+            }
         }
 
         if (type.flags & ts.TypeFlags.Enum && type.getSymbol())

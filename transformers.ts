@@ -651,23 +651,20 @@ export function replaceByFunctionAndProcsLambdaTypes(typeMap: TypescriptToJavaTy
                         if (returnType == BuiltIn.BUILTIN_TYPE_UNIT) {
                             typeMap.registerType(`prebuilt-action-${nbParameters}`, PROCS[nbParameters])
 
-                            let ref = new PreJavaTypeReference()
-                            ref.type = PROCS[nbParameters]
-                            ref.typeParameters = []
+                            let refTypeParameters = []
                             for (let i = 0; i < nbParameters; i++)
-                                ref.typeParameters.push(functionalMethod.parameters[i].type)
-                            return ref
+                                refTypeParameters.push(functionalMethod.parameters[i].type)
+                            return new PreJavaTypeReference(PROCS[nbParameters], refTypeParameters)
                         }
                         else {
                             typeMap.registerType(`prebuilt-function-${nbParameters}`, LAMBDAS[nbParameters])
 
-                            let ref = new PreJavaTypeReference()
-                            ref.type = LAMBDAS[nbParameters]
-                            ref.typeParameters = []
+                            let refTypeParameters = []
                             for (let i = 0; i < nbParameters; i++)
-                                ref.typeParameters.push(functionalMethod.parameters[i].type)
-                            ref.typeParameters.push(returnType)
+                                refTypeParameters.push(functionalMethod.parameters[i].type)
+                            refTypeParameters.push(returnType)
 
+                            let ref = new PreJavaTypeReference(LAMBDAS[nbParameters], refTypeParameters)
                             return ref
                         }
                     }

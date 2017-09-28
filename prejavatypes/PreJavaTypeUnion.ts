@@ -27,9 +27,6 @@ export class PreJavaTypeUnion extends PreJavaType {
 
         let unionType = type as ts.UnionType
 
-        if (this.aliasName == 'PartialObserver')
-            tsTools.fetchUsedFreeTypeParameters(type, context.getProgram().getTypeChecker())
-
         let usedTypeParameters = tsTools.fetchUsedFreeTypeParameters(type, context.getProgram().getTypeChecker())
         this.typeParameters = usedTypeParameters
             .map(typeParameterName => {
@@ -42,15 +39,19 @@ export class PreJavaTypeUnion extends PreJavaType {
 
         this.setTypes(
             unionType.types
+                .map(t => {
+                    let pjt = context.getTypeMap().getOrCreatePreJavaTypeForTsType(t, false, this.typeParameters)
+                    if (pjt.getSimpleName(null) == null) {
+                        console.log(`here`)
+                        context.getTypeMap().getOrCreatePreJavaTypeForTsType(t, false, this.typeParameters)
+                    }
+                    return t
+                })
                 .map(t => context.getTypeMap().getOrCreatePreJavaTypeForTsType(t, false, this.typeParameters))
                 .map(t => {
                     if (t instanceof PreJavaTypeClassOrInterface
                         && t.typeParameters && t.typeParameters.length) {
-                        //&& t.typeParameters.map(tp => tp.name).join() != this.typeParameters.map(tp => tp.name).join()) {
-                        let res = new PreJavaTypeReference()
-                        res.type = t
-                        res.typeParameters = t.typeParameters.slice()
-                        return res
+                        return new PreJavaTypeReference(t, t.typeParameters.slice())
                     }
                     return t
                 })
