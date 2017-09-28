@@ -352,7 +352,7 @@ export class ExportPhase {
 
                         flow.push(`public ${type.getSimpleName(null)}(`)
                         if (constructor.parameters)
-                            flow.push(constructor.parameters.map(p => `${javaWriter.importTypeParametrized(p.type)} ${this.escapePropertyName(p.name)}`).join(', ')).push(`)`)
+                            flow.push(constructor.parameters.map(p => this.formalParameterJavaString(p, javaWriter)).join(', ')).push(`)`)
 
                         flow.push(`{`).finishLine()
                         if (theBaseClassConstructorParameters && theBaseClassConstructorParameters.length) {
@@ -609,7 +609,7 @@ export class ExportPhase {
      * Method exportation
      */
 
-    private functionParameterJavaString(parameter: PreJavaTypeFormalParameter, javaWriter: JavaWriter) {
+    private formalParameterJavaString(parameter: PreJavaTypeFormalParameter, javaWriter: JavaWriter) {
         let noAutoBox = false
         if (parameter.type == BuiltIn.BUILTIN_TYPE_NUMBER || parameter.type instanceof PreJavaTypeParameter) {
             javaWriter.importType(this.DO_NOT_AUTOBOX)
@@ -642,7 +642,7 @@ export class ExportPhase {
         }
 
         flow.push(`@JsOverlay`).finishLine()
-        flow.push(`public static ${unionType.getParametrization(null)} ${unionType.getParametrizedSimpleName(null)} of${unionedType.getHumanizedName(null)}(${this.functionParameterJavaString(parameter, javaWriter)}) {`).finishLine()
+        flow.push(`public static ${unionType.getParametrization(null)} ${unionType.getParametrizedSimpleName(null)} of${unionedType.getHumanizedName(null)}(${this.formalParameterJavaString(parameter, javaWriter)}) {`).finishLine()
         flow.pushLineStart('    ')
         flow.push(`return Js.uncheckedCast( value );`).finishLine()
         flow.pullLineStart()
@@ -673,7 +673,7 @@ export class ExportPhase {
         }
 
         flow.push(`@JsOverlay`).finishLine()
-        flow.push(`static ${unionType.getParametrization(null)} ${unionType.getParametrizedSimpleName(null)} of${unionedType.getHumanizedName(null)}(${this.functionParameterJavaString(parameter, javaWriter)}) {`).finishLine()
+        flow.push(`static ${unionType.getParametrization(null)} ${unionType.getParametrizedSimpleName(null)} of${unionedType.getHumanizedName(null)}(${this.formalParameterJavaString(parameter, javaWriter)}) {`).finishLine()
         flow.pushLineStart('    ')
         flow.push(`return Js.cast( value );`).finishLine()
         flow.pullLineStart()
@@ -686,7 +686,7 @@ export class ExportPhase {
             flow.push(`<${method.typeParameters.map(tp => tp.name).join(', ')}> `)
         flow.push(`${javaWriter.importTypeParametrized(method.returnType)} call(`)
         if (method.parameters)
-            flow.push(method.parameters.map(p => this.functionParameterJavaString(p, javaWriter)).join(', '))
+            flow.push(method.parameters.map(p => this.formalParameterJavaString(p, javaWriter)).join(', '))
         flow.push(`);`).finishLine()
     }
 
@@ -703,7 +703,7 @@ export class ExportPhase {
 
         flow.blankLine()
         flow.push(`@JsOverlay`).finishLine()
-        flow.push(`${isClass ? 'public final' : 'default'} void setByIndex(int index, ${this.functionParameterJavaString(parameter, javaWriter)}) {`).finishLine()
+        flow.push(`${isClass ? 'public final' : 'default'} void setByIndex(int index, ${this.formalParameterJavaString(parameter, javaWriter)}) {`).finishLine()
         flow.pushLineStart('    ')
         flow.push(`Js.asArrayLike(this).setAt(index, value);`).finishLine()
         flow.pullLineStart()
@@ -736,7 +736,7 @@ export class ExportPhase {
 
         flow.blankLine()
         flow.push(`@JsOverlay`).finishLine()
-        flow.push(`public final void setByIndex(String index, ${this.functionParameterJavaString(parameter, javaWriter)}) {`).finishLine()
+        flow.push(`public final void setByIndex(String index, ${this.formalParameterJavaString(parameter, javaWriter)}) {`).finishLine()
         flow.pushLineStart('    ')
         flow.push(`Js.asPropertyMap(this).set(index, value);`).finishLine()
         flow.pullLineStart()
@@ -779,7 +779,7 @@ export class ExportPhase {
             flow.push(`<${typeParameters.map(tp => tp.name).join(', ')}> `)
         flow.push(`${javaWriter.importTypeParametrized(method.returnType)} ${escapedMethodName}(`)
         if (method.parameters)
-            flow.push(method.parameters.map(p => this.functionParameterJavaString(p, javaWriter)).join(', '))
+            flow.push(method.parameters.map(p => this.formalParameterJavaString(p, javaWriter)).join(', '))
         flow.push(`);`).finishLine()
     }
 
@@ -806,7 +806,7 @@ export class ExportPhase {
             flow.push(`<${method.typeParameters.map(tp => tp.name).join(', ')}> `)
         flow.push(`${javaWriter.importTypeParametrized(method.returnType)} ${escapedMethodName}(`)
         if (method.parameters)
-            flow.push(method.parameters.map(p => this.functionParameterJavaString(p, javaWriter)).join(', '))
+            flow.push(method.parameters.map(p => this.formalParameterJavaString(p, javaWriter)).join(', '))
         flow.push(`);`).finishLine()
     }
 }
