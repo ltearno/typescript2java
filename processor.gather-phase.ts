@@ -55,48 +55,6 @@ export class GatherPhase {
     }
 
     sumup() {
-        console.log(`removing unsupported types`)
-        Transformers.removeNotSupportedTypes(this.typeMap)
-
-        console.log(`simplifying unions`)
-        Transformers.simplifyUnions(this.typeMap)
-
-        console.log(`replacing anonymous types`)
-        Transformers.replaceByFunctionAndProcsLambdaTypes(this.typeMap)
-
-        console.log(`removing OverridingProperties`)
-        Transformers.removeOverridingProperties(this.typeMap)
-
-        console.log(`reducing anonymous types`)
-        Transformers.deduplicateTypes(this.typeMap)
-        Transformers.removeEmptyTypes(this.typeMap)
-
-        console.log(`unanonymising types`)
-        Transformers.ensureAllTypesHaveNameAndPackage(this.typeMap, this.baseJavaPackage)
-
-        ///console.log(`removing duplicate overloads (with same type erasure)`)
-        ///Transformers.removeDuplicateOverloads(this.typeMap)
-
-        console.log(`changing DTO interfaces into classes`)
-        Transformers.changeDtoInterfacesIntoClasses(this.typeMap)
-
-        console.log(`transforming types inheriting multiple implementations`)
-        Transformers.arrangeMultipleImplementationInheritance(this.typeMap, 'Impl')
-
-        console.log(`add missing methods from interface hierarchy in classes`)
-        Transformers.addMethodsFromInterfaceHierarchy(this.typeMap)
-
-        console.log(`(todo) Array should be replaced by an externally provided type`)
-
-        console.log(`developping methods with union parameters`)
-        Transformers.developMethodsWithUnionParameters(this.typeMap)
-
-        console.log(`renaming duplicate fqns`)
-        Transformers.checkNoDuplicateTypeNames(this.typeMap)
-
-        console.log(`checking constructors`)
-        Transformers.ensureCorrectConstructors(this.typeMap)
-
         console.log(`statistics:`)
         console.log(`${this.typeMap.nbGlobalClasses()} global scope classes`)
         console.log(`${this.typeMap.typeSet().size} jsinterop types`)

@@ -18,6 +18,55 @@ const MAX_NB_DEVELOPPED_METHODS = 5
 
 let currentIdAnonymousTypes = 1
 
+export function applyTransformations(typeMap: TypescriptToJavaTypemap, renaming: { [key: string]: { [key: string]: string } }) {
+    console.log(`removing unsupported types`)
+    removeNotSupportedTypes(typeMap)
+
+    console.log(`simplifying unions`)
+    simplifyUnions(typeMap)
+
+    console.log(`replacing anonymous types`)
+    replaceByFunctionAndProcsLambdaTypes(typeMap)
+
+    console.log(`removing OverridingProperties`)
+    removeOverridingProperties(typeMap)
+
+    console.log(`reducing anonymous types`)
+    deduplicateTypes(typeMap)
+    removeEmptyTypes(typeMap)
+
+    console.log(`unanonymising types`)
+    ensureAllTypesHaveNameAndPackage(typeMap, this.baseJavaPackage)
+
+    ///console.log(`removing duplicate overloads (with same type erasure)`)
+    ///removeDuplicateOverloads(typeMap)
+
+    console.log(`changing DTO interfaces into classes`)
+    changeDtoInterfacesIntoClasses(typeMap)
+
+    console.log(`transforming types inheriting multiple implementations`)
+    arrangeMultipleImplementationInheritance(typeMap, 'Impl')
+
+    console.log(`add missing methods from interface hierarchy in classes`)
+    addMethodsFromInterfaceHierarchy(typeMap)
+
+    console.log(`(todo) Array should be replaced by an externally provided type`)
+
+    console.log(`developping methods with union parameters`)
+    developMethodsWithUnionParameters(typeMap)
+
+    if (renaming) {
+        console.log(`renaming types specified in configration`)
+        renameTypes(typeMap, renaming)
+    }
+
+    //console.log(`renaming duplicate fqns`)
+    //checkNoDuplicateTypeNames(typeMap)
+
+    console.log(`checking constructors`)
+    ensureCorrectConstructors(typeMap)
+}
+
 export function ensureAllTypesHaveNameAndPackage(typeMap: TypescriptToJavaTypemap, defaultPackageName: string) {
     for (let type of typeMap.typeSet()) {
         if (type instanceof PreJavaTypeClassOrInterface) {
@@ -638,6 +687,25 @@ export function ensureCorrectConstructors(typeMap: TypescriptToJavaTypemap) {
             caseClassOrInterfaceType: type => {
                 if (!type.isClass)
                     return
+            }
+        })
+    }
+}
+
+export function renameTypes(typeMap: TypescriptToJavaTypemap, renaming: { [key: string]: { [key: string]: string } }) {
+    for (let type of typeMap.typeSet()) {
+        Visit.visitPreJavaType(type, {
+            caseClassOrInterfaceType: type => {
+                if (type.packageName in renaming && type.name in renaming[type.packageName]) {
+                    console.log(`renaming ${type.name} to ${renaming[type.packageName][type.name]}`)
+                    type.name = renaming[type.packageName][type.name]
+                }
+            },
+            caseUnion: type => {
+                if (type.packageName in renaming && type.name in renaming[type.packageName]) {
+                    console.log(`renaming ${type.name} to ${renaming[type.packageName][type.name]}`)
+                    type.name = renaming[type.packageName][type.name]
+                }
             }
         })
     }

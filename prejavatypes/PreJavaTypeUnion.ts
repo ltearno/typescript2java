@@ -9,6 +9,7 @@ import * as tsTools from '../ts-tools'
 let currentUnionId = 1
 
 export class PreJavaTypeUnion extends PreJavaType {
+    name: string
     packageName: string
     types: PreJavaType[]
     typeParameters: PreJavaTypeParameter[]
@@ -72,12 +73,10 @@ export class PreJavaTypeUnion extends PreJavaType {
                 this.packageName = this.findPackage(context)
         }
 
-        if (this.getSimpleName() == 'UnionWithROfFunction1OfObjectAndROfRAndArrayLikeOfObjectAndPromiseLikeOfObjectAndSubscribableOfObject') {
-            let tc = context.getProgram().getTypeChecker()
-            tsTools.fetchUsedFreeTypeParameters(type, tc)
-            unionType.types
-                .map(t => context.getTypeMap().getOrCreatePreJavaTypeForTsType(t, false, this.typeParameters))
-        }
+        if ((!this.types) || this.types.length == 0)
+            this.name = 'EmptyUnion'
+        else
+            this.name = this.getHumanizedName(null)
     }
 
     private findPackage(context: ProcessContext) {
@@ -174,12 +173,7 @@ export class PreJavaTypeUnion extends PreJavaType {
         })
     }
 
-    getSimpleName(): string {
-        if ((!this.types) || this.types.length == 0)
-            return 'EmptyUnion'// + '_id_' + this.unionId
-
-        return this.getHumanizedName(null)// + '_id_' + this.unionId
-    }
+    getSimpleName(): string { return this.name }
 
     getPackageName(): string { return this.packageName }
 

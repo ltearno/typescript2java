@@ -1,6 +1,7 @@
 import * as ts from "typescript"
 import * as tools from "./tools"
 import * as path from "path"
+import * as Transformers from './transformers'
 import { GatherPhase } from "./processor.gather-phase"
 import { ExportPhase } from './processor.export-phase'
 
@@ -11,6 +12,7 @@ export interface Configuration {
     javaPackages: { [key: string]: string }
     processInternalTypes: boolean
     outputDirectory: string
+    renaming: { [key: string]: { [key: string]: string } }
 }
 
 export class Engine {
@@ -69,6 +71,9 @@ export class Engine {
                 gatherPhase.addTypesFromSourceFile(sourceFile)
             }
         })
+
+        Transformers.applyTransformations(gatherPhase.getTypeMap(), this.configuration.renaming)
+
         gatherPhase.sumup()
         let types = gatherPhase.getTypeMap().typeSet()
 
