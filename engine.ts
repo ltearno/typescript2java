@@ -14,6 +14,7 @@ export interface Configuration {
     outputDirectory: string
     renaming: { [key: string]: { [key: string]: string } }
     adding: { [key: string]: { [key: string]: string } }
+    removing: { [key: string]: { [key: string]: string[] } }
 }
 
 export class Engine {
@@ -80,7 +81,7 @@ export class Engine {
 
         console.log(`Exporting nodes...`)
         let exportPhase = new ExportPhase()
-        exportPhase.exportNodes(types, program, this.configuration.outputDirectory, this.configuration.adding)
+        exportPhase.exportNodes(types, program, this.configuration.outputDirectory, this.configuration.adding, this.configuration.removing)
 
         console.log(`Finished.`)
     }

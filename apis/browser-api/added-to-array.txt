@@ -26,3 +26,13 @@ public final java.lang.Iterable<T> iterate() {
         }
     };
 }
+
+@JsOverlay
+@SafeVarargs
+public final static <T> Array<T> of(@DoNotAutobox T... array )
+{
+    Array<T> result = new Array<>();
+    for( T item : array )
+        result.push( item );
+    return result;
+}

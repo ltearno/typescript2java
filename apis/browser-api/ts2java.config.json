@@ -20,5 +20,12 @@
         "fr.lteconsulting.jsinterop.browser": {
             "Array": "added-to-array.txt"
         }
+    },
+    "removing": {
+        "fr.lteconsulting.jsinterop.browser": {
+            "Array": [
+                "static Array of(T)"
+            ]
+        }
     }
 }

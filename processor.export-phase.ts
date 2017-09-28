@@ -56,7 +56,7 @@ export class ExportPhase {
     JS = new PreJavaTypeBuiltinJavaType('jsinterop.base', 'Js')
     DO_NOT_AUTOBOX = new PreJavaTypeBuiltinJavaType('javaemul.internal.annotations', 'DoNotAutobox')
 
-    exportNodes(types: Set<PreJavaType>, program: ts.Program, baseDirectory: string, adding: { [key: string]: { [key: string]: string } }) {
+    exportNodes(types: Set<PreJavaType>, program: ts.Program, baseDirectory: string, adding: { [key: string]: { [key: string]: string } }, removing: { [key: string]: { [key: string]: string[] } }) {
         for (let type of types) {
             let fqn = type.getParametrizedFullyQualifiedName(null)
             console.log(`exporting ${fqn}`)
@@ -65,7 +65,7 @@ export class ExportPhase {
                 caseUnion: type => this.exportUnionType(type, program, baseDirectory),
                 caseTuple: type => this.exportTuple(type, program, baseDirectory),
                 caseEnumType: type => this.exportEnum(type, program, baseDirectory),
-                caseClassOrInterfaceType: type => this.exportClassOrInterface(type, program, baseDirectory, adding)
+                caseClassOrInterfaceType: type => this.exportClassOrInterface(type, program, baseDirectory, adding, removing)
             })
         }
     }
@@ -236,7 +236,7 @@ export class ExportPhase {
         return { namespace, name }
     }
 
-    private exportClassOrInterface(type: PreJavaTypeClassOrInterface, program: ts.Program, baseDirectory: string, adding: { [key: string]: { [key: string]: string } }) {
+    private exportClassOrInterface(type: PreJavaTypeClassOrInterface, program: ts.Program, baseDirectory: string, adding: { [key: string]: { [key: string]: string } }, removing: { [key: string]: { [key: string]: string[] } }) {
         let javaWriter = new JavaWriter(type.getPackageName())
         let flow = new TextFlow()
 
@@ -364,13 +364,8 @@ export class ExportPhase {
             }
 
             // added code
-            if (adding && (type.packageName in adding) && (type.name in adding[type.packageName])) {
-                flow.blankLine().push('/*\n    Added customized code\n*/').finishLine()
+            this.mabeAddCustomizedCode(type.packageName, type.name, adding, flow)
 
-                let fileName = adding[type.packageName][type.name]
-                let content = fs.readFileSync(fileName, 'utf8')
-                flow.finishLine().push(content).finishLine()
-            }
 
             let nit = type.numberIndexType
             if (nit) {
@@ -425,6 +420,10 @@ export class ExportPhase {
                 })
             }
 
+            let removedMethods: string[] = null
+            if (removing && (type.packageName in removing) && (type.name in removing[type.packageName]))
+                removedMethods = removing[type.packageName][type.name]
+
             if (type.isClassLike() && type.staticMethods && type.staticMethods.length) {
                 flow.blankLine()
                     .push('/*\n    Static methods\n*/').finishLine()
@@ -442,6 +441,14 @@ export class ExportPhase {
                         if (method.name.indexOf('@') >= 0) {
                             flow.push(`// skipped static method ${method.name}`).blankLine().blankLine()
                             return
+                        }
+
+                        if (removedMethods) {
+                            let methodRemovingSignature = this.getMethodRemovingSignature(method, true)
+                            if (removedMethods.indexOf(methodRemovingSignature) >= 0) {
+                                flow.push(`// removed static method ${method.name}`).blankLine().blankLine()
+                                return
+                            }
                         }
 
                         this.exportStaticMethod(method, type, javaWriter, flow)
@@ -555,6 +562,14 @@ export class ExportPhase {
                             return
                         }
 
+                        if (removedMethods) {
+                            let methodRemovingSignature = this.getMethodRemovingSignature(method, true)
+                            if (removedMethods.indexOf(methodRemovingSignature) >= 0) {
+                                flow.push(`// removed method ${method.name}`).blankLine().blankLine()
+                                return
+                            }
+                        }
+
                         this.exportClassMethod(method, type, isClass, javaWriter, flow)
                     })
             }
@@ -565,6 +580,21 @@ export class ExportPhase {
         }
 
         this.exportJavaUnit(type, javaWriter, flow, baseDirectory)
+    }
+
+    private getMethodRemovingSignature(method: PreJavaTypeCallSignature, isStatic: boolean) {
+        //"static Array of(T)"
+        return `${isStatic ? 'static ' : ''}${method.returnType.getSimpleName(null)} ${method.name}(${method.parameters.map(p => p.type.getSimpleName(null)).join(',')})`
+    }
+
+    private mabeAddCustomizedCode(packageName: string, name: string, adding: { [key: string]: { [key: string]: string } }, flow: TextFlow) {
+        if (adding && (packageName in adding) && (name in adding[packageName])) {
+            flow.blankLine().push('/*\n    Added customized code\n*/').finishLine()
+
+            let fileName = adding[packageName][name]
+            let content = fs.readFileSync(fileName, 'utf8')
+            flow.finishLine().push(content).finishLine()
+        }
     }
 
     private exportJavaUnit(type: PreJavaType, javaWriter: JavaWriter, flow: TextFlow, baseDirectory: string) {
