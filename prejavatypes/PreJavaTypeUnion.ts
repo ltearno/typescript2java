@@ -67,9 +67,9 @@ export class PreJavaTypeUnion extends PreJavaType {
 
         if (type) {
             if (type.aliasSymbol && type.aliasSymbol.valueDeclaration)
-                this.packageName = context.getJavaPackage(type.aliasSymbol.valueDeclaration.getSourceFile())
+                this.packageName = context.getJavaPackage(type.aliasSymbol)
             else if (type.symbol && type.symbol.valueDeclaration)
-                this.packageName = context.getJavaPackage(type.symbol.valueDeclaration.getSourceFile())
+                this.packageName = context.getJavaPackage(type.symbol)
             else
                 this.packageName = this.findPackage(context)
         }

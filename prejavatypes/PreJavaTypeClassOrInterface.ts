@@ -244,8 +244,8 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
                 jsName = tsTools.guessName((declaration as ts.ClassDeclaration).name)
 
             let sourceFile = declaration.getSourceFile()
-            this.setPackageName(context.getJavaPackage(sourceFile))
-            this.setPrototypeName(context.getJsPackage(sourceFile), jsName)
+            this.setPackageName(context.getJavaPackage(symbol))
+            this.setPrototypeName(context.getJsPackage(symbol), jsName)
         }
     }
 

@@ -5,8 +5,8 @@ import { PreJavaTypeParameter } from './PreJavaTypeParameter'
 
 export interface ProcessContext {
     createAnonymousTypeName(): string
-    getJavaPackage(sourceFile: ts.SourceFile): string
-    getJsPackage(sourceFile: ts.SourceFile): string
+    getJavaPackage(symbol: ts.Symbol): string
+    getJsPackage(symbol: ts.Symbol): string
     getProgram: () => ts.Program
     getTypeMap: () => TypescriptToJavaTypemap
 }

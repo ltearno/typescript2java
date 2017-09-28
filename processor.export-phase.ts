@@ -206,10 +206,10 @@ export class ExportPhase {
         flow.startJavaDocComments()
         if (type.sourceTypes && type.sourceTypes.size) {
             type.sourceTypes.forEach(sourceType => {
-                flow.push(`base type: ${sourceType.getSymbol() ? program.getTypeChecker().getFullyQualifiedName(sourceType.getSymbol()) : 'no symbol'}`).finishLine()
+                flow.push(`source type: ${sourceType.getSymbol() ? program.getTypeChecker().getFullyQualifiedName(sourceType.getSymbol()) : 'no symbol'}`).finishLine()
                 flow.push(`flags: ${sourceType.flags}`).finishLine()
                 if (sourceType && sourceType.symbol && sourceType.symbol && sourceType.symbol.declarations && sourceType.symbol.declarations.length)
-                    sourceType.symbol.declarations.forEach(declaration => flow.push(`declared in: ${declaration.getSourceFile().fileName}:${declaration.pos}`).finishLine())
+                    sourceType.symbol.declarations.forEach(declaration => flow.push(`declared in: ${declaration.getSourceFile().fileName} at char ${declaration.pos}`).finishLine())
             })
         }
         if (type.constructorSignatures && type.constructorSignatures.length) {

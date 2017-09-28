@@ -27,8 +27,8 @@ export class TypescriptToJavaTypemap {
     }
 
     constructor(private program: ts.Program,
-        private javaPackageGuesser: { (sourceFile: ts.SourceFile): string },
-        private jsPackageGuesser: { (sourceFile: ts.SourceFile): string }) { }
+        private javaPackageGuesser: { (symbol: ts.Symbol): string },
+        private jsPackageGuesser: { (symbol: ts.Symbol): string }) { }
 
     nbGlobalClasses() {
         return this.globalClasses.size
@@ -234,7 +234,7 @@ export class TypescriptToJavaTypemap {
                         // TODO the 'preJava.getSimpleName(null) == guessName(declaration.name)' is not 100% sufficient but should work most of the time...
                         if (preJava instanceof PreJavaTypeClassOrInterface && preJava.getSimpleName(null) == tsTools.guessName(declaration.name)) {
                             preJava.addConstructorSignature(this.convertSignature(null, constructorSignature, null))
-                            preJava.setPrototypeName(this.processContext.getJsPackage(declaration.getSourceFile()), tsTools.guessName(declaration.name))
+                            preJava.setPrototypeName(this.processContext.getJsPackage(t.symbol), tsTools.guessName(declaration.name))
                         }
                     }
                 })
@@ -246,7 +246,7 @@ export class TypescriptToJavaTypemap {
                     if (declaration && declaration.name && declaration.name.getText()) {
                         let signature = this.convertSignature(declaration.name.getText(), tsSignature, null)
                         if (signature)
-                            this.getGlobalClass(declaration.getSourceFile()).addStaticMethod(signature)
+                            this.getGlobalClass(t.symbol/*declaration.getSourceFile()*/).addStaticMethod(signature)
                     }
                 })
             }
@@ -256,7 +256,7 @@ export class TypescriptToJavaTypemap {
                 || (t.getProperties() && t.getProperties().some(p => p.name != 'prototype'))) {
                 let variableType = this.getOrCreatePreJavaTypeForTsType(t, false)
 
-                this.getGlobalClass(declaration.getSourceFile()).addStaticProperty({ name: tsTools.guessName(declaration.name), comments: null, type: variableType, writable: true })
+                this.getGlobalClass(t.symbol/*declaration.getSourceFile()*/).addStaticProperty({ name: tsTools.guessName(declaration.name), comments: null, type: variableType, writable: true })
             }
         })
     }
@@ -273,7 +273,7 @@ export class TypescriptToJavaTypemap {
             callSignatures.forEach(tsSignature => {
                 let signature = this.convertSignature(name, tsSignature, null)
                 if (signature) {
-                    this.getGlobalClass(declaration.getSourceFile()).addStaticMethod(signature)
+                    this.getGlobalClass(t.symbol /*declaration.getSourceFile()*/).addStaticMethod(signature)
                 }
             })
         }
@@ -391,12 +391,12 @@ export class TypescriptToJavaTypemap {
         return BuiltIn.BUILTIN_TYPE_OBJECT
     }
 
-    private getGlobalClass(sourceFile: ts.SourceFile): PreJavaTypeClassOrInterface {
-        let jsPackage = this.processContext.getJsPackage(sourceFile)
+    private getGlobalClass(symbol: ts.Symbol): PreJavaTypeClassOrInterface {
+        let jsPackage = this.processContext.getJsPackage(symbol)
         let key = jsPackage ? jsPackage : '-'
 
         if (!this.globalClasses.has(key)) {
-            let javaPackage = this.processContext.getJavaPackage(sourceFile)
+            let javaPackage = this.processContext.getJavaPackage(symbol)
 
             let globalClass = new PreJavaTypeClassOrInterface()
             globalClass.comments = [`Wrapper class for all global definition of ${jsPackage} (java ${javaPackage}) package`]

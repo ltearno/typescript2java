@@ -13,7 +13,7 @@ export class GatherPhase {
         private defaultJavaPackage: string,
         private javaPackages: { [key: string]: string },
         private program: ts.Program) {
-        this.typeMap = new TypescriptToJavaTypemap(program, sourceFile => this.getJavaPackage(sourceFile), sourceFile => this.getJSPackage(sourceFile))
+        this.typeMap = new TypescriptToJavaTypemap(program, symbol => this.getJavaPackage(symbol), sourceFile => this.getJSPackage(sourceFile))
     }
 
     getTypeMap() {
@@ -60,14 +60,39 @@ export class GatherPhase {
         console.log(`${this.typeMap.typeSet().size} jsinterop types`)
     }
 
-    private getJavaPackage(sourceFile: ts.SourceFile) {
-        let jsPackage = this.getJSPackage(sourceFile)
+    private getJavaPackage(symbol: ts.Symbol) {
+        let jsPackage = this.getJSPackage(symbol)
         return `${this.baseJavaPackage}.${jsPackage ? jsPackage : this.defaultJavaPackage}`
     }
 
-    private getJSPackage(sourceFile: ts.SourceFile) {
-        if (!sourceFile)
+    private getJSPackage(symbol: ts.Symbol) {
+        if (!symbol)
             return null
+
+        let baseJsPackage = this.getJSPackageFromSourceFile(symbol)
+
+        let fqn = this.program.getTypeChecker().getFullyQualifiedName(symbol)
+        if (!fqn)
+            return baseJsPackage
+
+        if (fqn) {
+            if (fqn.indexOf('"') >= 0)
+                fqn = fqn.substring(fqn.indexOf('"', 1) + 2)
+
+            if (fqn.indexOf('.') > 0) {
+                baseJsPackage = (baseJsPackage ? (baseJsPackage + '.') : '') + fqn.substring(0, fqn.lastIndexOf('.'))
+            }
+        }
+
+        return baseJsPackage
+    }
+
+    private getJSPackageFromSourceFile(symbol: ts.Symbol) {
+        if (!symbol)
+            return null
+
+        let symbolDeclaration = symbol.valueDeclaration || (symbol.declarations && symbol.declarations[0])
+        let sourceFile = symbolDeclaration.getSourceFile()
 
         let relative = path.relative(this.program.getCurrentDirectory(), sourceFile.fileName)
 

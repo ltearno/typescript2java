@@ -21,8 +21,8 @@ export class PreJavaTypeTuple extends PreJavaType {
     }
 
     processSourceType(type: ts.Type, typeParametersToApplyToAnonymousTypes: PreJavaTypeParameter[], context: ProcessContext) {
-        if (type && type.symbol && type.symbol.valueDeclaration)
-            this.packageName = context.getJavaPackage(type.symbol.valueDeclaration.getSourceFile())
+        if (type && type.symbol)
+            this.packageName = context.getJavaPackage(type.symbol)
         else
             this.packageName = context.getJavaPackage(null)
     }

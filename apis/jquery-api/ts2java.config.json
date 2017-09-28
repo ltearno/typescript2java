@@ -1,0 +1,33 @@
+{
+    "sourceRootDir": "./tsd",
+    "baseJavaPackage": "fr.lteconsulting.jsinterop",
+    "defaultJavaPackage": "browser",
+    "javaPackages": {
+        "tsd/jquery": "jquery"
+    },
+    "processInternalTypes": false,
+    "outputDirectory": "./out/src/main/java",
+    "renaming": {
+        "fr.lteconsulting.jsinterop.browser": {
+            "EventListenerOrEventListenerObject_UnionOfEventListenerAndEventListenerObject": "EventListenerOrEventListenerObject",
+            "IDBValidKey_UnionOfDateAndIDBArrayKeyAndNumberAndString": "IDBValidKey",
+            "UnionOfAesCbcParamsAndAesCfbParamsAndAesCmacParamsAndAesCtrParamsAndAesGcmParamsAndRsaOaepParamsAndString": "UnionOfCryptoParamsAndString",
+            "UnionOfAesDerivedKeyParamsAndConcatParamsAndHkdfCtrParamsAndHmacImportParamsAndPbkdf2ParamsAndString": "UnionOfCryptoParamsAndString2",
+            "UnionOfConcatParamsAndDhKeyDeriveParamsAndEcdhKeyDeriveParamsAndHkdfCtrParamsAndPbkdf2ParamsAndString": "UnionOfCryptoParamsAndString3",
+            "UnionOfDhImportKeyParamsAndEcKeyImportParamsAndHmacImportParamsAndRsaHashedImportParamsAndString": "UnionOfKeyParams",
+            "UnionOfSVGCircleElementAndSVGEllipseElementAndSVGImageElementAndSVGLineElementAndSVGPathElementAndSVGPolygonElementAndSVGPolylineElementAndSVGRectElementAndSVGTextElementAndSVGUseElement": "UnionOfSeveralSVGElement"
+        }
+    },
+    "adding": {
+        "fr.lteconsulting.jsinterop.browser": {
+            "Array": "added-to-array.txt"
+        }
+    },
+    "removing": {
+        "fr.lteconsulting.jsinterop.browser": {
+            "Array": [
+                "static Array of(T)"
+            ]
+        }
+    }
+}
