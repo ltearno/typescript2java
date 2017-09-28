@@ -1,37 +1,25 @@
 import * as path from "path"
 import * as fs from "fs"
 
-export function mkdirRec(p, opts = undefined, made = null) {
-    if (!opts || typeof opts !== 'object')
-        opts = { mode: opts }
-
-    var mode = opts.mode
-    var xfs = opts.fs || fs
-
-    if (mode === undefined)
-        mode = 0x777 & (~process.umask())
-    if (!made) made = null
+export function mkdirRec(p) {
+    const mode = 0o755
 
     p = path.resolve(p)
 
     try {
-        xfs.mkdirSync(p, mode)
-        made = made || p
+        fs.mkdirSync(p, mode)
     }
     catch (err0) {
         switch (err0.code) {
             case 'ENOENT':
-                made = mkdirRec(path.dirname(p), opts, made)
-                mkdirRec(p, opts, made)
+                mkdirRec(path.dirname(p))
+                mkdirRec(p)
                 break
 
-            // In the case of any other error, just see if there's a dir
-            // there already.  If so, then hooray!  If not, then something
-            // is borked.
             default:
-                var stat
+                let stat
                 try {
-                    stat = xfs.statSync(p)
+                    stat = fs.statSync(p)
                 }
                 catch (err1) {
                     throw err0
@@ -40,8 +28,6 @@ export function mkdirRec(p, opts = undefined, made = null) {
                 break
         }
     }
-
-    return made
 }
 
 export function dumpObject(o: any) {
