@@ -42,9 +42,7 @@ public void onModuleLoad() {
 
 // And the wait(int duration) method :
 private Promise<Void> wait(int duration) {
-    return new Promise<>((resolver, rejecter) -> {
-        setTimeout(evt -> resolver.call(null), duration);
-    });
+    return new Promise<>((resolver, rejecter) -> setTimeout(evt -> resolver.call(null), duration));
 }
 ----
 
