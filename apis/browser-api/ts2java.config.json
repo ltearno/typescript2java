@@ -1,5 +1,5 @@
 {
-    "sourceRootDir": "./apis/browser-api/tsd",
+    "sourceRootDir": "./tsd",
     "baseJavaPackage": "fr.lteconsulting.jsinterop",
     "defaultJavaPackage": "browser",
     "javaPackages": {},
