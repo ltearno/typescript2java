@@ -54,6 +54,7 @@ export class ExportPhase {
     JS_ARRAY_LIKE = new PreJavaTypeBuiltinJavaType('jsinterop.base', 'JsArrayLike')
     JS_FUNCTION = new PreJavaTypeBuiltinJavaType('jsinterop.annotations', 'JsFunction')
     JS = new PreJavaTypeBuiltinJavaType('jsinterop.base', 'Js')
+    DO_NOT_AUTOBOX = new PreJavaTypeBuiltinJavaType('javaemul.internal.annotations', 'DoNotAutobox')
 
     exportNodes(types: Set<PreJavaType>, program: ts.Program, baseDirectory: string) {
         for (let type of types) {
@@ -110,24 +111,10 @@ export class ExportPhase {
             }
 
             for (let unionedType of type.types) {
-                javaWriter.importType(this.JS_OVERLAY)
-
-                flow.push(`@JsOverlay`).finishLine()
-                flow.push(`public final ${javaWriter.importTypeParametrized(unionedType)} as${unionedType.getHumanizedName(null)}() {`).finishLine()
-                flow.pushLineStart('    ')
-                flow.push(`return Js.uncheckedCast( this );`).finishLine()
-                flow.pullLineStart()
-                flow.push(`}`).finishLine()
-                flow.finishLine()
-
-                flow.push(`@JsOverlay`).finishLine()
-                flow.push(`public static ${type.getParametrization(null)} ${type.getParametrizedSimpleName(null)} of${unionedType.getHumanizedName(null)}(${javaWriter.importTypeParametrized(unionedType)} value) {`).finishLine()
-                flow.pushLineStart('    ')
-                flow.push(`return Js.uncheckedCast( value );`).finishLine()
-                flow.pullLineStart()
-                flow.push(`}`).finishLine()
-                flow.finishLine()
+                this.exportClassLikeUnionMethodAsUnionedType(unionedType, javaWriter, flow)
+                this.exportClassLikeUnionMethodOfUnionedType(type, unionedType, javaWriter, flow)
             }
+
             flow.pullLineStart()
             flow.push(`}`).finishLine()
         }
@@ -138,24 +125,10 @@ export class ExportPhase {
             flow.pushLineStart('    ')
 
             for (let unionedType of type.types) {
-                javaWriter.importType(this.JS_OVERLAY)
-
-                flow.push(`@JsOverlay`).finishLine()
-                flow.push(`default ${javaWriter.importTypeParametrized(unionedType)} as${unionedType.getHumanizedName(null)}() {`).finishLine()
-                flow.pushLineStart('    ')
-                flow.push(`return Js.cast( this );`).finishLine()
-                flow.pullLineStart()
-                flow.push(`}`).finishLine()
-                flow.finishLine()
-
-                flow.push(`@JsOverlay`).finishLine()
-                flow.push(`static ${type.getParametrization(null)} ${type.getParametrizedSimpleName(null)} of${unionedType.getHumanizedName(null)}(${javaWriter.importTypeParametrized(unionedType)} value) {`).finishLine()
-                flow.pushLineStart('    ')
-                flow.push(`return Js.cast( value );`).finishLine()
-                flow.pullLineStart()
-                flow.push(`}`).finishLine()
-                flow.finishLine()
+                this.exportInterfaceLikeUnionMethodAsUnionedType(unionedType, javaWriter, flow)
+                this.exportInterfaceLikeUnionMethodOfUnionedType(type, unionedType, javaWriter, flow)
             }
+
             flow.pullLineStart()
             flow.push(`}`).finishLine()
         }
@@ -292,12 +265,12 @@ export class ExportPhase {
                 flow.endJavaDocComments()
             }
 
-            if (method.typeParameters && method.typeParameters.length)
-                flow.push(`<${method.typeParameters.map(tp => tp.name).join(', ')}> `)
-            flow.push(`${javaWriter.importTypeParametrized(method.returnType)} call(`)
-            if (method.parameters)
-                flow.push(method.parameters.map(p => `${javaWriter.importTypeParametrized(p.type)} ${this.escapePropertyName(p.name)}${p.dotdotdot ? ' /* ... */' : ''}${p.optional ? ' /* optional */' : ''}`).join(', '))
-            flow.push(`);`).finishLine()
+            this.exportJsFunctionCallMethod(method, javaWriter, flow)
+
+            if (method.parameters && method.parameters.length == 1 && (method.parameters[0].type instanceof PreJavaTypeUnion)) {
+                // TODO first : don't replace JsFunction types with Unioned parameter by Function or Action...
+                // develop unioned types...
+            }
 
             flow.pullLineStart()
             flow.push(`}`)
@@ -396,24 +369,8 @@ export class ExportPhase {
                     flow.blankLine().push(`/** skipped index of type {@link ${javaWriter.importTypeParametrized(nit)}} because already in type hierarchy */`).finishLine()
                 }
                 else {
-                    javaWriter.importType(this.JS_OVERLAY)
-                    javaWriter.importType(this.JS)
-
-                    flow.blankLine()
-                    flow.push(`@JsOverlay`).finishLine()
-                    flow.push(`${isClass ? 'public final' : 'default'} void setByIndex(int index, ${javaWriter.importTypeParametrized(nit)} value) {`).finishLine()
-                    flow.pushLineStart('    ')
-                    flow.push(`Js.asArrayLike(this).setAt(index, value);`).finishLine()
-                    flow.pullLineStart()
-                    flow.push(`}`).finishLine()
-
-                    flow.blankLine()
-                    flow.push(`@JsOverlay`).finishLine()
-                    flow.push(`${isClass ? 'public final' : 'default'} ${javaWriter.importTypeParametrized(nit)} getByIndex(int index) {`).finishLine()
-                    flow.pushLineStart('    ')
-                    flow.push(`return (${javaWriter.importTypeParametrized(nit)}) Js.asArrayLike(this).getAt(index);`).finishLine()
-                    flow.pullLineStart()
-                    flow.push(`}`).finishLine()
+                    this.exportNumberIndexSetterMethod(nit, isClass, javaWriter, flow)
+                    this.exportNumberIndexGetterMethod(nit, isClass, javaWriter, flow)
                 }
             }
 
@@ -423,24 +380,8 @@ export class ExportPhase {
                     flow.blankLine().push(`/** skipped index of type {@link ${javaWriter.importTypeParametrized(sit)}} because already in type hierarchy */`).finishLine()
                 }
                 else {
-                    javaWriter.importType(this.JS_OVERLAY)
-                    javaWriter.importType(this.JS)
-
-                    flow.blankLine()
-                    flow.push(`@JsOverlay`).finishLine()
-                    flow.push(`public final void setByIndex(String index, ${javaWriter.importTypeParametrized(sit)} value) {`).finishLine()
-                    flow.pushLineStart('    ')
-                    flow.push(`Js.asPropertyMap(this).set(index, value);`).finishLine()
-                    flow.pullLineStart()
-                    flow.push(`}`).finishLine()
-
-                    flow.blankLine()
-                    flow.push(`@JsOverlay`).finishLine()
-                    flow.push(`public final ${javaWriter.importTypeParametrized(sit)} getByIndex(String index) {`).finishLine()
-                    flow.pushLineStart('    ')
-                    flow.push(`return (${javaWriter.importTypeParametrized(sit)}) Js.asPropertyMap(this).get(index);`).finishLine()
-                    flow.pullLineStart()
-                    flow.push(`}`).finishLine()
+                    this.exportStringIndexSetterMethod(sit, isClass, javaWriter, flow)
+                    this.exportStringIndexGetterMethod(sit, isClass, javaWriter, flow)
                 }
             }
 
@@ -491,33 +432,10 @@ export class ExportPhase {
                     .forEach(method => {
                         if (method.name.indexOf('@') >= 0) {
                             flow.push(`// skipped static method ${method.name}`).blankLine().blankLine()
+                            return
                         }
-                        else {
-                            if (method.comments && method.comments.length) {
-                                flow.startJavaDocComments()
-                                flow.push(method.comments)
-                                flow.endJavaDocComments()
-                            }
 
-                            let escapedMethodName = method.name
-                            if (type.methods && type.methods.some(m => m.name == escapedMethodName))
-                                escapedMethodName = '_' + escapedMethodName
-                            escapedMethodName = this.escapePropertyName(escapedMethodName)
-                            let methodNamespace = type.jsNamespace ? (type.jsNamespace + '.' + type.jsName) : type.jsName
-                            if (!methodNamespace)
-                                javaWriter.importType(this.JS_PACKAGE)
-
-                            javaWriter.importType(this.JS_METHOD)
-                            flow.push(`@JsMethod(namespace=${methodNamespace ? ('"' + methodNamespace + '"') : 'JsPackage.GLOBAL'}, name = "${method.name}")`).finishLine()
-                            flow.push(`public static native `)
-                            let typeParameters = method.typeParameters
-                            if (typeParameters && typeParameters.length)
-                                flow.push(`<${typeParameters.map(tp => tp.name).join(', ')}> `)
-                            flow.push(`${javaWriter.importTypeParametrized(method.returnType)} ${escapedMethodName}(`)
-                            if (method.parameters)
-                                flow.push(method.parameters.map(p => `${javaWriter.importTypeParametrized(p.type)}${p.dotdotdot ? '...' : ''} ${this.escapePropertyName(p.name)}${p.optional ? ' /* optional */' : ''}`).join(', '))
-                            flow.push(`);`).finishLine()
-                        }
+                        this.exportStaticMethod(method, type, javaWriter, flow)
                     })
             }
 
@@ -625,33 +543,10 @@ export class ExportPhase {
                     .forEach(method => {
                         if (method.name.indexOf('@') >= 0) {
                             flow.push(`// skipped method ${method.name}`).blankLine().blankLine()
+                            return
                         }
-                        else {
-                            flow.startJavaDocComments()
-                            flow.push(`Std Signature : ${Signature.getCallSignatureStandardSignature(method)}`).finishLine()
-                            flow.push(`TE Signature : ${Signature.getCallSignatureTypeErasedSignature(method)}`).finishLine()
-                            flow.endJavaDocComments()
 
-                            if (method.comments && method.comments.length) {
-                                flow.startJavaDocComments()
-                                flow.push(method.comments)
-                                flow.endJavaDocComments()
-                            }
-
-                            let escapedMethodName = this.escapePropertyName(method.name)
-
-                            if (escapedMethodName != method.name) {
-                                javaWriter.importType(this.JS_METHOD)
-                                flow.push(`@JsMethod(name = "${method.name}")`).finishLine()
-                            }
-                            flow.push(`${isClass ? 'public native ' : ''}`)
-                            if (method.typeParameters && method.typeParameters.length)
-                                flow.push(`<${method.typeParameters.map(tp => tp.name).join(', ')}> `)
-                            flow.push(`${javaWriter.importTypeParametrized(method.returnType)} ${escapedMethodName}(`)
-                            if (method.parameters)
-                                flow.push(method.parameters.map(p => `${javaWriter.importTypeParametrized(p.type)}${p.dotdotdot ? '...' : ''} ${this.escapePropertyName(p.name)}${p.optional ? ' /* optional */' : ''}`).join(', '))
-                            flow.push(`);`).finishLine()
-                        }
+                        this.exportClassMethod(method, type, isClass, javaWriter, flow)
                     })
             }
 
@@ -709,5 +604,209 @@ export class ExportPhase {
     private escapeMethodName(symbolName: string) {
         return this.escapePropertyName(symbolName)
     }
-}
 
+    /**
+     * Method exportation
+     */
+
+    private functionParameterJavaString(parameter: PreJavaTypeFormalParameter, javaWriter: JavaWriter) {
+        let noAutoBox = false
+        if (parameter.type == BuiltIn.BUILTIN_TYPE_NUMBER || parameter.type instanceof PreJavaTypeParameter) {
+            javaWriter.importType(this.DO_NOT_AUTOBOX)
+            noAutoBox = true
+        }
+
+        return `${noAutoBox ? '@DoNotAutobox ' : ''}${javaWriter.importTypeParametrized(parameter.type)}${parameter.dotdotdot ? '... ' : ''} ${parameter.name}${parameter.optional ? ' /* optional */' : ''}`
+    }
+
+    private exportClassLikeUnionMethodAsUnionedType(unionedType: PreJavaType, javaWriter: JavaWriter, flow: TextFlow) {
+        javaWriter.importType(this.JS_OVERLAY)
+
+        flow.push(`@JsOverlay`).finishLine()
+        flow.push(`public final ${javaWriter.importTypeParametrized(unionedType)} as${unionedType.getHumanizedName(null)}() {`).finishLine()
+        flow.pushLineStart('    ')
+        flow.push(`return Js.uncheckedCast( this );`).finishLine()
+        flow.pullLineStart()
+        flow.push(`}`).finishLine()
+        flow.finishLine()
+    }
+
+    private exportClassLikeUnionMethodOfUnionedType(unionType: PreJavaTypeUnion, unionedType: PreJavaType, javaWriter: JavaWriter, flow: TextFlow) {
+        javaWriter.importType(this.JS_OVERLAY)
+
+        let parameter: PreJavaTypeFormalParameter = {
+            name: 'value',
+            type: unionedType,
+            dotdotdot: false,
+            optional: false
+        }
+
+        flow.push(`@JsOverlay`).finishLine()
+        flow.push(`public static ${unionType.getParametrization(null)} ${unionType.getParametrizedSimpleName(null)} of${unionedType.getHumanizedName(null)}(${this.functionParameterJavaString(parameter, javaWriter)}) {`).finishLine()
+        flow.pushLineStart('    ')
+        flow.push(`return Js.uncheckedCast( value );`).finishLine()
+        flow.pullLineStart()
+        flow.push(`}`).finishLine()
+        flow.finishLine()
+    }
+
+    private exportInterfaceLikeUnionMethodAsUnionedType(unionedType: PreJavaType, javaWriter: JavaWriter, flow: TextFlow) {
+        javaWriter.importType(this.JS_OVERLAY)
+
+        flow.push(`@JsOverlay`).finishLine()
+        flow.push(`default ${javaWriter.importTypeParametrized(unionedType)} as${unionedType.getHumanizedName(null)}() {`).finishLine()
+        flow.pushLineStart('    ')
+        flow.push(`return Js.cast( this );`).finishLine()
+        flow.pullLineStart()
+        flow.push(`}`).finishLine()
+        flow.finishLine()
+    }
+
+    private exportInterfaceLikeUnionMethodOfUnionedType(unionType: PreJavaTypeUnion, unionedType: PreJavaType, javaWriter: JavaWriter, flow: TextFlow) {
+        javaWriter.importType(this.JS_OVERLAY)
+
+        let parameter: PreJavaTypeFormalParameter = {
+            name: 'value',
+            type: unionedType,
+            dotdotdot: false,
+            optional: false
+        }
+
+        flow.push(`@JsOverlay`).finishLine()
+        flow.push(`static ${unionType.getParametrization(null)} ${unionType.getParametrizedSimpleName(null)} of${unionedType.getHumanizedName(null)}(${this.functionParameterJavaString(parameter, javaWriter)}) {`).finishLine()
+        flow.pushLineStart('    ')
+        flow.push(`return Js.cast( value );`).finishLine()
+        flow.pullLineStart()
+        flow.push(`}`).finishLine()
+        flow.finishLine()
+    }
+
+    private exportJsFunctionCallMethod(method: PreJavaTypeCallSignature, javaWriter: JavaWriter, flow: TextFlow) {
+        if (method.typeParameters && method.typeParameters.length)
+            flow.push(`<${method.typeParameters.map(tp => tp.name).join(', ')}> `)
+        flow.push(`${javaWriter.importTypeParametrized(method.returnType)} call(`)
+        if (method.parameters)
+            flow.push(method.parameters.map(p => this.functionParameterJavaString(p, javaWriter)).join(', '))
+        flow.push(`);`).finishLine()
+    }
+
+    private exportNumberIndexSetterMethod(nit: PreJavaType, isClass: boolean, javaWriter: JavaWriter, flow: TextFlow) {
+        javaWriter.importType(this.JS_OVERLAY)
+        javaWriter.importType(this.JS)
+
+        let parameter: PreJavaTypeFormalParameter = {
+            name: 'value',
+            type: nit,
+            dotdotdot: false,
+            optional: false
+        }
+
+        flow.blankLine()
+        flow.push(`@JsOverlay`).finishLine()
+        flow.push(`${isClass ? 'public final' : 'default'} void setByIndex(int index, ${this.functionParameterJavaString(parameter, javaWriter)}) {`).finishLine()
+        flow.pushLineStart('    ')
+        flow.push(`Js.asArrayLike(this).setAt(index, value);`).finishLine()
+        flow.pullLineStart()
+        flow.push(`}`).finishLine()
+    }
+
+    private exportNumberIndexGetterMethod(nit: PreJavaType, isClass: boolean, javaWriter: JavaWriter, flow: TextFlow) {
+        javaWriter.importType(this.JS_OVERLAY)
+        javaWriter.importType(this.JS)
+
+        flow.blankLine()
+        flow.push(`@JsOverlay`).finishLine()
+        flow.push(`${isClass ? 'public final' : 'default'} ${javaWriter.importTypeParametrized(nit)} getByIndex(int index) {`).finishLine()
+        flow.pushLineStart('    ')
+        flow.push(`return (${javaWriter.importTypeParametrized(nit)}) Js.asArrayLike(this).getAt(index);`).finishLine()
+        flow.pullLineStart()
+        flow.push(`}`).finishLine()
+    }
+
+    private exportStringIndexSetterMethod(sit: PreJavaType, isClass: boolean, javaWriter: JavaWriter, flow: TextFlow) {
+        javaWriter.importType(this.JS_OVERLAY)
+        javaWriter.importType(this.JS)
+
+        let parameter: PreJavaTypeFormalParameter = {
+            name: 'value',
+            type: sit,
+            dotdotdot: false,
+            optional: false
+        }
+
+        flow.blankLine()
+        flow.push(`@JsOverlay`).finishLine()
+        flow.push(`public final void setByIndex(String index, ${this.functionParameterJavaString(parameter, javaWriter)}) {`).finishLine()
+        flow.pushLineStart('    ')
+        flow.push(`Js.asPropertyMap(this).set(index, value);`).finishLine()
+        flow.pullLineStart()
+        flow.push(`}`).finishLine()
+    }
+
+    private exportStringIndexGetterMethod(sit: PreJavaType, isClass: boolean, javaWriter: JavaWriter, flow: TextFlow) {
+        javaWriter.importType(this.JS_OVERLAY)
+        javaWriter.importType(this.JS)
+
+        flow.blankLine()
+        flow.push(`@JsOverlay`).finishLine()
+        flow.push(`public final ${javaWriter.importTypeParametrized(sit)} getByIndex(String index) {`).finishLine()
+        flow.pushLineStart('    ')
+        flow.push(`return (${javaWriter.importTypeParametrized(sit)}) Js.asPropertyMap(this).get(index);`).finishLine()
+        flow.pullLineStart()
+        flow.push(`}`).finishLine()
+    }
+
+    private exportStaticMethod(method: PreJavaTypeCallSignature, type: PreJavaTypeClassOrInterface, javaWriter: JavaWriter, flow: TextFlow) {
+        if (method.comments && method.comments.length) {
+            flow.startJavaDocComments()
+            flow.push(method.comments)
+            flow.endJavaDocComments()
+        }
+
+        let escapedMethodName = method.name
+        if (type.methods && type.methods.some(m => m.name == escapedMethodName))
+            escapedMethodName = '_' + escapedMethodName
+        escapedMethodName = this.escapePropertyName(escapedMethodName)
+        let methodNamespace = type.jsNamespace ? (type.jsNamespace + '.' + type.jsName) : type.jsName
+        if (!methodNamespace)
+            javaWriter.importType(this.JS_PACKAGE)
+
+        javaWriter.importType(this.JS_METHOD)
+        flow.push(`@JsMethod(namespace=${methodNamespace ? ('"' + methodNamespace + '"') : 'JsPackage.GLOBAL'}, name = "${method.name}")`).finishLine()
+        flow.push(`public static native `)
+        let typeParameters = method.typeParameters
+        if (typeParameters && typeParameters.length)
+            flow.push(`<${typeParameters.map(tp => tp.name).join(', ')}> `)
+        flow.push(`${javaWriter.importTypeParametrized(method.returnType)} ${escapedMethodName}(`)
+        if (method.parameters)
+            flow.push(method.parameters.map(p => this.functionParameterJavaString(p, javaWriter)).join(', '))
+        flow.push(`);`).finishLine()
+    }
+
+    private exportClassMethod(method: PreJavaTypeCallSignature, type: PreJavaTypeClassOrInterface, isClass: boolean, javaWriter: JavaWriter, flow: TextFlow) {
+        flow.startJavaDocComments()
+        flow.push(`Std Signature : ${Signature.getCallSignatureStandardSignature(method)}`).finishLine()
+        flow.push(`TE Signature : ${Signature.getCallSignatureTypeErasedSignature(method)}`).finishLine()
+        flow.endJavaDocComments()
+
+        if (method.comments && method.comments.length) {
+            flow.startJavaDocComments()
+            flow.push(method.comments)
+            flow.endJavaDocComments()
+        }
+
+        let escapedMethodName = this.escapePropertyName(method.name)
+
+        if (escapedMethodName != method.name) {
+            javaWriter.importType(this.JS_METHOD)
+            flow.push(`@JsMethod(name = "${method.name}")`).finishLine()
+        }
+        flow.push(`${isClass ? 'public native ' : ''}`)
+        if (method.typeParameters && method.typeParameters.length)
+            flow.push(`<${method.typeParameters.map(tp => tp.name).join(', ')}> `)
+        flow.push(`${javaWriter.importTypeParametrized(method.returnType)} ${escapedMethodName}(`)
+        if (method.parameters)
+            flow.push(method.parameters.map(p => this.functionParameterJavaString(p, javaWriter)).join(', '))
+        flow.push(`);`).finishLine()
+    }
+}
