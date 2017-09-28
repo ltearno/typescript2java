@@ -78,6 +78,11 @@ export class PreJavaTypeUnion extends PreJavaType {
             this.name = 'EmptyUnion'
         else
             this.name = this.getHumanizedName(null)
+
+        if (this.name.length > 100) {
+            let left = this.name.length - 20
+            this.name = this.name.substring(0, 10) + `_${left}_` + this.name.substring(this.name.length - 10)
+        }
     }
 
     private findPackage(context: ProcessContext) {
