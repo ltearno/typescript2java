@@ -4,8 +4,8 @@
   "description": "",
   "main": "main.js",
   "dependencies": {
-    "typescript": "^2.2.1",
-    "typings": "^2.1.0"
+    "typescript": "2.2.1",
+    "typings": "2.1.0"
   },
   "devDependencies": {},
   "scripts": {
