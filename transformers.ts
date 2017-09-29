@@ -31,7 +31,7 @@ export function applyTransformations(typeMap: TypescriptToJavaTypemap, renaming:
         removeNotSupportedTypes,
         simplifyUnions,
         replaceByFunctionAndProcsLambdaTypes,
-        removeOverridingProperties,
+        //removeOverridingProperties,
         deduplicateTypes,
         removeEmptyTypes,
         ensureAllTypesHaveNameAndPackage,
@@ -242,18 +242,17 @@ export let developMethodsWithUnionParameters: Transformer = function (typeMap: T
                     methodsSignatures.add(sig)
                     type.methods.push(method)
                     somethingChanged = true
+                    counter++
                 }
 
                 type.methods && type.methods.forEach(m => {
                     let dups = developMethodWithUnionParameters(m, 5)
                     dups && dups.forEach(dup => maybeAdd(dup))
-                    counter += dups && dups.length
                 })
 
                 type.methods && type.methods.forEach(m => {
                     let dups = developMethodWithOptionalParameters(m)
                     dups && dups.forEach(dup => maybeAdd(dup))
-                    counter += dups && dups.length
                 })
             }
         })
