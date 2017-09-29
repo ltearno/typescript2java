@@ -582,7 +582,7 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
     }
 
     addBaseType(baseType: PreJavaType) {
-        if (baseType)
+        if (baseType && baseType != BuiltIn.BUILTIN_TYPE_OBJECT)
             this.baseTypes.add(baseType)
         if (baseType == null)
             console.log(`NULL BASE TYPE`)

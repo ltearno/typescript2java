@@ -1,4 +1,5 @@
 import * as ts from "typescript"
+import * as BuiltIn from '../builtin-types'
 import { PreJavaType, ProcessContext, TypeReplacer } from './PreJavaType'
 
 export class PreJavaTypeParameter extends PreJavaType {
@@ -9,6 +10,8 @@ export class PreJavaTypeParameter extends PreJavaType {
         super()
         this.name = name
         this.constraint = constraint
+        if (constraint == BuiltIn.BUILTIN_TYPE_OBJECT)
+            constraint = null
     }
 
     processSourceType(type: ts.Type, typeParametersToApplyToAnonymousTypes: PreJavaTypeParameter[], context: ProcessContext) {

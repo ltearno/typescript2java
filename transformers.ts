@@ -480,19 +480,47 @@ export function changeDtoInterfacesIntoClasses(typeMap: TypescriptToJavaTypemap)
 
 
 export function arrangeMultipleImplementationInheritance(typeMap: TypescriptToJavaTypemap, implementationSuffix: string, interfaceSuffix: string) {
+    let interfaceProxyCache = new Map<PreJavaType, PreJavaTypeClassOrInterface>()
+    function createInterfaceProxyForClass(type: PreJavaTypeClassOrInterface) {
+        if (interfaceProxyCache.has(type))
+            return interfaceProxyCache.get(type)
+
+        let newType = new PreJavaTypeClassOrInterface()
+        newType.baseTypes = type.baseTypes
+        newType.comments = type.comments && type.comments.slice()
+        newType.constructorSignatures = type.constructorSignatures
+        newType.methods = type.methods && type.methods.slice()
+        newType.callSignatures = type.callSignatures && type.callSignatures.slice()
+        newType.name = type.name + interfaceSuffix
+        newType.numberIndexType = type.numberIndexType
+        newType.stringIndexType = type.stringIndexType
+        newType.packageName = type.packageName
+        newType.properties = type.properties && type.properties.slice()
+        newType.jsNamespace = type.jsNamespace
+        newType.jsName = type.jsName
+        newType.isClass = false
+        newType.typeParameters = type.typeParameters && type.typeParameters.slice()
+        newType.sourceTypes = type.sourceTypes
+
+        type.baseTypes = new Set()
+        type.baseTypes.add(newType)
+
+        interfaceProxyCache.set(type, newType)
+        typeMap.registerType({} as ts.Type, newType)
+
+        return newType
+    }
+
     let maxPasses = 10
 
     while (maxPasses-- >= 0) {
         let somethingDone = false
         for (let type of typeMap.typeSet()) {
             if (type instanceof PreJavaTypeClassOrInterface && type.baseTypes && type.baseTypes.size) {
-                let implementationSuperTypes: PreJavaTypeClassOrInterface[] = []
+                let implementationSuperTypes: PreJavaType[] = []
                 for (let superType of type.baseTypes.values()) {
-                    while (superType && superType instanceof PreJavaTypeReference)
-                        superType = superType.type
-                    if (superType instanceof PreJavaTypeClassOrInterface && superType.isClassLike()) {
+                    if (superType.isClassLike())
                         implementationSuperTypes.push(superType)
-                    }
                 }
 
                 if ((type.isClassLike() && implementationSuperTypes.length <= 1) || (!type.isClassLike() && implementationSuperTypes.length == 0))
@@ -500,37 +528,29 @@ export function arrangeMultipleImplementationInheritance(typeMap: TypescriptToJa
 
                 somethingDone = true
 
-                let nbConstructors = type.constructorSignatures && type.constructorSignatures.length
-
                 for (let superType of implementationSuperTypes) {
-                    // super_type doit maintenant être une interface => on le transforme comme ca tout le monde pointe vers l'interface
-                    let newType = new PreJavaTypeClassOrInterface()
-                    newType.baseTypes = new Set()
-                    newType.baseTypes.add(superType)
-                    newType.comments = superType.comments && superType.comments.slice()
-                    newType.constructorSignatures = superType.constructorSignatures
-                    newType.methods = superType.methods && superType.methods.slice()
-                    newType.callSignatures = superType.callSignatures && superType.callSignatures.slice()
-                    newType.name = superType.name + implementationSuffix
-                    newType.numberIndexType = superType.numberIndexType
-                    newType.stringIndexType = superType.stringIndexType
-                    newType.packageName = superType.packageName
-                    newType.properties = superType.properties && superType.properties.slice()
-                    newType.jsNamespace = superType.jsNamespace
-                    newType.jsName = superType.jsName
-                    newType.isClass = true
-                    newType.typeParameters = superType.typeParameters && superType.typeParameters.slice()
-                    newType.sourceTypes = superType.sourceTypes
+                    let originalSuperType = superType
 
-                    superType.name = superType.name + interfaceSuffix
-                    superType.isClass = false
-                    superType.constructorSignatures = null
-                    superType.jsName = null
-                    superType.jsNamespace = null
+                    while (superType && superType instanceof PreJavaTypeReference)
+                        superType = superType.type
+                    while (superType && superType instanceof PreJavaTypeTPEnvironnement)
+                        superType = superType.type
 
-                    newType.cleanAndCheckMethods()
+                    if (!(superType instanceof PreJavaTypeClassOrInterface))
+                        continue
 
-                    typeMap.registerType({} as ts.Type, newType)
+                    let newType = createInterfaceProxyForClass(superType)
+
+                    if (originalSuperType instanceof PreJavaTypeReference) {
+                        originalSuperType.type = newType
+                    }
+                    else if (originalSuperType instanceof PreJavaTypeClassOrInterface) {
+                        type.baseTypes.delete(originalSuperType)
+                        type.baseTypes.add(newType)
+                    }
+                    else {
+                        console.log(`DONT KNOW WHAT TO DO ANKJSU`)
+                    }
                 }
             }
         }

@@ -62,8 +62,6 @@ export class PreJavaTypeReference extends PreJavaType {
         public type: PreJavaType,
         public typeParameters: PreJavaType[]) {
         super()
-        if (this.type == null)
-            console.log(`fu`)
     }
 
     processSourceType(type: ts.Type, typeParametersToApplyToAnonymousTypes: PreJavaTypeParameter[], context: ProcessContext) {
