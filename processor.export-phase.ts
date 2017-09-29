@@ -99,7 +99,7 @@ export class ExportPhase {
         if (type.isClassLike()) {
             javaWriter.importType(this.JS_PACKAGE)
             flow.push(`@JsType(isNative=true, namespace=JsPackage.GLOBAL, name="Object")`).finishLine()
-            flow.push(`public abstract class ${type.getParametrizedSimpleName(null)} ${extendedBaseTypes.length ? `extends ${extendedBaseTypes.map(t => javaWriter.importTypeParametrized(t)).join()} ` : ''}${implementedBaseTypes.length ? `implements ${implementedBaseTypes.map(t => javaWriter.importTypeParametrized(t)).join()} ` : ''} {`).finishLine()
+            flow.push(`public abstract class ${type.getSimpleName()}${this.getParametrizationWithConstraints(type, javaWriter)} ${extendedBaseTypes.length ? `extends ${extendedBaseTypes.map(t => javaWriter.importTypeParametrized(t)).join()} ` : ''}${implementedBaseTypes.length ? `implements ${implementedBaseTypes.map(t => javaWriter.importTypeParametrized(t)).join()} ` : ''} {`).finishLine()
             flow.pushLineStart('    ')
 
             let baseConstructors = typeTools.getSuperConstructors(type, false)
@@ -122,7 +122,7 @@ export class ExportPhase {
         else {
             javaWriter.importType(this.JS_PACKAGE)
             flow.push(`@JsType(isNative=true, namespace=JsPackage.GLOBAL, name="?")`).finishLine()
-            flow.push(`public interface ${type.getParametrizedSimpleName(null)} ${implementedBaseTypes.length ? `extends ${implementedBaseTypes.map(t => javaWriter.importTypeParametrized(t)).join()} ` : ''} {`).finishLine()
+            flow.push(`public interface ${type.getSimpleName()}${this.getParametrizationWithConstraints(type, javaWriter)} ${implementedBaseTypes.length ? `extends ${implementedBaseTypes.map(t => javaWriter.importTypeParametrized(t)).join()} ` : ''} {`).finishLine()
             flow.pushLineStart('    ')
 
             for (let unionedType of type.types) {
@@ -695,7 +695,7 @@ export class ExportPhase {
         }
 
         flow.push(`@JsOverlay`).finishLine()
-        flow.push(`public static ${unionType.getParametrization(null)} ${unionType.getParametrizedSimpleName(null)} of${unionedType.getHumanizedName(null)}(${this.formalParameterJavaString(parameter, javaWriter)}) {`).finishLine()
+        flow.push(`public static ${this.getParametrizationWithConstraints(unionType, javaWriter)} ${unionType.getParametrizedSimpleName(null)} of${unionedType.getHumanizedName(null)}(${this.formalParameterJavaString(parameter, javaWriter)}) {`).finishLine()
         flow.pushLineStart('    ')
         flow.push(`return Js.uncheckedCast( value );`).finishLine()
         flow.pullLineStart()
@@ -715,6 +715,13 @@ export class ExportPhase {
         flow.finishLine()
     }
 
+    private getParametrizationWithConstraints(unionType: PreJavaTypeUnion, javaWriter: JavaWriter) {
+        if (!unionType.typeParameters || !unionType.typeParameters.length)
+            return ''
+
+        return `<${unionType.typeParameters.map(tp => this.typeParameterString(tp, javaWriter)).join(', ')}>`
+    }
+
     private exportInterfaceLikeUnionMethodOfUnionedType(unionType: PreJavaTypeUnion, unionedType: PreJavaType, javaWriter: JavaWriter, flow: TextFlow) {
         javaWriter.importType(this.JS_OVERLAY)
 
@@ -726,7 +733,7 @@ export class ExportPhase {
         }
 
         flow.push(`@JsOverlay`).finishLine()
-        flow.push(`static ${unionType.getParametrization(null)} ${unionType.getParametrizedSimpleName(null)} of${unionedType.getHumanizedName(null)}(${this.formalParameterJavaString(parameter, javaWriter)}) {`).finishLine()
+        flow.push(`static ${this.getParametrizationWithConstraints(unionType, javaWriter)} ${unionType.getParametrizedSimpleName(null)} of${unionedType.getHumanizedName(null)}(${this.formalParameterJavaString(parameter, javaWriter)}) {`).finishLine()
         flow.pushLineStart('    ')
         flow.push(`return Js.cast( value );`).finishLine()
         flow.pullLineStart()
