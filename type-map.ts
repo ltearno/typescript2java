@@ -119,19 +119,10 @@ export class TypescriptToJavaTypemap {
         signatureTypeParameters && signatureTypeParameters
             .forEach(tp => typeParametersToApplyToAnonymousTypes.push(tp))
 
-        /*tsSignatureParameters && tsSignatureParameters.forEach(tp => {
-            let freeTypeNames = tsTools.fetchUsedFreeTypeParameters(tp, this.processContext.getProgram().getTypeChecker())
-            freeTypeNames && freeTypeNames.forEach(typeName => {
-                if (!signatureTypeParameters.some(tp => tp.name == typeName)
-                    && !typeParametersToApplyToAnonymousTypes.some(tpIn => tpIn.name == typeName))
-                    signatureTypeParameters.push(new PreJavaTypeParameter(typeName))
-            })
-        })*/
-
         let signatureReturnType = tsSignature.getReturnType()
         let returnType = this.getOrCreatePreJavaTypeForTsType(signatureReturnType, true, typeParametersToApplyToAnonymousTypes)
 
-        return new PreJavaTypeCallSignature(
+        let result = new PreJavaTypeCallSignature(
             signatureTypeParameters,
             returnType,
             name,
@@ -193,6 +184,17 @@ export class TypescriptToJavaTypemap {
                     .filter(p => p != null)
                 : null
         )
+
+        tsSignature.getParameters() && tsSignature.getParameters()
+            .filter(p => p.name == 'thisArg')
+            .forEach(p => {
+                let parameterType = p.valueDeclaration && this.program.getTypeChecker().getTypeAtLocation(p.valueDeclaration)
+                let pjtType = parameterType && this.getOrCreatePreJavaTypeForTsType(parameterType, false, typeParametersToApplyToAnonymousTypes)
+                if (pjtType)
+                    result.addComments(`thisArg is ${pjtType.getParametrizedFullyQualifiedName(null)}`)
+            })
+
+        return result
     }
 
     getOrCreatePreJavaTypeForTsType(tsType: ts.Type, preferNothingVoid: boolean = false, typeParametersToApplyToAnonymousTypes: PreJavaTypeParameter[] = null): PreJavaType {

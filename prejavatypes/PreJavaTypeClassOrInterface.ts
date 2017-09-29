@@ -80,7 +80,7 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
         this.extractComments(type)
         this.extractIndexTypes(type, context)
         this.extractPropertiesAndMethods(type as ts.InterfaceTypeWithDeclaredMembers, context)
-        
+
         if (!this.name)
             console.log(`empty name`)
     }
@@ -349,7 +349,7 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
                     for (let callSignature of callSignatures) {
                         let method = context.getTypeMap().convertSignature(propertyName, callSignature, this.typeParameters)
                         if (method) {
-                            method.addComments(`${callSignature.declaration.getSourceFile().fileName}@${callSignature.declaration.getStart()}`)
+                            this.addTracabilityCommentsToMethod(method, callSignature)
                             method.addComments(comments)
                             if (c++ > 0)
                                 method.comments.push(`VERSION ${c - 1}`)
@@ -373,9 +373,15 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
         let callSignatures = type.getCallSignatures()
         callSignatures && callSignatures.forEach(callSignature => {
             let signature = context.getTypeMap().convertSignature(null, callSignature, this.typeParameters)
-            if (signature)
+            if (signature) {
+                this.addTracabilityCommentsToMethod(signature, callSignature)
                 this.addCallSignature(signature)
+            }
         })
+    }
+
+    private addTracabilityCommentsToMethod(method: PreJavaTypeCallSignature, callSignature: ts.Signature) {
+        method.addComments(`${callSignature.declaration.getSourceFile().fileName}@${callSignature.declaration.getStart()}`)
     }
 
     hasOnlyProperties() {
