@@ -80,85 +80,9 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
         this.extractComments(type)
         this.extractIndexTypes(type, context)
         this.extractPropertiesAndMethods(type as ts.InterfaceTypeWithDeclaredMembers, context)
-        //this.extractIsJsFunction()
-
+        
         if (!this.name)
             console.log(`empty name`)
-    }
-
-    private extractIsJsFunction() {
-        this.isFunctionalInterface = false
-
-        if (!this.hasOnlyOneCallSignature())
-            return
-
-        if (this.baseTypes && this.baseTypes.size) {
-            for (let baseType of this.baseTypes) {
-                // TODO : by traversing references and typeEnv, we should build a Type env for method signatures
-                while (baseType instanceof PreJavaTypeReference)
-                    baseType = baseType.type
-                while (baseType instanceof PreJavaTypeTPEnvironnement)
-                    baseType = baseType.type
-                if (!(baseType instanceof PreJavaTypeClassOrInterface))
-                    return
-                if (!baseType.isFunctionalInterface)
-                    return
-                if (Signature.getCallSignatureTypeErasedSignature(this.callSignatures[0]) != Signature.getCallSignatureTypeErasedSignature(baseType.callSignatures[0]))
-                    return
-            }
-        }
-
-        this.isFunctionalInterface = true
-        this.isClass = false
-    }
-
-    private getAbstractMethods(type: PreJavaType): PreJavaTypeCallSignature[] {
-        let old = this.isClass
-        this.isClass = false
-        let r = this.getAbstractMethodsImpl(this)
-        this.isClass = old
-        return r
-    }
-
-    private getAbstractMethodsImpl(type: PreJavaType): PreJavaTypeCallSignature[] {
-        return Visit.visitPreJavaType(type, {
-            caseBuiltinType: () => [],
-            caseEnumType: () => [],
-            caseFakeType: () => [],
-            caseTuple: () => [],
-            caseTypeParameter: () => [],
-            caseReferenceType: type => this.getAbstractMethodsImpl(type.type),
-            caseTPEnvironnement: type => this.getAbstractMethodsImpl(type.type),
-            caseUnion: union => {
-                let res = []
-                // TODO : manage type environments when going up in the hierarchy chain
-                union.baseTypes && union.baseTypes.forEach(bt => {
-                    this.getAbstractMethodsImpl(bt).forEach(abstractMethod => {
-                        this.addMethodInCollection(abstractMethod, res)
-                    })
-                })
-                return res
-            },
-            caseClassOrInterfaceType: type => {
-                if (type.isClass)
-                    return []
-
-                // TODO : when has a property, give up !
-                //if (type.properties && type.properties.length)
-                //    return []
-
-                let res = []
-                // TODO : manage type environments when going up in the hierarchy chain
-                type.methods && type.methods.forEach(method => this.addMethodInCollection(method, res))
-                type.callSignatures && type.callSignatures.forEach(method => this.addMethodInCollection(method, res))
-                type.baseTypes && type.baseTypes.forEach(bt => {
-                    this.getAbstractMethodsImpl(bt).forEach(abstractMethod => {
-                        this.addMethodInCollection(abstractMethod, res)
-                    })
-                })
-                return res
-            }
-        })
     }
 
     hasOnlyOneCallSignature() {
