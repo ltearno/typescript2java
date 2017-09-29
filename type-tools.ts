@@ -93,8 +93,13 @@ export function skipReferencingTypes(type: PreJavaType) {
 }
 
 export function hasOnlyCallSignatures(type: PreJavaTypeClassOrInterface) {
-    if (type.baseTypes && type.baseTypes.size)
-        return false
+    if (type.baseTypes) {
+        for (let baseType of type.baseTypes)
+            if (baseType.isClassLike())
+                return false
+    }
+    //if (type.baseTypes && type.baseTypes.size)
+    //    return false
     if (!type.callSignatures || !type.callSignatures.length)
         return false
     if (type.constructorSignatures && type.constructorSignatures.length)

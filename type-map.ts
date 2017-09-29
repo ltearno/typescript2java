@@ -231,6 +231,9 @@ export class TypescriptToJavaTypemap {
                 cs.forEach(constructorSignature => {
                     if (constructorSignature.getReturnType() && constructorSignature.parameters && constructorSignature.parameters.length > 0) {
                         let preJava = this.getOrCreatePreJavaTypeForTsType(constructorSignature.getReturnType())
+                        // skip type references
+                        while (preJava instanceof PreJavaTypeReference)
+                            preJava = preJava.type
                         // TODO the 'preJava.getSimpleName(null) == guessName(declaration.name)' is not 100% sufficient but should work most of the time...
                         if (preJava instanceof PreJavaTypeClassOrInterface && preJava.getSimpleName(null) == tsTools.guessName(declaration.name)) {
                             preJava.addConstructorSignature(this.convertSignature(null, constructorSignature, null))

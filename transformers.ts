@@ -45,10 +45,13 @@ export function applyTransformations(typeMap: TypescriptToJavaTypemap, renaming:
     changeDtoInterfacesIntoClasses(typeMap)
 
     console.log(`transforming types inheriting multiple implementations`)
-    arrangeMultipleImplementationInheritance(typeMap, 'Impl')
+    arrangeMultipleImplementationInheritance(typeMap, '', '_Interface')
 
     console.log(`add missing methods from interface hierarchy in classes`)
     addMethodsFromInterfaceHierarchy(typeMap)
+
+    console.log(`process JsFunctions`)
+    processJsFunctions(typeMap)
 
     console.log(`(todo) Array should be replaced by an externally provided type`)
 
@@ -476,7 +479,7 @@ export function changeDtoInterfacesIntoClasses(typeMap: TypescriptToJavaTypemap)
 
 
 
-export function arrangeMultipleImplementationInheritance(typeMap: TypescriptToJavaTypemap, implementationSuffix: string) {
+export function arrangeMultipleImplementationInheritance(typeMap: TypescriptToJavaTypemap, implementationSuffix: string, interfaceSuffix: string) {
     let maxPasses = 10
 
     while (maxPasses-- >= 0) {
@@ -519,6 +522,7 @@ export function arrangeMultipleImplementationInheritance(typeMap: TypescriptToJa
                     newType.typeParameters = superType.typeParameters && superType.typeParameters.slice()
                     newType.sourceTypes = superType.sourceTypes
 
+                    superType.name = superType.name + interfaceSuffix
                     superType.isClass = false
                     superType.constructorSignatures = null
                     superType.jsName = null
@@ -705,5 +709,44 @@ export function renameTypes(typeMap: TypescriptToJavaTypemap, renaming: { [key: 
                 }
             }
         })
+    }
+}
+
+function processJsFunctions(typeMap: TypescriptToJavaTypemap) {
+    while (true) {
+        let somethingChanged = false
+        for (let type of typeMap.typeSet()) {
+            Visit.visitPreJavaType(type, {
+                caseClassOrInterfaceType: type => {
+                    if (type.isFunctionalInterface)
+                        return
+
+                    if (!type.hasOnlyOneCallSignature())
+                        return
+
+                    if (type.baseTypes && type.baseTypes.size) {
+                        for (let baseType of type.baseTypes) {
+                            // TODO : by traversing references and typeEnv, we should build a Type env for method signatures
+                            while (baseType instanceof PreJavaTypeReference)
+                                baseType = baseType.type
+                            while (baseType instanceof PreJavaTypeTPEnvironnement)
+                                baseType = baseType.type
+                            if (!(baseType instanceof PreJavaTypeClassOrInterface))
+                                return
+                            if (!baseType.isFunctionalInterface)
+                                return
+                            if (Signature.getCallSignatureTypeErasedSignature(type.callSignatures[0]) != Signature.getCallSignatureTypeErasedSignature(baseType.callSignatures[0]))
+                                return
+                        }
+                    }
+
+                    type.isFunctionalInterface = true
+                    type.isClass = false
+                    somethingChanged = true
+                }
+            })
+        }
+        if (!somethingChanged)
+            break
     }
 }

@@ -247,16 +247,25 @@ export class ExportPhase {
 
         this.exportComments(type, flow, program)
 
-        let functionalInterface = typeTools.hasOnlyCallSignatures(type)
-        if (functionalInterface && type.callSignatures.length == 1) {
+        let functionalInterface = type.isFunctionalInterface// typeTools.hasOnlyCallSignatures(type)
+        if (functionalInterface /*&& type.callSignatures.length == 1*/) {
             // easy functional interface : @JsFunction
             javaWriter.importType(this.JS_FUNCTION)
+
+            if (type.isClassLike())
+                console.log(`kjhgjgh`)
 
             flow.push(`@JsFunction`).finishLine()
             flow.push(`public interface ${type.getSimpleName(null)}`)
 
             if (type.typeParameters && type.typeParameters.length)
                 flow.push(`<${type.typeParameters.map(tp => this.typeParameterString(tp, javaWriter)).join(', ')}>`)
+
+            if (type.baseTypes && type.baseTypes.size) {
+                let bts: PreJavaType[] = []
+                type.baseTypes.forEach(bt => bts.push(bt))
+                flow.push(` extends ${bts.map(bt => javaWriter.importTypeParametrized(bt)).join(', ')}`)
+            }
 
             flow.push(`{`)
             flow.finishLine()
