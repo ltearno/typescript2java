@@ -18,70 +18,79 @@ const MAX_NB_DEVELOPPED_METHODS = 5
 
 let currentIdAnonymousTypes = 1
 
+type Transformer = (
+    typeMap: TypescriptToJavaTypemap,
+    defaultPackageName: string,
+    renaming: { [key: string]: { [key: string]: string } })
+    => boolean
+
 export function applyTransformations(typeMap: TypescriptToJavaTypemap, renaming: { [key: string]: { [key: string]: string } }) {
     console.log(`removing unsupported types`)
-    removeNotSupportedTypes(typeMap)
 
-    console.log(`simplifying unions`)
-    simplifyUnions(typeMap)
+    let transformers = [
+        removeNotSupportedTypes,
+        simplifyUnions,
+        replaceByFunctionAndProcsLambdaTypes,
+        removeOverridingProperties,
+        deduplicateTypes,
+        removeEmptyTypes,
+        ensureAllTypesHaveNameAndPackage,
+        arrangeMultipleImplementationInheritance,
+        changeDtoInterfacesIntoClasses,
+        addMethodsFromInterfaceHierarchy,
+        processJsFunctions,
+        developMethodsWithUnionParameters,
+        renameTypes
+    ]
 
-    console.log(`replacing anonymous types`)
-    replaceByFunctionAndProcsLambdaTypes(typeMap)
+    let passCounter = 1
+    while (true) {
+        let somethingChanged = false
 
-    console.log(`removing OverridingProperties`)
-    removeOverridingProperties(typeMap)
+        console.log(`transformation, pass ${passCounter}\n`)
 
-    console.log(`reducing anonymous types`)
-    deduplicateTypes(typeMap)
-    removeEmptyTypes(typeMap)
+        for (let i = 0; i < transformers.length; i++) {
+            let result = transformers[i](typeMap, this.baseJavaPackage, renaming)
+            console.log(`transformer ${i} : ${result}`)
+            if (result)
+                somethingChanged = true
+        }
 
-    console.log(`unanonymising types`)
-    ensureAllTypesHaveNameAndPackage(typeMap, this.baseJavaPackage)
-
-    ///console.log(`removing duplicate overloads (with same type erasure)`)
-    ///removeDuplicateOverloads(typeMap)
-
-    console.log(`changing DTO interfaces into classes`)
-    changeDtoInterfacesIntoClasses(typeMap)
-
-    console.log(`transforming types inheriting multiple implementations`)
-    arrangeMultipleImplementationInheritance(typeMap, '', '_Interface')
-
-    console.log(`add missing methods from interface hierarchy in classes`)
-    addMethodsFromInterfaceHierarchy(typeMap)
-
-    console.log(`process JsFunctions`)
-    processJsFunctions(typeMap)
-
-    console.log(`(todo) Array should be replaced by an externally provided type`)
-
-    console.log(`developping methods with union parameters`)
-    developMethodsWithUnionParameters(typeMap)
-
-    if (renaming) {
-        console.log(`renaming types specified in configration`)
-        renameTypes(typeMap, renaming)
+        if (!somethingChanged)
+            break
+        passCounter++
+        if (passCounter > 10) {
+            console.log(`ERROR : too many transformation passes !`)
+            break
+        }
     }
 
-    //console.log(`renaming duplicate fqns`)
-    //checkNoDuplicateTypeNames(typeMap)
-
-    console.log(`checking constructors`)
-    ensureCorrectConstructors(typeMap)
+    console.log(`transformation applied`)
 }
 
-export function ensureAllTypesHaveNameAndPackage(typeMap: TypescriptToJavaTypemap, defaultPackageName: string) {
+export let ensureAllTypesHaveNameAndPackage: Transformer = function (typeMap: TypescriptToJavaTypemap, defaultPackageName: string) {
+    console.log(`unanonymising types`)
+
+    let somethingChanged = false
     for (let type of typeMap.typeSet()) {
         if (type instanceof PreJavaTypeClassOrInterface) {
-            if (type.getParametrizedSimpleName(null) == null)
+            if (type.getParametrizedSimpleName(null) == null) {
                 type.setSimpleName(`AnonymousType_${currentIdAnonymousTypes++}`)
+                somethingChanged = true
+            }
         }
-        if (defaultPackageName && !type.getPackageName())
+        if (defaultPackageName && !type.getPackageName()) {
             type.setPackageName(defaultPackageName)
+            somethingChanged = true
+        }
     }
+    return somethingChanged
 }
 
-export function removeOverridingProperties(typeMap: TypescriptToJavaTypemap) {
+export let removeOverridingProperties: Transformer = function (typeMap: TypescriptToJavaTypemap) {
+    console.log(`removing OverridingProperties`)
+
+    let somethingChanged = false
     let nextObjectId = 1
     let objectMap = new WeakMap<any, number>()
     function getObjectId(o) {
@@ -105,11 +114,15 @@ export function removeOverridingProperties(typeMap: TypescriptToJavaTypemap) {
             caseClassOrInterfaceType: type => {
                 if (type.properties && type.properties.length) {
                     let propertiesByName = new Map<string, PreJavaTypeProperty>()
+
                     type.properties.forEach(p => propertiesByName.set(p.name, p))
 
                     typeTools.browseTypeHierarchy(type, visitedType => {
-                        visitedType.properties && visitedType.properties
-                            .forEach(p => propertiesByName.delete(p.name))
+                        visitedType.properties && visitedType.properties.forEach(p => {
+                            propertiesByName.delete(p.name)
+                            somethingChanged = true
+                            console.log(`remove property ${p.name} from ${type.getParametrizedFullyQualifiedName(null)}`)
+                        })
                     })
 
                     type.properties = []
@@ -121,8 +134,12 @@ export function removeOverridingProperties(typeMap: TypescriptToJavaTypemap) {
                     type.methods.forEach(m => methodsByFootprint.set(Signature.getCallSignatureTypeErasedSignature(m), m))
 
                     typeTools.browseTypeHierarchy(type, visitedType => {
-                        visitedType.methods && visitedType.methods
-                            .forEach(m => methodsByFootprint.delete(Signature.getCallSignatureTypeErasedSignature(m)))
+                        visitedType.methods && visitedType.methods.forEach(m => {
+                            let sig = Signature.getCallSignatureTypeErasedSignature(m)
+                            methodsByFootprint.delete(sig)
+                            somethingChanged = true
+                            console.log(`remove method ${sig} from ${type.getParametrizedFullyQualifiedName(null)}`)
+                        })
                     })
 
                     type.methods = []
@@ -131,6 +148,7 @@ export function removeOverridingProperties(typeMap: TypescriptToJavaTypemap) {
             }
         })
     })
+    return somethingChanged
 }
 
 
@@ -204,13 +222,15 @@ function developMethodWithOptionalParameters(method: PreJavaTypeCallSignature): 
     return res.length ? res : null
 }
 
-export function developMethodsWithUnionParameters(typeMap: TypescriptToJavaTypemap) {
+export let developMethodsWithUnionParameters: Transformer = function (typeMap: TypescriptToJavaTypemap) {
+    console.log(`developping methods with union parameters`)
+
+    let somethingChanged = false
     let counter = 0
     for (let type of typeMap.typeSet()) {
         Visit.visitPreJavaType(type, {
             caseClassOrInterfaceType: type => {
-                let functionalInterface = typeTools.hasOnlyCallSignatures(type)
-                if (functionalInterface && type.callSignatures.length == 1)
+                if (type.isFunctionalInterface)
                     return
 
                 let methodsSignatures = new Set<string>()
@@ -221,6 +241,7 @@ export function developMethodsWithUnionParameters(typeMap: TypescriptToJavaTypem
                         return
                     methodsSignatures.add(sig)
                     type.methods.push(method)
+                    somethingChanged = true
                 }
 
                 type.methods && type.methods.forEach(m => {
@@ -238,6 +259,7 @@ export function developMethodsWithUnionParameters(typeMap: TypescriptToJavaTypem
         })
     }
     console.log(`added ${counter} developped methods`)
+    return somethingChanged
 }
 
 
@@ -245,7 +267,9 @@ export function developMethodsWithUnionParameters(typeMap: TypescriptToJavaTypem
 
 
 
-export function deduplicateTypes(typeMap: TypescriptToJavaTypemap) {
+export let deduplicateTypes: Transformer = function (typeMap: TypescriptToJavaTypemap) {
+    console.log(`deduplicating types`)
+
     let types = typeMap.typeSet()
 
     let typeDuplicates = new Map<string, PreJavaType[]>()
@@ -281,17 +305,17 @@ export function deduplicateTypes(typeMap: TypescriptToJavaTypemap) {
 
     console.log(`merging duplicate anonymous types`)
     typeDuplicates.forEach((list, footprint) => {
-        for (let i = 1; i < list.length; i++) {
-            //console.log(`${list[i].getSimpleName(null)} => ${list[0].getSimpleName(null)}`)
+        for (let i = 1; i < list.length; i++)
             replacements.set(list[i], list[0])
-        }
     })
-    typeMap.substituteType((type: PreJavaType): PreJavaType => replacements.get(type) || type)
+
+    return typeMap.substituteType((type: PreJavaType): PreJavaType => replacements.get(type) || type)
 }
 
-export function removeEmptyTypes(typeMap: TypescriptToJavaTypemap) {
+export let removeEmptyTypes: Transformer = function (typeMap: TypescriptToJavaTypemap) {
     console.log(`replacing empty classes by Object`)
-    typeMap.substituteType(type => {
+
+    return typeMap.substituteType(type => {
         return Visit.visitPreJavaType<PreJavaType>(type, {
             caseClassOrInterfaceType: type => {
                 if (type.callSignatures && type.callSignatures.length)
@@ -323,8 +347,9 @@ export function removeEmptyTypes(typeMap: TypescriptToJavaTypemap) {
 
 
 
-export function simplifyUnions(typeMap: TypescriptToJavaTypemap) {
-    typeMap.substituteType(type => Visit.visitPreJavaType(type, {
+export let simplifyUnions: Transformer = function (typeMap: TypescriptToJavaTypemap) {
+    console.log(`simplifying unions`)
+    return typeMap.substituteType(type => Visit.visitPreJavaType(type, {
         caseUnion: type => {
             if (!type.types || !type.types.length)
                 return BuiltIn.BUILTIN_TYPE_OBJECT
@@ -336,14 +361,24 @@ export function simplifyUnions(typeMap: TypescriptToJavaTypemap) {
     }))
 }
 
-export function removeNotSupportedTypes(typeMap: TypescriptToJavaTypemap) {
-    typeMap.substituteType((type) => type instanceof PreJavaTypeFakeType ? null : type)
-    typeMap.substituteType((type) => type.getSimpleName(null) == '?' ? BuiltIn.BUILTIN_TYPE_OBJECT : type)
-    typeMap.substituteType((type) => type.getSimpleName(null) == '' ? null : type)
+export let removeNotSupportedTypes: Transformer = function (typeMap: TypescriptToJavaTypemap) {
+    return typeMap.substituteType((type) => {
+        if (type instanceof PreJavaTypeFakeType)
+            return null
+        if (type.getSimpleName(null) == '?')
+            return BuiltIn.BUILTIN_TYPE_OBJECT
+        if (type.getSimpleName(null) == '')
+            return null
+
+        return type
+    })
 }
 
 // TODO : for classes : add methods from interface hierarchy which are not in the method list
-export function addMethodsFromInterfaceHierarchy(typeMap: TypescriptToJavaTypemap) {
+export let addMethodsFromInterfaceHierarchy: Transformer = function (typeMap: TypescriptToJavaTypemap) {
+    console.log(`add missing methods from interface hierarchy in classes`)
+
+    let somethingChanged = false
     for (let type of typeMap.typeSet()) {
         Visit.visitPreJavaType(type, {
             caseClassOrInterfaceType: type => {
@@ -365,13 +400,15 @@ export function addMethodsFromInterfaceHierarchy(typeMap: TypescriptToJavaTypema
                                     optional: p.optional,
                                     dotdotdot: p.dotdotdot
                                 }))
-                            method.addComments(`added from type hierarchy`)
+                            method.addComments(`added from type hierarchy (${visitedInterface.getFullyQualifiedName(null)})`)
 
                             // optimization of type.addMethod(method)
                             let sig = Signature.getCallSignatureTypeErasedSignature(method)
                             if (!methodsSignatures.has(sig)) {
                                 methodsSignatures.add(sig)
                                 type.methods.push(method)
+
+                                somethingChanged = true
                             }
                         })
 
@@ -380,7 +417,11 @@ export function addMethodsFromInterfaceHierarchy(typeMap: TypescriptToJavaTypema
                             // TODO For the moment, we just keep the super type class
                             let existingProperty = type.properties && type.properties.find(p => p.name == visitedProperty.name)
                             if (existingProperty) {
-                                existingProperty.type = typeVariableEnv ? new PreJavaTypeTPEnvironnement(visitedProperty.type, typeVariableEnv) : visitedProperty.type
+                                let newType = typeVariableEnv ? new PreJavaTypeTPEnvironnement(visitedProperty.type, typeVariableEnv) : visitedProperty.type
+                                if (newType.getParametrizedFullyQualifiedName(null) != existingProperty.type.getParametrizedFullyQualifiedName(null)) {
+                                    existingProperty.type = newType
+                                    somethingChanged = true
+                                }
                             }
                             else {
                                 let newProperty: PreJavaTypeProperty = {
@@ -391,6 +432,8 @@ export function addMethodsFromInterfaceHierarchy(typeMap: TypescriptToJavaTypema
                                 }
 
                                 type.addProperty(newProperty)
+
+                                somethingChanged = true
                             }
                         })
                     })
@@ -398,75 +441,15 @@ export function addMethodsFromInterfaceHierarchy(typeMap: TypescriptToJavaTypema
             }
         })
     }
+    return somethingChanged
 }
 
+export let changeDtoInterfacesIntoClasses: Transformer = function (typeMap: TypescriptToJavaTypemap) {
+    console.log(`changing DTO interfaces into classes`)
 
-
-export function removeDuplicateOverloads(typeMap: TypescriptToJavaTypemap) {
-    for (let type of typeMap.typeSet()) {
-        if (type instanceof PreJavaTypeClassOrInterface && type.methods && type.methods.length) {
-            let classOrInterface = type as PreJavaTypeClassOrInterface
-            // TODO in the process we loose type parameters information.
-            // TODO so when sometimes instead of removing a method, we should arrange type parameters according to the removed method
-            let methodsByNameAndParameters = groupBy(type.methods, method => method.name + '-' + (method.parameters ? method.parameters.map(p => p.type.getFullyQualifiedName(null)).join('-') : ''))
-            for (let methodGroup of methodsByNameAndParameters.values()) {
-                if (methodGroup.length < 2)
-                    continue
-
-                // only keep one, the most general return type
-                let minHierarchyDepth = 1000
-                for (let method of methodGroup) {
-                    let depth = method.returnType.getHierachyDepth()
-                    if (depth < minHierarchyDepth)
-                        minHierarchyDepth = depth
-                }
-
-                let minReturnTypeHierarchyDepthMethods: PreJavaTypeCallSignature[] = []
-                for (let method of methodGroup) {
-                    let returnType = method.returnType
-                    if (returnType.getHierachyDepth() == minHierarchyDepth)
-                        minReturnTypeHierarchyDepthMethods.push(method)
-                    else
-                        classOrInterface.removeMethod(method)
-                }
-
-                if (minReturnTypeHierarchyDepthMethods.length > 1) {
-                    // TODO let's keep the first one but we could fins something else, use Object, create a Union type, ...
-                    for (let i = 1; i < minReturnTypeHierarchyDepthMethods.length; i++)
-                        classOrInterface.removeMethod(minReturnTypeHierarchyDepthMethods[i])
-                }
-            }
-        }
-    }
-}
-
-function groupBy<K, V>(items: V[], keySelector: { (value: V): K }) {
-    let groups = new Map<K, V[]>()
-
-    items.forEach(item => {
-        let key = keySelector(item)
-        let signatures = groups.get(key)
-        if (signatures) {
-            signatures.push(item)
-        }
-        else {
-            signatures = [item]
-            groups.set(key, signatures)
-        }
-    })
-
-    return groups
-}
-
-
-
-
-
-
-export function changeDtoInterfacesIntoClasses(typeMap: TypescriptToJavaTypemap) {
     let nb = 0
     for (let type of typeMap.typeSet()) {
-        if (type instanceof PreJavaTypeClassOrInterface && (!type.isClass) && type.hasOnlyProperties() && !typeMap.hasSubType(type) && (!type.staticMethods || !type.staticMethods.length) && (!type.staticProperties || !type.staticProperties.length)) {
+        if (type instanceof PreJavaTypeClassOrInterface && (!type.isClass) && !type.isFunctionalInterface /*&& type.hasOnlyProperties()*/ && !typeMap.hasSubType(type) && (!type.staticMethods || !type.staticMethods.length) && (!type.staticProperties || !type.staticProperties.length)) {
             if (!type.comments)
                 type.comments = []
             type.comments.push(`*** changed to class to reflect the possible DTO use of this type ***`)
@@ -475,11 +458,17 @@ export function changeDtoInterfacesIntoClasses(typeMap: TypescriptToJavaTypemap)
         }
     }
     console.log(`${nb} DTO types converted to classes`)
+    return nb > 0
 }
 
 
 
-export function arrangeMultipleImplementationInheritance(typeMap: TypescriptToJavaTypemap, implementationSuffix: string, interfaceSuffix: string) {
+export let arrangeMultipleImplementationInheritance: Transformer = function (typeMap: TypescriptToJavaTypemap) {
+    console.log(`transforming types inheriting multiple implementations`)
+
+    const implementationSuffix = ''
+    const interfaceSuffix = '_Interface'
+
     let interfaceProxyCache = new Map<PreJavaType, PreJavaTypeClassOrInterface>()
     function createInterfaceProxyForClass(type: PreJavaTypeClassOrInterface) {
         if (interfaceProxyCache.has(type))
@@ -488,7 +477,6 @@ export function arrangeMultipleImplementationInheritance(typeMap: TypescriptToJa
         let newType = new PreJavaTypeClassOrInterface()
         newType.baseTypes = type.baseTypes
         newType.comments = type.comments && type.comments.slice()
-        newType.constructorSignatures = type.constructorSignatures
         newType.methods = type.methods && type.methods.slice()
         newType.callSignatures = type.callSignatures && type.callSignatures.slice()
         newType.name = type.name + interfaceSuffix
@@ -513,8 +501,8 @@ export function arrangeMultipleImplementationInheritance(typeMap: TypescriptToJa
 
     let maxPasses = 10
 
+    let somethingDone = false
     while (maxPasses-- >= 0) {
-        let somethingDone = false
         for (let type of typeMap.typeSet()) {
             if (type instanceof PreJavaTypeClassOrInterface && type.baseTypes && type.baseTypes.size) {
                 let implementationSuperTypes: PreJavaType[] = []
@@ -540,8 +528,19 @@ export function arrangeMultipleImplementationInheritance(typeMap: TypescriptToJa
                         continue
 
                     let newType = createInterfaceProxyForClass(superType)
+                    if (!newType.comments)
+                        newType.comments = []
+                    newType.comments.push(`created because of multiple implementation inheritance of ${type.getParametrizedFullyQualifiedName(null)}`)
+
+                    if (!type.comments)
+                        type.comments = []
+                    type.comments.push(`\noriginal implementationSuperTypes :`)
+                    implementationSuperTypes.forEach(st => (type as PreJavaTypeClassOrInterface).comments.push(`- ${st.getParametrizedFullyQualifiedName(null)}`))
+                    type.comments.push(`original super type ${originalSuperType.getParametrizedFullyQualifiedName(null)} has been replaced by ${newType.getParametrizedFullyQualifiedName(null)}`)
 
                     if (originalSuperType instanceof PreJavaTypeReference) {
+                        if (originalSuperType.type != superType)
+                            console.log(`god`)
                         originalSuperType.type = newType
                     }
                     else if (originalSuperType instanceof PreJavaTypeClassOrInterface) {
@@ -558,9 +557,10 @@ export function arrangeMultipleImplementationInheritance(typeMap: TypescriptToJa
         if (!somethingDone)
             break
     }
+    return somethingDone
 }
 
-export function checkNoDuplicateTypeNames(typeMap: TypescriptToJavaTypemap) {
+export let checkNoDuplicateTypeNames: Transformer = function (typeMap: TypescriptToJavaTypemap) {
     let typeFqnCache: Map<string, PreJavaType> = new Map()
     let hasDuplicate = false
     console.log(`duplicate types :`)
@@ -591,9 +591,12 @@ export function checkNoDuplicateTypeNames(typeMap: TypescriptToJavaTypemap) {
     }
     if (!hasDuplicate)
         console.log(`no duplicate found`)
+    return false
 }
 
-export function replaceByFunctionAndProcsLambdaTypes(typeMap: TypescriptToJavaTypemap) {
+export let replaceByFunctionAndProcsLambdaTypes: Transformer = function (typeMap: TypescriptToJavaTypemap) {
+    console.log(`replacing anonymous types`)
+
     let PARAMETER_NAMES = ['P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7', 'P8', 'P9', 'P10', 'P11', 'P12', 'P13']
     let NB_PARAMS = PARAMETER_NAMES.length
     let LAMBDAS: PreJavaTypeClassOrInterface[] = []
@@ -601,6 +604,7 @@ export function replaceByFunctionAndProcsLambdaTypes(typeMap: TypescriptToJavaTy
         let LAMBDA = new PreJavaTypeClassOrInterface()
         LAMBDA.setSimpleName(`Function${i ? i : ''}`)
         LAMBDA.setPackageName('fr.lteconsulting.prebuilt')
+        LAMBDA.isFunctionalInterface = true
         let typeParameters = []
         for (let j = 0; j < i; j++)
             typeParameters.push(new PreJavaTypeParameter(PARAMETER_NAMES[j]))
@@ -626,6 +630,7 @@ export function replaceByFunctionAndProcsLambdaTypes(typeMap: TypescriptToJavaTy
         let PROC = new PreJavaTypeClassOrInterface()
         PROC.setSimpleName(`Action${i ? i : ''}`)
         PROC.setPackageName('fr.lteconsulting.prebuilt')
+        PROC.isFunctionalInterface = true
         let typeParameters = []
         for (let j = 0; j < i; j++)
             typeParameters.push(new PreJavaTypeParameter(PARAMETER_NAMES[j]))
@@ -645,7 +650,7 @@ export function replaceByFunctionAndProcsLambdaTypes(typeMap: TypescriptToJavaTy
         PROCS.push(PROC)
     }
 
-    typeMap.substituteType(type => {
+    return typeMap.substituteType(type => {
         return Visit.visitPreJavaType(type, {
             caseReferenceType: type => {
                 // not really shure if there's no possibility of failure with that...
@@ -701,38 +706,39 @@ export function replaceByFunctionAndProcsLambdaTypes(typeMap: TypescriptToJavaTy
     })
 }
 
+export let renameTypes: Transformer = function (typeMap: TypescriptToJavaTypemap, baseJavaPackage: string, renaming: { [key: string]: { [key: string]: string } }) {
+    if (!renaming)
+        return false
 
-export function ensureCorrectConstructors(typeMap: TypescriptToJavaTypemap) {
-    for (let type of typeMap.typeSet()) {
-        Visit.visitPreJavaType(type, {
-            caseClassOrInterfaceType: type => {
-                if (!type.isClass)
-                    return
-            }
-        })
-    }
-}
+    console.log(`renaming types specified in configration`)
 
-export function renameTypes(typeMap: TypescriptToJavaTypemap, renaming: { [key: string]: { [key: string]: string } }) {
+    let somethingChanged = false
     for (let type of typeMap.typeSet()) {
         Visit.visitPreJavaType(type, {
             caseClassOrInterfaceType: type => {
                 if (type.packageName in renaming && type.name in renaming[type.packageName]) {
                     console.log(`renaming ${type.name} to ${renaming[type.packageName][type.name]}`)
                     type.name = renaming[type.packageName][type.name]
+                    somethingChanged = true
                 }
             },
             caseUnion: type => {
                 if (type.packageName in renaming && type.name in renaming[type.packageName]) {
                     console.log(`renaming ${type.name} to ${renaming[type.packageName][type.name]}`)
                     type.name = renaming[type.packageName][type.name]
+                    somethingChanged = true
                 }
             }
         })
     }
+
+    return somethingChanged
 }
 
-function processJsFunctions(typeMap: TypescriptToJavaTypemap) {
+let processJsFunctions: Transformer = function (typeMap: TypescriptToJavaTypemap) {
+    console.log(`process JsFunctions`)
+
+    let hasMadeChange = false
     while (true) {
         let somethingChanged = false
         for (let type of typeMap.typeSet()) {
@@ -768,5 +774,9 @@ function processJsFunctions(typeMap: TypescriptToJavaTypemap) {
         }
         if (!somethingChanged)
             break
+
+        hasMadeChange = true
     }
+
+    return hasMadeChange
 }

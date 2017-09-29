@@ -4,7 +4,7 @@ import * as BuiltIn from './builtin-types'
 import * as Visit from './prejavatypes/PreJavaTypeVisit'
 
 import { PreJavaType, TypeReplacer, ProcessContext } from './prejavatypes/PreJavaType'
-import { PreJavaTypeReference } from './prejavatypes/PreJavaTypeReference'
+import { PreJavaTypeReference, PreJavaTypeTPEnvironnement } from './prejavatypes/PreJavaTypeReference'
 import { PreJavaTypeUnion } from './prejavatypes/PreJavaTypeUnion'
 import { PreJavaTypeClassOrInterface } from './prejavatypes/PreJavaTypeClassOrInterface'
 import { PreJavaTypeTuple } from './prejavatypes/PreJavaTypeTuple'
@@ -54,11 +54,12 @@ export class TypescriptToJavaTypemap {
         this.typeMap.set(typeKey, type)
     }
 
-    substituteType(replacer: TypeReplacer) {
+    substituteType(replacer: TypeReplacer): boolean {
         let nbPassLeft = 10
+        let somethingChanged = false
         while (nbPassLeft-- >= 0) {
             let cache = new Map<PreJavaType, PreJavaType>()
-            let somethingChanged = false
+            somethingChanged = false
             for (let [typeKey, type] of this.typeMap.entries()) {
                 let substitute = type.substituteType(replacer, cache, new Set())
 
@@ -75,11 +76,30 @@ export class TypescriptToJavaTypemap {
 
         if (!nbPassLeft)
             console.log(`WARNING : substituteType did not manage to finish in 10 passes !`)
+
+        return somethingChanged
     }
 
     hasSubType(type: PreJavaType) {
-        for (let type of this.typeMap.values()) {
-            if (type instanceof PreJavaTypeClassOrInterface && type.baseTypes && type.baseTypes.has(type))
+        for (let visited of this.typeMap.values()) {
+            let hasTypeAsSuperType = Visit.visitPreJavaType(visited, {
+                caseClassOrInterfaceType: maybeSubType => {
+                    if (maybeSubType.baseTypes) {
+                        for (let superType of maybeSubType.baseTypes) {
+                            while (superType instanceof PreJavaTypeReference)
+                                superType = superType.type
+                            while (superType instanceof PreJavaTypeTPEnvironnement)
+                                superType = superType.type
+                            if (superType == type)
+                                return true
+                        }
+                    }
+                    return false
+                },
+                onOther: () => false
+            })
+
+            if (hasTypeAsSuperType)
                 return true
         }
 

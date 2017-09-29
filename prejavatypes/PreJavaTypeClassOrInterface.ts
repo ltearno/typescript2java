@@ -260,10 +260,11 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
         let declaration = symbol.valueDeclaration || (symbol.declarations && symbol.declarations.length && symbol.declarations[0])
         if (declaration) {
             let jsName = null
-            if (declaration.kind & ts.SyntaxKind.ClassDeclaration)
+            if (declaration.kind == ts.SyntaxKind.ClassDeclaration) {
                 jsName = tsTools.guessName((declaration as ts.ClassDeclaration).name)
+                this.isClass = true
+            }
 
-            let sourceFile = declaration.getSourceFile()
             this.setPackageName(context.getJavaPackage(symbol))
             this.setPrototypeName(context.getJsPackage(symbol), jsName)
         }
@@ -415,7 +416,7 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
             this.baseTypes = new Set()
             baseTypes.forEach(type => {
                 let sub = type.substituteType(replacer, cache, passThroughTypes)
-                if (sub)
+                if (sub && sub != BuiltIn.BUILTIN_TYPE_OBJECT)
                     this.baseTypes.add(sub)
             })
         }
@@ -573,7 +574,7 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
         this.jsNamespace = namespace
         this.jsName = name
 
-        this.isClass = true
+        //this.isClass = true
     }
 
     setTypeParameters(typeParameters: PreJavaTypeParameter[]) {
@@ -589,6 +590,9 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
     }
 
     addConstructorSignature(signature: PreJavaTypeCallSignature) {
+        this.isClass = true
+        if (!this.jsName) // TODO somethinig better
+            this.jsName = this.name
         this.addMethodInCollection(signature, this.constructorSignatures)
     }
 
@@ -607,19 +611,20 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
     cleanAndCheckMethods() {
     }
 
-    addMethod(method: PreJavaTypeCallSignature) {
-        this.addMethodInCollection(method, this.methods)
+    addMethod(method: PreJavaTypeCallSignature):boolean {
+        return this.addMethodInCollection(method, this.methods)
     }
 
-    addMethodInCollection(method: PreJavaTypeCallSignature, methods: PreJavaTypeCallSignature[]) {
+    addMethodInCollection(method: PreJavaTypeCallSignature, methods: PreJavaTypeCallSignature[]):boolean {
         if (!method || method.name == 'toString')
-            return
+            return false
 
         let sig = Signature.getCallSignatureTypeErasedSignature(method)
         if (methods.some(m => Signature.getCallSignatureTypeErasedSignature(m) == sig))
-            return
+            return false
 
         methods.push(method)
+        return true
     }
 
     addStaticProperty(property: PreJavaTypeProperty) {

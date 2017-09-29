@@ -796,7 +796,7 @@ export class ExportPhase {
 
         flow.blankLine()
         flow.push(`@JsOverlay`).finishLine()
-        flow.push(`public final void setByIndex(String index, ${this.formalParameterJavaString(parameter, javaWriter)}) {`).finishLine()
+        flow.push(`${isClass ? 'public final' : 'default'} void setByIndex(String index, ${this.formalParameterJavaString(parameter, javaWriter)}) {`).finishLine()
         flow.pushLineStart('    ')
         flow.push(`Js.asPropertyMap(this).set(index, value);`).finishLine()
         flow.pullLineStart()
@@ -809,7 +809,7 @@ export class ExportPhase {
 
         flow.blankLine()
         flow.push(`@JsOverlay`).finishLine()
-        flow.push(`public final ${javaWriter.importTypeParametrized(sit)} getByIndex(String index) {`).finishLine()
+        flow.push(`${isClass ? 'public final' : 'default'} ${javaWriter.importTypeParametrized(sit)} getByIndex(String index) {`).finishLine()
         flow.pushLineStart('    ')
         flow.push(`return (${javaWriter.importTypeParametrized(sit)}) Js.asPropertyMap(this).get(index);`).finishLine()
         flow.pullLineStart()
