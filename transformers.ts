@@ -63,9 +63,6 @@ export function applyTransformations(typeMap: TypescriptToJavaTypemap, renaming:
             console.log(`ERROR : too many transformation passes !`)
             break
         }
-
-        // TODO fix this : the algo is not stable when repeating the process loop, that's bad!
-        break
     }
 
     console.log(`transformation applied`)
@@ -596,12 +593,16 @@ export let checkNoDuplicateTypeNames: Transformer = function (typeMap: Typescrip
     return false
 }
 
-export let replaceByFunctionAndProcsLambdaTypes: Transformer = function (typeMap: TypescriptToJavaTypemap) {
-    console.log(`replacing anonymous types`)
+const PARAMETER_NAMES = ['P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7', 'P8', 'P9', 'P10', 'P11', 'P12', 'P13']
+const NB_PARAMS = PARAMETER_NAMES.length
+let LAMBDAS: PreJavaTypeClassOrInterface[]
+let PROCS: PreJavaTypeClassOrInterface[]
 
-    let PARAMETER_NAMES = ['P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7', 'P8', 'P9', 'P10', 'P11', 'P12', 'P13']
-    let NB_PARAMS = PARAMETER_NAMES.length
-    let LAMBDAS: PreJavaTypeClassOrInterface[] = []
+function ensureLambdasAndProcsCreated() {
+    if (LAMBDAS || PROCS)
+        return
+
+    LAMBDAS = []
     for (let i = 0; i < NB_PARAMS; i++) {
         let LAMBDA = new PreJavaTypeClassOrInterface()
         LAMBDA.setSimpleName(`Function${i ? i : ''}`)
@@ -627,7 +628,7 @@ export let replaceByFunctionAndProcsLambdaTypes: Transformer = function (typeMap
         LAMBDAS.push(LAMBDA)
     }
 
-    let PROCS: PreJavaTypeClassOrInterface[] = []
+    PROCS = []
     for (let i = 0; i < NB_PARAMS; i++) {
         let PROC = new PreJavaTypeClassOrInterface()
         PROC.setSimpleName(`Action${i ? i : ''}`)
@@ -651,6 +652,12 @@ export let replaceByFunctionAndProcsLambdaTypes: Transformer = function (typeMap
 
         PROCS.push(PROC)
     }
+}
+
+export let replaceByFunctionAndProcsLambdaTypes: Transformer = function (typeMap: TypescriptToJavaTypemap) {
+    console.log(`replacing anonymous types`)
+
+    ensureLambdasAndProcsCreated()
 
     return typeMap.substituteType(type => {
         return Visit.visitPreJavaType(type, {

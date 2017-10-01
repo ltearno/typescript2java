@@ -13,6 +13,9 @@ export class PreJavaTypeCallSignature {
     comments: string[]
 
     constructor(
+        //       public isStatic: boolean,
+        //        public jsMethodName: string,
+        //public jsPropertyName: string,
         public typeParameters: PreJavaTypeParameter[],
         public returnType: PreJavaType,
         public name: string,
