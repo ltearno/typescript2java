@@ -1,6 +1,7 @@
 import * as ts from "typescript"
 import { PreJavaType, ProcessContext, TypeReplacer } from './PreJavaType'
 import { PreJavaTypeParameter } from './PreJavaTypeParameter'
+
 export interface PreJavaTypeFormalParameter {
     name: string
     type: PreJavaType
@@ -9,26 +10,22 @@ export interface PreJavaTypeFormalParameter {
 }
 
 export class PreJavaTypeCallSignature {
-    typeParameters: PreJavaTypeParameter[]
-    returnType: PreJavaType
-    name: string
-    parameters: PreJavaTypeFormalParameter[]
     comments: string[]
 
-    constructor(typeParameters: PreJavaTypeParameter[], returnType: PreJavaType, name: string, parameters: PreJavaTypeFormalParameter[]) {
-        this.typeParameters = typeParameters
-        this.returnType = returnType
-        this.name = name
-        this.parameters = parameters
+    constructor(
+        public typeParameters: PreJavaTypeParameter[],
+        public returnType: PreJavaType,
+        public name: string,
+        public parameters: PreJavaTypeFormalParameter[]) {
     }
 
     addComments(comments: string[] | string) {
         if (!this.comments)
             this.comments = []
-        if (typeof comments === 'string')
-            this.comments.push(comments)
-        else
+        if (Array.isArray(comments))
             comments && comments.forEach(c => this.comments.push(c))
+        else if (typeof comments === 'string')
+            this.comments.push(comments)
     }
 
     serializeSignature(defaultName: string = null) {
