@@ -193,7 +193,7 @@ function developMethodWithUnionParameters(method: PreJavaTypeCallSignature, nbMe
     }
 
     do {
-        let dup = new PreJavaTypeCallSignature(method.typeParameters, method.returnType, method.name, method.parameters.map((parameter, index) => {
+        let dup = new PreJavaTypeCallSignature(method.jsMethodName, method.jsPropertyName, method.typeParameters, method.returnType, method.name, method.parameters.map((parameter, index) => {
             return {
                 name: parameter.name,
                 type: possibleParams[index][counter[index]],
@@ -215,7 +215,7 @@ function developMethodWithOptionalParameters(method: PreJavaTypeCallSignature): 
 
     for (let i = method.parameters.length - 1; i >= 0; i--) {
         if (method.parameters[i].optional || method.parameters[i].dotdotdot) {
-            res.push(new PreJavaTypeCallSignature(method.typeParameters, method.returnType, method.name, method.parameters.slice(0, i)))
+            res.push(new PreJavaTypeCallSignature(method.jsMethodName, method.jsPropertyName, method.typeParameters, method.returnType, method.name, method.parameters.slice(0, i)))
         }
     }
 
@@ -384,7 +384,7 @@ export let addMethodsFromInterfaceHierarchy: Transformer = function (typeMap: Ty
                     type.methods && type.methods.forEach(m => methodsSignatures.set(Signature.getCallSignatureTypeErasedSignature(m), { isImplemented: true, method: m }))
 
                     function translateMethod(visitedMethod: PreJavaTypeCallSignature, visitedType: PreJavaType, typeVariableEnv: TypeEnvironment) {
-                        let method = new PreJavaTypeCallSignature(visitedMethod.typeParameters, visitedMethod.returnType, visitedMethod.name, visitedMethod.parameters)
+                        let method = new PreJavaTypeCallSignature(visitedMethod.jsMethodName, visitedMethod.jsPropertyName, visitedMethod.typeParameters, visitedMethod.returnType, visitedMethod.name, visitedMethod.parameters)
                         method.returnType = typeVariableEnv ? new PreJavaTypeTPEnvironnement(visitedMethod.returnType, typeVariableEnv) : visitedMethod.returnType
                         if (method.parameters)
                             method.parameters = method.parameters.map(p => ({
@@ -637,7 +637,7 @@ function ensureLambdasAndProcsCreated() {
                 type: typeParameters[j],
                 name: `p${j + 1}`
             })
-        let method = new PreJavaTypeCallSignature(null, typeParameters[i], null, parameters)
+        let method = new PreJavaTypeCallSignature(null, null, null, typeParameters[i], null, parameters)
         LAMBDA.callSignatures.push(method)
 
         LAMBDAS.push(LAMBDA)
@@ -662,7 +662,7 @@ function ensureLambdasAndProcsCreated() {
                 type: typeParameters[j],
                 name: `p${j + 1}`
             })
-        let method = new PreJavaTypeCallSignature(null, BuiltIn.BUILTIN_TYPE_UNIT, null, parameters)
+        let method = new PreJavaTypeCallSignature(null, null, null, BuiltIn.BUILTIN_TYPE_UNIT, null, parameters)
         PROC.callSignatures.push(method)
 
         PROCS.push(PROC)

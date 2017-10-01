@@ -143,6 +143,8 @@ export class TypescriptToJavaTypemap {
         let returnType = this.getOrCreatePreJavaTypeForTsType(signatureReturnType, true, typeParametersToApplyToAnonymousTypes)
 
         let result = new PreJavaTypeCallSignature(
+            name,
+            null,
             signatureTypeParameters,
             returnType,
             name,

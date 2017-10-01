@@ -507,8 +507,8 @@ export class ExportPhase {
 
                         let getterName = `get${upcaseName}`
                         let setterName = `set${upcaseName}`
-                        let getterSig = Signature.getCallSignatureTypeErasedSignature(new PreJavaTypeCallSignature(null, property.type, getterName, null))
-                        let setterSig = Signature.getCallSignatureTypeErasedSignature(new PreJavaTypeCallSignature(null, BuiltIn.BUILTIN_TYPE_UNIT, setterName, [{
+                        let getterSig = Signature.getCallSignatureTypeErasedSignature(new PreJavaTypeCallSignature(null, property.name, null, property.type, getterName, null))
+                        let setterSig = Signature.getCallSignatureTypeErasedSignature(new PreJavaTypeCallSignature(null, property.name, null, BuiltIn.BUILTIN_TYPE_UNIT, setterName, [{
                             dotdotdot: false,
                             optional: false,
                             type: property.type,
