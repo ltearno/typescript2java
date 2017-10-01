@@ -402,7 +402,10 @@ function browseAllTypesWithTopLevelFirst(typeMap: TypescriptToJavaTypemap, visit
     }
 }
 
-function translateMethodWithTypeEnvironment(visitedMethod: PreJavaTypeCallSignature, visitedType: PreJavaType, typeVariableEnv: TypeEnvironment) {
+function translateMethodWithTypeEnvironment(visitedMethod: PreJavaTypeCallSignature, typeVariableEnv: TypeEnvironment) {
+    if (!typeVariableEnv)
+        return visitedMethod
+
     let method = new PreJavaTypeCallSignature(visitedMethod.jsMethodName, visitedMethod.jsPropertyName, visitedMethod.typeParameters, visitedMethod.returnType, visitedMethod.name, visitedMethod.parameters)
     method.returnType = typeVariableEnv ? new PreJavaTypeTPEnvironnement(visitedMethod.returnType, typeVariableEnv) : visitedMethod.returnType
     if (method.parameters)
@@ -413,17 +416,85 @@ function translateMethodWithTypeEnvironment(visitedMethod: PreJavaTypeCallSignat
             dotdotdot: p.dotdotdot
         }))
 
-    method.addComments(`inherited from (${visitedType.getFullyQualifiedName(null)})`)
-
     return method
+}
+
+class SignatureCache {
+    private cache = new WeakMap<PreJavaTypeCallSignature, string>()
+
+    remove(method: PreJavaTypeCallSignature) {
+        this.cache.delete(method)
+    }
+
+    get(method: PreJavaTypeCallSignature) {
+        if (this.cache.has(method))
+            return this.cache.get(method)
+
+        let result = Signature.getCallSignatureTypeErasedSignature(method)
+        this.cache.set(method, result)
+        return result
+    }
+}
+
+function isSubTypeOf(type: PreJavaType, maybeSuperType: PreJavaType): boolean {
+    //console.log(`${type.getFullyQualifiedName(null)} ${maybeSuperType.getFullyQualifiedName(null)}`)
+    if (!maybeSuperType || maybeSuperType == BuiltIn.BUILTIN_TYPE_OBJECT)
+        return true
+
+    if (type.getFullyQualifiedName(null) == maybeSuperType.getFullyQualifiedName(null))
+        return true
+
+    let baseTypes = Visit.visitPreJavaType<Set<PreJavaType>>(type, {
+        caseClassOrInterfaceType: type => type.baseTypes,
+        caseUnion: type => type.baseTypes,
+        onOther: () => null
+    })
+
+    if (!baseTypes)
+        return false
+
+    for (let baseType of baseTypes) {
+        if (isSubTypeOf(baseType, maybeSuperType))
+            return true
+    }
+
+    return false
 }
 
 export let adjustOverringMethodsReturnType: Transformer = function (typeMap: TypescriptToJavaTypemap) {
     console.log(`adjusting overriding methods return type`)
 
+    let sigCache = new SignatureCache()
+
     let somethingChanged = false
 
     browseAllTypesWithTopLevelFirst(typeMap, {
+        caseClassOrInterfaceType: type => {
+            // for all methods in here, check that return type is at least narrower than overriden methods
+            // si le type de la méthode ici n'est pas un sous type du retour de la super-méthode, on remplace par le type de la super méthode
+            let methodsSignaturesToCheck = new Map<string, PreJavaTypeCallSignature>()
+            type.methods && type.methods.forEach(m => methodsSignaturesToCheck.set(sigCache.get(m), m))
+
+            typeTools.browseTypeHierarchy(type, (visitedType, typeVariableEnv) => {
+                visitedType.methods && visitedType.methods.forEach(visitedMethod => {
+                    visitedMethod = translateMethodWithTypeEnvironment(visitedMethod, typeVariableEnv)
+                    let visitedMethodSignature = sigCache.get(visitedMethod)
+
+                    if (methodsSignaturesToCheck.has(visitedMethodSignature)) {
+                        // no more check to do
+                        let typeMethod = methodsSignaturesToCheck.get(visitedMethodSignature)
+                        methodsSignaturesToCheck.delete(visitedMethodSignature)
+
+                        if (!isSubTypeOf(typeMethod.returnType, visitedMethod.returnType)) {
+                            console.log(`changing return type of method ${typeMethod.name} in type ${type.getFullyQualifiedName(null)}`)
+                            typeMethod.addComments(`return type changed to ${visitedMethod.returnType.getFullyQualifiedName(null)} because overriding the one in ${visitedType.getFullyQualifiedName(null)}`)
+                            typeMethod.returnType = visitedMethod.returnType
+                            somethingChanged = true
+                        }
+                    }
+                })
+            })
+        }
     })
 
     return somethingChanged
@@ -444,11 +515,11 @@ export let addMethodsFromInterfaceHierarchy: Transformer = function (typeMap: Ty
             // register type methods as implemented
             type.methods && type.methods.forEach(m => methodsSignatures.set(Signature.getCallSignatureTypeErasedSignature(m), { isImplemented: true, method: m }))
 
-            // browse type hierarchy and account for non implmeented (abstract) methods
+            // browse type hierarchy and account for non implemented (abstract) methods
             typeTools.browseTypeHierarchy(type, (visitedType, typeVariableEnv) => {
                 if (visitedType.isClassLike()) {
                     visitedType.methods && visitedType.methods.forEach(visitedMethod => {
-                        let method = translateMethodWithTypeEnvironment(visitedMethod, visitedType, typeVariableEnv)
+                        let method = translateMethodWithTypeEnvironment(visitedMethod, typeVariableEnv)
                         let sig = Signature.getCallSignatureTypeErasedSignature(method)
                         if (!methodsSignatures.has(sig))
                             methodsSignatures.set(sig, { isImplemented: true, method: method })
@@ -458,9 +529,10 @@ export let addMethodsFromInterfaceHierarchy: Transformer = function (typeMap: Ty
                 }
                 else {
                     visitedType.methods && visitedType.methods.forEach(visitedMethod => {
-                        let method = translateMethodWithTypeEnvironment(visitedMethod, visitedType, typeVariableEnv)
+                        let method = translateMethodWithTypeEnvironment(visitedMethod, typeVariableEnv)
                         let sig = Signature.getCallSignatureTypeErasedSignature(method)
                         if (!methodsSignatures.has(sig)) {
+                            method.addComments(`inherited from (${visitedType.getFullyQualifiedName(null)})`)
                             methodsSignatures.set(sig, { isImplemented: false, method: method })
                         }
                     })
