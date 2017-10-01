@@ -379,91 +379,116 @@ export let simplifyUnions: Transformer = function (typeMap: TypescriptToJavaType
     }))
 }
 
+function browseAllTypesWithTopLevelFirst(typeMap: TypescriptToJavaTypemap, processor: { (type: PreJavaType) }) {
+    let processedTypes = new Set()
+
+    function processType(type: PreJavaType) {
+        if (processedTypes.has(type))
+            return
+
+        Visit.visitPreJavaType(type, {
+            caseClassOrInterfaceType: type => type.baseTypes && type.baseTypes.forEach(bt => processType(bt)),
+            caseUnion: type => type.baseTypes && type.baseTypes.forEach(bt => processType(bt))
+        })
+
+        processor(type)
+
+        processedTypes.add(type)
+    }
+
+    for (let type of typeMap.typeSet()) {
+        processType(type)
+    }
+}
+
 export let addMethodsFromInterfaceHierarchy: Transformer = function (typeMap: TypescriptToJavaTypemap) {
     console.log(`add missing methods from interface hierarchy in classes`)
 
+    function translateMethod(visitedMethod: PreJavaTypeCallSignature, visitedType: PreJavaType, typeVariableEnv: TypeEnvironment) {
+        let method = new PreJavaTypeCallSignature(visitedMethod.jsMethodName, visitedMethod.jsPropertyName, visitedMethod.typeParameters, visitedMethod.returnType, visitedMethod.name, visitedMethod.parameters)
+        method.returnType = typeVariableEnv ? new PreJavaTypeTPEnvironnement(visitedMethod.returnType, typeVariableEnv) : visitedMethod.returnType
+        if (method.parameters)
+            method.parameters = method.parameters.map(p => ({
+                name: p.name,
+                type: typeVariableEnv ? new PreJavaTypeTPEnvironnement(p.type, typeVariableEnv) : p.type,
+                optional: p.optional,
+                dotdotdot: p.dotdotdot
+            }))
+        method.addComments(`inherited from (${visitedType.getFullyQualifiedName(null)})`)
+        return method
+    }
+
     let somethingChanged = false
-    for (let type of typeMap.typeSet()) {
+
+    browseAllTypesWithTopLevelFirst(typeMap, type => {
         Visit.visitPreJavaType(type, {
             caseClassOrInterfaceType: type => {
-                if (type.isClassLike()) {
-                    let methodsSignatures = new Map<string, { isImplemented: boolean; method: PreJavaTypeCallSignature }>()
+                if (!type.isClassLike())
+                    return
 
-                    // register type methods as implemented
-                    type.methods && type.methods.forEach(m => methodsSignatures.set(Signature.getCallSignatureTypeErasedSignature(m), { isImplemented: true, method: m }))
+                let methodsSignatures = new Map<string, { isImplemented: boolean; method: PreJavaTypeCallSignature; }>()
 
-                    function translateMethod(visitedMethod: PreJavaTypeCallSignature, visitedType: PreJavaType, typeVariableEnv: TypeEnvironment) {
-                        let method = new PreJavaTypeCallSignature(visitedMethod.jsMethodName, visitedMethod.jsPropertyName, visitedMethod.typeParameters, visitedMethod.returnType, visitedMethod.name, visitedMethod.parameters)
-                        method.returnType = typeVariableEnv ? new PreJavaTypeTPEnvironnement(visitedMethod.returnType, typeVariableEnv) : visitedMethod.returnType
-                        if (method.parameters)
-                            method.parameters = method.parameters.map(p => ({
-                                name: p.name,
-                                type: typeVariableEnv ? new PreJavaTypeTPEnvironnement(p.type, typeVariableEnv) : p.type,
-                                optional: p.optional,
-                                dotdotdot: p.dotdotdot
-                            }))
-                        method.addComments(`inherited from (${visitedType.getFullyQualifiedName(null)})`)
-                        return method
+                // register type methods as implemented
+                type.methods && type.methods.forEach(m => methodsSignatures.set(Signature.getCallSignatureTypeErasedSignature(m), { isImplemented: true, method: m }))
+
+                // browse type hierarchy and account for non implmeented (abstract) methods
+                typeTools.browseTypeHierarchy(type, (visitedType, typeVariableEnv) => {
+                    if (visitedType.isClassLike()) {
+                        visitedType.methods && visitedType.methods.forEach(visitedMethod => {
+                            let method = translateMethod(visitedMethod, visitedType, typeVariableEnv)
+                            let sig = Signature.getCallSignatureTypeErasedSignature(method)
+                            if (!methodsSignatures.has(sig))
+                                methodsSignatures.set(sig, { isImplemented: true, method: method })
+                            else
+                                methodsSignatures.get(sig).isImplemented = true
+                        })
                     }
+                    else {
+                        visitedType.methods && visitedType.methods.forEach(visitedMethod => {
+                            let method = translateMethod(visitedMethod, visitedType, typeVariableEnv)
+                            let sig = Signature.getCallSignatureTypeErasedSignature(method)
+                            if (!methodsSignatures.has(sig)) {
+                                methodsSignatures.set(sig, { isImplemented: false, method: method })
+                            }
+                        })
 
-                    // browse type hierarchy and account for non implmeented (abstract) methods
-                    typeTools.browseTypeHierarchy(type, (visitedType, typeVariableEnv) => {
-                        if (visitedType.isClassLike()) {
-                            visitedType.methods && visitedType.methods.forEach(visitedMethod => {
-                                let method = translateMethod(visitedMethod, visitedType, typeVariableEnv)
-                                let sig = Signature.getCallSignatureTypeErasedSignature(method)
-                                if (!methodsSignatures.has(sig))
-                                    methodsSignatures.set(sig, { isImplemented: true, method: method })
-                                else
-                                    methodsSignatures.get(sig).isImplemented = true
-                            })
-                        }
-                        else {
-                            visitedType.methods && visitedType.methods.forEach(visitedMethod => {
-                                let method = translateMethod(visitedMethod, visitedType, typeVariableEnv)
-                                let sig = Signature.getCallSignatureTypeErasedSignature(method)
-                                if (!methodsSignatures.has(sig)) {
-                                    methodsSignatures.set(sig, { isImplemented: false, method: method })
-                                }
-                            })
-
-                            visitedType.properties && visitedType.properties.forEach(visitedProperty => {
-                                let existingProperty = type.properties && type.properties.find(p => p.name == visitedProperty.name)
-                                if (existingProperty) {
-                                    // TODO minimal management of property redefinitions : should allow the type to be tightened and not widened
-                                    // TODO For the moment, we just keep the super type class
-                                    let newType = typeVariableEnv ? new PreJavaTypeTPEnvironnement(visitedProperty.type, typeVariableEnv) : visitedProperty.type
-                                    if (newType.getParametrizedFullyQualifiedName(null) != existingProperty.type.getParametrizedFullyQualifiedName(null)) {
-                                        existingProperty.type = newType
-                                        somethingChanged = true
-                                    }
-                                }
-                                else {
-                                    let newProperty: PreJavaTypeProperty = {
-                                        name: visitedProperty.name,
-                                        type: typeVariableEnv ? new PreJavaTypeTPEnvironnement(visitedProperty.type, typeVariableEnv) : visitedProperty.type,
-                                        writable: visitedProperty.writable,
-                                        comments: visitedProperty.comments
-                                    }
-
-                                    type.addProperty(newProperty)
-
+                        visitedType.properties && visitedType.properties.forEach(visitedProperty => {
+                            let existingProperty = type.properties && type.properties.find(p => p.name == visitedProperty.name)
+                            if (existingProperty) {
+                                // TODO minimal management of property redefinitions : should allow the type to be tightened and not widened
+                                // TODO For the moment, we just keep the super type class
+                                let newType = typeVariableEnv ? new PreJavaTypeTPEnvironnement(visitedProperty.type, typeVariableEnv) : visitedProperty.type
+                                if (newType.getParametrizedFullyQualifiedName(null) != existingProperty.type.getParametrizedFullyQualifiedName(null)) {
+                                    existingProperty.type = newType
                                     somethingChanged = true
                                 }
-                            })
-                        }
-                    })
+                            }
+                            else {
+                                let newProperty: PreJavaTypeProperty = {
+                                    name: visitedProperty.name,
+                                    type: typeVariableEnv ? new PreJavaTypeTPEnvironnement(visitedProperty.type, typeVariableEnv) : visitedProperty.type,
+                                    writable: visitedProperty.writable,
+                                    comments: visitedProperty.comments
+                                }
 
-                    for (let info of methodsSignatures.values()) {
-                        if (!info.isImplemented) {
-                            type.methods.push(info.method)
-                            somethingChanged = true
-                        }
+                                type.addProperty(newProperty)
+
+                                somethingChanged = true
+                            }
+                        })
+                    }
+                })
+
+                for (let info of methodsSignatures.values()) {
+                    if (!info.isImplemented) {
+                        type.methods.push(info.method)
+                        somethingChanged = true
                     }
                 }
             }
         })
-    }
+    })
+
     return somethingChanged
 }
 

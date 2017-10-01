@@ -502,7 +502,7 @@ export class ExportPhase {
                         return sa > sb ? 1 : -1
                     })
                     .forEach(method => {
-                        if (method.name.indexOf('@') >= 0) {
+                        if ((method.jsMethodName && method.jsMethodName.indexOf('@') >= 0) || (method.jsPropertyName && method.jsPropertyName.indexOf('@') >= 0)) {
                             flow.push(`// skipped method ${method.name}`).blankLine().blankLine()
                             return
                         }

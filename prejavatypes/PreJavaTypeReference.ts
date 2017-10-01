@@ -62,6 +62,8 @@ export class PreJavaTypeReference extends PreJavaType {
         public type: PreJavaType,
         public typeParameters: PreJavaType[]) {
         super()
+
+        // TODO check that it's a type with free type parameters : Class or Union...
     }
 
     processSourceType(type: ts.Type, typeParametersToApplyToAnonymousTypes: PreJavaTypeParameter[], context: ProcessContext) {
