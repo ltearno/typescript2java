@@ -63,6 +63,9 @@ export function applyTransformations(typeMap: TypescriptToJavaTypemap, renaming:
             console.log(`ERROR : too many transformation passes !`)
             break
         }
+
+        // TODO fix this : the algo is not stable when repeating the process loop, that's bad!
+        break
     }
 
     console.log(`transformation applied`)
