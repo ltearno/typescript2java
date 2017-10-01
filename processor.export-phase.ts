@@ -23,29 +23,6 @@ import { PreJavaTypeCallSignature, PreJavaTypeFormalParameter } from './prejavat
 
 export class ExportPhase {
     private exportedFqns = new Set<string>()
-    private reservedWords: { [key: string]: string } = {
-        '_': '_underscore_',
-        'public': '_public_',
-        'protected': 'protected_',
-        'private': 'private_',
-        'do': 'do_',
-        'switch': 'switch_',
-        'char': 'char_',
-        'class': 'class_',
-        'extends': 'extends_',
-        'return': 'return_',
-        'throw': 'throw_',
-        'catch': 'catch_',
-        'finally': 'finally_',
-        'import': 'import_',
-        'assert': 'assert_',
-        'default': 'default_',
-        'continue': 'continue_',
-        'for': 'for_',
-        'notify': 'notify_',
-
-        'className': 'cssClassName'
-    }
 
     JS_TYPE = new PreJavaTypeBuiltinJavaType('jsinterop.annotations', 'JsType')
     JS_OVERLAY = new PreJavaTypeBuiltinJavaType('jsinterop.annotations', 'JsOverlay')
@@ -422,7 +399,7 @@ export class ExportPhase {
                             flow.endJavaDocComments()
                         }
 
-                        let escapedPropertyName = this.escapePropertyName(property.name)
+                        let escapedPropertyName = typeTools.escapePropertyName(property.name)
                         let propertyNamespace = type.jsNamespace ? (type.jsNamespace + '.' + type.jsName) : type.jsName
                         if (!propertyNamespace)
                             javaWriter.importType(this.JS_PACKAGE)
@@ -469,7 +446,7 @@ export class ExportPhase {
                     })
             }
 
-            if (type.properties && type.properties.length) {
+            if (isClass && type.properties && type.properties.length) {
                 javaWriter.importType(this.JS_PROPERTY)
 
                 flow.blankLine()
@@ -492,60 +469,14 @@ export class ExportPhase {
                             flow.endJavaDocComments()
                         }
 
-                        let escapedPropertyName = this.escapePropertyName(property.name)
+                        let escapedPropertyName = typeTools.escapePropertyName(property.name)
 
-                        if (isClass) {
-                            if (escapedPropertyName != property.name)
-                                flow.push(`@JsProperty(name="${property.name}")`).finishLine()
+                        if (escapedPropertyName != property.name)
+                            flow.push(`@JsProperty(name="${property.name}")`).finishLine()
 
-                            flow.push(`public ${javaWriter.importTypeParametrized(property.type)} ${escapedPropertyName};`).finishLine()
-
-                            flow.blankLine()
-                        }
-
-                        let upcaseName = escapedPropertyName.slice(0, 1).toLocaleUpperCase() + escapedPropertyName.slice(1)
-
-                        let getterName = `get${upcaseName}`
-                        let setterName = `set${upcaseName}`
-                        let getterSig = Signature.getCallSignatureTypeErasedSignature(new PreJavaTypeCallSignature(null, property.name, null, property.type, getterName, null))
-                        let setterSig = Signature.getCallSignatureTypeErasedSignature(new PreJavaTypeCallSignature(null, property.name, null, BuiltIn.BUILTIN_TYPE_UNIT, setterName, [{
-                            dotdotdot: false,
-                            optional: false,
-                            type: property.type,
-                            name: setterName
-                        }]))
-                        //if (type.methods.some(m => m.name == getterName || m.name == setterName)) {
-                        if (type.methods.some(m => {
-                            let mSig = Signature.getCallSignatureTypeErasedSignature(m)
-                            return mSig == getterSig || mSig == setterSig
-                        })) {
-                            getterName = getterName + '__'
-                            setterName = setterName + '__'
-                        }
-
-                        flow.push(`@JsProperty( name = "${property.name}")`).finishLine()
-                        flow.push(`${isClass ? 'public native ' : ''}${javaWriter.importTypeParametrized(property.type)} ${getterName}();`).finishLine()
+                        flow.push(`public ${javaWriter.importTypeParametrized(property.type)} ${escapedPropertyName};`).finishLine()
 
                         flow.blankLine()
-                        flow.push(`@JsProperty( name = "${property.name}")`).finishLine()
-                        flow.push(`${isClass ? 'public native ' : ''}void ${setterName}( ${javaWriter.importTypeParametrized(property.type)} value );`).finishLine()
-
-                        let unionedTypes = typeTools.getUnionedTypes(property.type)
-                        unionedTypes && unionedTypes.forEach(unionedType => {
-                            flow.blankLine()
-                            if (isClass) {
-                                javaWriter.importType(this.JS_OVERLAY)
-                                flow.push(`@JsOverlay`).finishLine()
-                                flow.push('public final ')
-                            }
-                            else {
-                                flow.push('default ')
-                            }
-
-                            flow.push(`void ${setterName}( ${javaWriter.importTypeParametrized(unionedType)} value ) `)
-                                .push(`{ ${setterName}(${javaWriter.importType(property.type)}.of${unionedType.getHumanizedName(null)}( value )); }`)
-                                .finishLine()
-                        })
                     })
             }
 
@@ -598,7 +529,7 @@ export class ExportPhase {
 
     private getMethodRemovingSignature(method: PreJavaTypeCallSignature, isStatic: boolean) {
         //"static Array of(T)"
-        return `${isStatic ? 'static ' : ''}${method.returnType.getSimpleName(null)} ${method.name}(${method.parameters.map(p => p.type.getSimpleName(null)).join(',')})`
+        return `${isStatic ? 'static ' : ''}${method.returnType.getSimpleName(null)} ${method.name}(${method.parameters ? method.parameters.map(p => p.type.getSimpleName(null)).join(',') : ''})`
     }
 
     private mabeAddCustomizedCode(packageName: string, name: string, adding: { [key: string]: { [key: string]: string } }, flow: TextFlow) {
@@ -636,26 +567,6 @@ export class ExportPhase {
 
         let fileName = path.join(fileDirectory, `${type.getSimpleName(null)}.java`)
         fs.writeFileSync(fileName, content, 'utf8')
-    }
-
-    private escapePropertyName(symbolName: string) {
-        if (symbolName.indexOf('@') >= 0)
-            symbolName = symbolName.replace(new RegExp('@', 'g'), '_at_')
-        if (symbolName.indexOf('-') >= 0)
-            symbolName = symbolName.replace(new RegExp('-', 'g'), '_dash_')
-        if (symbolName.indexOf('[') >= 0)
-            symbolName = symbolName.replace(new RegExp('\\[', 'g'), '_open_bracket_')
-        if (symbolName.indexOf(']') >= 0)
-            symbolName = symbolName.replace(new RegExp('\\]', 'g'), '_close_bracket_')
-        if (symbolName.indexOf('.') >= 0)
-            symbolName = symbolName.replace(new RegExp('\\.', 'g'), '_dot_')
-        if (symbolName in this.reservedWords && typeof this.reservedWords[symbolName] === 'string')
-            return this.reservedWords[symbolName]
-        return symbolName
-    }
-
-    private escapeMethodName(symbolName: string) {
-        return this.escapePropertyName(symbolName)
     }
 
     /**
@@ -828,7 +739,7 @@ export class ExportPhase {
         let escapedMethodName = method.name
         if (type.methods && type.methods.some(m => m.name == escapedMethodName))
             escapedMethodName = '_' + escapedMethodName
-        escapedMethodName = this.escapePropertyName(escapedMethodName)
+        escapedMethodName = typeTools.escapePropertyName(escapedMethodName)
         let methodNamespace = type.jsNamespace ? (type.jsNamespace + '.' + type.jsName) : type.jsName
         if (!methodNamespace)
             javaWriter.importType(this.JS_PACKAGE)
@@ -852,18 +763,28 @@ export class ExportPhase {
             flow.endJavaDocComments()
         }
 
-        let escapedMethodName = this.escapePropertyName(method.name)
-
-        if (escapedMethodName != method.name) {
-            javaWriter.importType(this.JS_METHOD)
-            flow.push(`@JsMethod(name = "${method.name}")`).finishLine()
+        if (method.jsMethodName) {
+            if (method.name != method.jsMethodName) {
+                javaWriter.importType(this.JS_METHOD)
+                flow.push(`@JsMethod(name = "${method.jsMethodName}")`).finishLine()
+            }
         }
+
+        if (method.jsPropertyName) {
+            javaWriter.importType(this.JS_PROPERTY)
+            flow.push(`@JsProperty(name = "${method.jsPropertyName}")`).finishLine()
+        }
+
         flow.push(`${isClass ? 'public native ' : ''}`)
+
         if (method.typeParameters && method.typeParameters.length)
             flow.push(`<${method.typeParameters.map(tp => this.typeParameterString(tp, javaWriter)).join(', ')}> `)
-        flow.push(`${javaWriter.importTypeParametrized(method.returnType)} ${escapedMethodName}(`)
+
+        flow.push(`${javaWriter.importTypeParametrized(method.returnType)} ${method.name}(`)
+
         if (method.parameters)
             flow.push(method.parameters.map(p => this.formalParameterJavaString(p, javaWriter)).join(', '))
+
         flow.push(`);`).finishLine()
     }
 }

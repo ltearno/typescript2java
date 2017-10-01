@@ -1,5 +1,6 @@
 import * as ts from "typescript"
 import * as tsTools from './ts-tools'
+import * as typeTools from './type-tools'
 import * as BuiltIn from './builtin-types'
 import * as Visit from './prejavatypes/PreJavaTypeVisit'
 
@@ -147,7 +148,7 @@ export class TypescriptToJavaTypemap {
             null,
             signatureTypeParameters,
             returnType,
-            name,
+            typeTools.escapeMethodName(name),
             tsSignature.getParameters()
                 ? tsSignature.getParameters()
                     .filter(p => p.name != 'thisArg')

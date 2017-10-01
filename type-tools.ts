@@ -5,6 +5,52 @@ import { PreJavaTypeCallSignature } from './prejavatypes/PreJavaTypeCallSignatur
 import { PreJavaTypeTPEnvironnement } from './prejavatypes/PreJavaTypeReference'
 import { PreJavaTypeParameter } from './prejavatypes/PreJavaTypeParameter'
 
+const reservedWords: { [key: string]: string } = {
+    '_': '_underscore_',
+    'public': '_public_',
+    'protected': 'protected_',
+    'private': 'private_',
+    'do': 'do_',
+    'switch': 'switch_',
+    'char': 'char_',
+    'class': 'class_',
+    'extends': 'extends_',
+    'return': 'return_',
+    'throw': 'throw_',
+    'catch': 'catch_',
+    'finally': 'finally_',
+    'import': 'import_',
+    'assert': 'assert_',
+    'default': 'default_',
+    'continue': 'continue_',
+    'for': 'for_',
+    'notify': 'notify_',
+
+    'className': 'cssClassName'
+}
+
+export function escapePropertyName(symbolName: string) {
+    if (!symbolName)
+        return null
+    if (symbolName.indexOf('@') >= 0)
+        symbolName = symbolName.replace(new RegExp('@', 'g'), '_at_')
+    if (symbolName.indexOf('-') >= 0)
+        symbolName = symbolName.replace(new RegExp('-', 'g'), '_dash_')
+    if (symbolName.indexOf('[') >= 0)
+        symbolName = symbolName.replace(new RegExp('\\[', 'g'), '_open_bracket_')
+    if (symbolName.indexOf(']') >= 0)
+        symbolName = symbolName.replace(new RegExp('\\]', 'g'), '_close_bracket_')
+    if (symbolName.indexOf('.') >= 0)
+        symbolName = symbolName.replace(new RegExp('\\.', 'g'), '_dot_')
+    if (symbolName in reservedWords && typeof reservedWords[symbolName] === 'string')
+        return reservedWords[symbolName]
+    return symbolName
+}
+
+export function escapeMethodName(symbolName: string) {
+    return escapePropertyName(symbolName)
+}
+
 export function browseTypeHierarchy(type: PreJavaType, visitor: { (visitedInterface: PreJavaTypeClassOrInterface, typeVariableEnv: { [key: string]: PreJavaType }) }, typeVariableEnv: { [key: string]: PreJavaType } = null, visitSelf: boolean = false) {
     Visit.visitPreJavaType(type, {
         caseReferenceType: type => {

@@ -14,7 +14,7 @@ import { PreJavaTypeParameter } from "./prejavatypes/PreJavaTypeParameter";
 
 import { TypescriptToJavaTypemap } from './type-map'
 
-const MAX_NB_DEVELOPPED_METHODS = 5
+const MAX_NB_DEVELOPPED_METHODS = 10
 
 let currentIdAnonymousTypes = 1
 
@@ -225,6 +225,33 @@ function developMethodWithOptionalParameters(method: PreJavaTypeCallSignature): 
 export let developMethodsWithUnionParameters: Transformer = function (typeMap: TypescriptToJavaTypemap) {
     console.log(`developping methods with union parameters`)
 
+    function developMethods(methodCollection: PreJavaTypeCallSignature[]) {
+        if (!methodCollection)
+            return
+
+        let methodsSignatures = new Set<string>()
+        methodCollection && methodCollection.forEach(m => methodsSignatures.add(Signature.getCallSignatureTypeErasedSignature(m)))
+        let maybeAdd = method => {
+            let sig = Signature.getCallSignatureTypeErasedSignature(method)
+            if (methodsSignatures.has(sig))
+                return
+            methodsSignatures.add(sig)
+            methodCollection.push(method)
+            somethingChanged = true
+            counter++
+        }
+
+        methodCollection && methodCollection.forEach(m => {
+            let dups = developMethodWithUnionParameters(m, 5)
+            dups && dups.forEach(dup => maybeAdd(dup))
+        })
+
+        methodCollection && methodCollection.forEach(m => {
+            let dups = developMethodWithOptionalParameters(m)
+            dups && dups.forEach(dup => maybeAdd(dup))
+        })
+    }
+
     let somethingChanged = false
     let counter = 0
     for (let type of typeMap.typeSet()) {
@@ -233,27 +260,9 @@ export let developMethodsWithUnionParameters: Transformer = function (typeMap: T
                 if (type.isFunctionalInterface)
                     return
 
-                let methodsSignatures = new Set<string>()
-                type.methods && type.methods.forEach(m => methodsSignatures.add(Signature.getCallSignatureTypeErasedSignature(m)))
-                let maybeAdd = method => {
-                    let sig = Signature.getCallSignatureTypeErasedSignature(method)
-                    if (methodsSignatures.has(sig))
-                        return
-                    methodsSignatures.add(sig)
-                    type.methods.push(method)
-                    somethingChanged = true
-                    counter++
-                }
-
-                type.methods && type.methods.forEach(m => {
-                    let dups = developMethodWithUnionParameters(m, 5)
-                    dups && dups.forEach(dup => maybeAdd(dup))
-                })
-
-                type.methods && type.methods.forEach(m => {
-                    let dups = developMethodWithOptionalParameters(m)
-                    dups && dups.forEach(dup => maybeAdd(dup))
-                })
+                developMethods(type.methods)
+                developMethods(type.staticMethods)
+                developMethods(type.constructorSignatures)
             }
         })
     }

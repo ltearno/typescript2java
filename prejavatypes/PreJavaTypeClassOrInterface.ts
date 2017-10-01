@@ -367,6 +367,22 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
                         writable: true,
                         comments
                     })
+
+                    // TODO : find another method name if it is already used...
+
+                    let escapedPropertyName = typeTools.escapePropertyName(propertyName)
+                    let upcaseName = escapedPropertyName.slice(0, 1).toLocaleUpperCase() + escapedPropertyName.slice(1)
+                    let getterName = `get${upcaseName}`
+                    let getterCallSignature = new PreJavaTypeCallSignature(null, propertyName, null, propertyPreJavaType, getterName, null)
+                    let setterName = `set${upcaseName}`
+                    let setterCallSignature = new PreJavaTypeCallSignature(null, propertyName, null, BuiltIn.BUILTIN_TYPE_UNIT, setterName, [{
+                        dotdotdot: false,
+                        optional: false,
+                        type: propertyPreJavaType,
+                        name: setterName
+                    }])
+                    this.addMethod(getterCallSignature)
+                    this.addMethod(setterCallSignature)
                 }
             })
         }
@@ -611,11 +627,11 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
     cleanAndCheckMethods() {
     }
 
-    addMethod(method: PreJavaTypeCallSignature):boolean {
+    addMethod(method: PreJavaTypeCallSignature): boolean {
         return this.addMethodInCollection(method, this.methods)
     }
 
-    addMethodInCollection(method: PreJavaTypeCallSignature, methods: PreJavaTypeCallSignature[]):boolean {
+    addMethodInCollection(method: PreJavaTypeCallSignature, methods: PreJavaTypeCallSignature[]): boolean {
         if (!method || method.name == 'toString')
             return false
 
