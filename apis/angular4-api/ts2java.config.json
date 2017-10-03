@@ -1,27 +1,50 @@
 {
-    "sourceRootDir": "./apis/angular4-api/tsd",
+    "sourceRootDir": "./tsd",
     "baseJavaPackage": "fr.lteconsulting.jsinterop",
     "defaultJavaPackage": "browser",
     "javaPackages": {
-        "apis/angular4-api/tsd/@angular/platform-browser-dynamic/src": "ng.platformBrowserDynamic",
-        "apis/angular4-api/tsd/@angular/platform-browser/src": "ng.platformBrowser",
-        "apis/angular4-api/tsd/@angular/http/src": "ng.http",
-        "apis/angular4-api/tsd/@angular/forms/src": "ng.forms",
-        "apis/angular4-api/tsd/@angular/router/src": "ng.router",
-        "apis/angular4-api/tsd/@angular/core/src": "ng.core",
-        "apis/angular4-api/tsd/@angular/common/src": "ng.common",
-        "apis/angular4-api/tsd/@angular/compiler/src/i18n": "ng.compiler.i18n",
-        "apis/angular4-api/tsd/@angular/compiler/src/aot": "ng.compiler.aot",
-        "apis/angular4-api/tsd/@angular/compiler/src/comiler_util": "ng.compiler.util",
-        "apis/angular4-api/tsd/@angular/compiler/src/expression_parser": "ng.compiler.expression.parse",
-        "apis/angular4-api/tsd/@angular/compiler/src/jit": "ng.compiler.jit",
-        "apis/angular4-api/tsd/@angular/compiler/src/ml_parser": "ng.compiler.mlparser",
-        "apis/angular4-api/tsd/@angular/compiler/src/output": "ng.compiler.output",
-        "apis/angular4-api/tsd/@angular/compiler/src/schema": "ng.compiler.schema",
-        "apis/angular4-api/tsd/@angular/compiler/src": "ng.compiler",
-        "apis/angular4-api/tsd/@angular/": "ng",
-        "apis/angular4-api/tsd/rxjs": "rxjs"
+        "tsd/@angular/platform-browser-dynamic/src": "ng.platformBrowserDynamic",
+        "tsd/@angular/platform-browser/src": "ng.platformBrowser",
+        "tsd/@angular/http/src": "ng.http",
+        "tsd/@angular/forms/src": "ng.forms",
+        "tsd/@angular/router/src": "ng.router",
+        "tsd/@angular/core/src": "ng.core",
+        "tsd/@angular/common/src": "ng.common",
+        "tsd/@angular/compiler/src/i18n": "ng.compiler.i18n",
+        "tsd/@angular/compiler/src/aot": "ng.compiler.aot",
+        "tsd/@angular/compiler/src/comiler_util": "ng.compiler.util",
+        "tsd/@angular/compiler/src/expression_parser": "ng.compiler.expression.parse",
+        "tsd/@angular/compiler/src/jit": "ng.compiler.jit",
+        "tsd/@angular/compiler/src/ml_parser": "ng.compiler.mlparser",
+        "tsd/@angular/compiler/src/output": "ng.compiler.output",
+        "tsd/@angular/compiler/src/schema": "ng.compiler.schema",
+        "tsd/@angular/compiler/src": "ng.compiler",
+        "tsd/@angular/": "ng",
+        "tsd/rxjs": "rxjs"
     },
     "processInternalTypes": true,
-    "outputDirectory": "./out/src/main/java"
+    "outputDirectory": "./out/src/main/java",
+    "renaming": {
+        "fr.lteconsulting.jsinterop.browser": {
+            "EventListenerOrEventListenerObject_UnionOfEventListenerAndEventListenerObject": "EventListenerOrEventListenerObject",
+            "IDBValidKey_UnionOfDateAndIDBArrayKeyAndNumberAndString": "IDBValidKey",
+            "UnionOfAesCbcParamsAndAesCfbParamsAndAesCmacParamsAndAesCtrParamsAndAesGcmParamsAndRsaOaepParamsAndString": "UnionOfCryptoParamsAndString",
+            "UnionOfAesDerivedKeyParamsAndConcatParamsAndHkdfCtrParamsAndHmacImportParamsAndPbkdf2ParamsAndString": "UnionOfCryptoParamsAndString2",
+            "UnionOfConcatParamsAndDhKeyDeriveParamsAndEcdhKeyDeriveParamsAndHkdfCtrParamsAndPbkdf2ParamsAndString": "UnionOfCryptoParamsAndString3",
+            "UnionOfDhImportKeyParamsAndEcKeyImportParamsAndHmacImportParamsAndRsaHashedImportParamsAndString": "UnionOfKeyParams",
+            "UnionOfSVGCircleElementAndSVGEllipseElementAndSVGImageElementAndSVGLineElementAndSVGPathElementAndSVGPolygonElementAndSVGPolylineElementAndSVGRectElementAndSVGTextElementAndSVGUseElement": "UnionOfSeveralSVGElement"
+        }
+    },
+    "adding": {
+        "fr.lteconsulting.jsinterop.browser": {
+            "Array": "../added-to-array.txt"
+        }
+    },
+    "removing": {
+        "fr.lteconsulting.jsinterop.browser": {
+            "Array": [
+                "static Array of(T)"
+            ]
+        }
+    }
 }

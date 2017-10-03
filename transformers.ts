@@ -64,6 +64,8 @@ export function applyTransformations(typeMap: TypescriptToJavaTypemap, renaming:
             console.log(`ERROR : too many transformation passes !`)
             break
         }
+
+        break
     }
 
     console.log(`transformation applied`)

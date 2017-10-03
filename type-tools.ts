@@ -64,7 +64,8 @@ export function browseTypeHierarchy(type: PreJavaType, visitor: { (visitedInterf
                             value = typeVariableEnv[t.name]
                     }
                 })
-                newEnv[targetTypeParameters[tpi].getSimpleName(null)] = value
+                if (targetTypeParameters[tpi])
+                    newEnv[targetTypeParameters[tpi].getSimpleName(null)] = value
             }
 
             browseTypeHierarchy(type.type, visitor, newEnv, true)
