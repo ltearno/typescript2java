@@ -379,7 +379,7 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
                         dotdotdot: false,
                         optional: false,
                         type: propertyPreJavaType,
-                        name: setterName
+                        name: "value"
                     }])
                     this.addMethod(getterCallSignature)
                     this.addMethod(setterCallSignature)
