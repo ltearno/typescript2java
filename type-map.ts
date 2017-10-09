@@ -391,7 +391,17 @@ export class TypescriptToJavaTypemap {
         if (objectType && objectType.objectFlags & ts.ObjectFlags.Reference) {
             let reference = type as ts.TypeReference
             if (reference.target != type) {
-                return new PreJavaTypeReference(this.getOrCreatePreJavaTypeForTsType(reference.target, false, typeParametersToApplyToAnonymousTypes), reference.typeArguments ? reference.typeArguments.map(typeArgument => this.getOrCreatePreJavaTypeForTsType(typeArgument, false, typeParametersToApplyToAnonymousTypes)) : null)
+                let referencedType = this.getOrCreatePreJavaTypeForTsType(reference.target, false, typeParametersToApplyToAnonymousTypes)
+                if (referencedType.getSimpleName(null) == 'Subscribable')
+                    console.log(`oiyu`)
+                let typeArguments = null
+                if (reference.typeArguments && reference.typeArguments.length) {
+                    typeArguments = reference.typeArguments
+                        .filter(typeArgument => !('isThisType' in typeArgument))
+                        .map(typeArgument => this.getOrCreatePreJavaTypeForTsType(typeArgument, false, typeParametersToApplyToAnonymousTypes))
+                }
+
+                return new PreJavaTypeReference(referencedType, typeArguments)
             }
         }
 

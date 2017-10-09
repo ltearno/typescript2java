@@ -325,7 +325,7 @@ export class ExportPhase {
                     flow.push(`public ${type.getSimpleName(null)}() `)
                     flow.push(`{`).finishLine()
                     if (theBaseClassConstructorParameters && theBaseClassConstructorParameters.length) {
-                        flow.pushLineStart('    ').push(`super(${theBaseClassConstructorParameters.map(p => 'null').join(', ')}); `).finishLine().pullLineStart()
+                        flow.pushLineStart('    ').push(`super(${theBaseClassConstructorParameters.map(p => `(${javaWriter.importTypeParametrized(p.type)}) null`).join(', ')}); `).finishLine().pullLineStart()
                     }
                     flow.push(`} `).finishLine()
                 }
@@ -347,7 +347,7 @@ export class ExportPhase {
 
                         flow.push(`{`).finishLine()
                         if (theBaseClassConstructorParameters && theBaseClassConstructorParameters.length) {
-                            flow.pushLineStart('    ').push(`super(${theBaseClassConstructorParameters.map(p => 'null').join(', ')}); `).finishLine().pullLineStart()
+                            flow.pushLineStart('    ').push(`super(${theBaseClassConstructorParameters.map(p => `(${javaWriter.importTypeParametrized(p.type)}) null`).join(', ')}); `).finishLine().pullLineStart()
                         }
                         flow.push(`} `).finishLine()
                     })

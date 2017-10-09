@@ -27,14 +27,17 @@ type Transformer = (
 export function applyTransformations(typeMap: TypescriptToJavaTypemap, renaming: { [key: string]: { [key: string]: string } }) {
     console.log(`removing unsupported types`)
 
-    let transformers = [
+    let initialTransformers = [
         removeNotSupportedTypes,
         simplifyUnions,
+        removeOverridingProperties
+    ]
+
+    let transformers = [
+        simplifyUnions,
         replaceByFunctionAndProcsLambdaTypes,
-        //removeOverridingProperties,
         deduplicateTypes,
         removeEmptyTypes,
-        ensureAllTypesHaveNameAndPackage,
         arrangeMultipleImplementationInheritance,
         changeDtoInterfacesIntoClasses,
         addMethodsFromInterfaceHierarchy,
@@ -44,21 +47,32 @@ export function applyTransformations(typeMap: TypescriptToJavaTypemap, renaming:
         renameTypes
     ]
 
-    let passCounter = 1
-    while (true) {
+    let finalTransformers = [
+        ensureAllTypesHaveNameAndPackage
+    ]
+
+    let doPass = (transformers: Transformer[]) => {
         let somethingChanged = false
-
-        console.log(`transformation, pass ${passCounter}\n`)
-
         for (let i = 0; i < transformers.length; i++) {
             let result = transformers[i](typeMap, this.baseJavaPackage, renaming)
             console.log(`transformer ${i} : ${result}`)
             if (result)
                 somethingChanged = true
         }
+        return somethingChanged
+    }
 
+    console.log(`initial pass`)
+    doPass(initialTransformers)
+
+    let passCounter = 1
+    while (true) {
+        console.log(`transformation, pass ${passCounter}\n`)
+
+        let somethingChanged = doPass(transformers)
         if (!somethingChanged)
             break
+
         passCounter++
         if (passCounter > 10) {
             console.log(`ERROR : too many transformation passes !`)
@@ -67,6 +81,9 @@ export function applyTransformations(typeMap: TypescriptToJavaTypemap, renaming:
 
         break
     }
+
+    console.log(`final pass`)
+    doPass(finalTransformers)
 
     console.log(`transformation applied`)
 }
@@ -624,6 +641,9 @@ export let arrangeMultipleImplementationInheritance: Transformer = function (typ
         newType.typeParameters = type.typeParameters && type.typeParameters.slice()
         newType.sourceTypes = type.sourceTypes
 
+        if (newType.name == 'Observable_Interface')
+            console.log(`yop`)
+
         type.baseTypes = new Set()
         type.baseTypes.add(newType)
 
@@ -637,6 +657,8 @@ export let arrangeMultipleImplementationInheritance: Transformer = function (typ
 
     let somethingDone = false
     while (maxPasses-- >= 0) {
+        somethingDone = false
+
         for (let type of typeMap.typeSet()) {
             if (type instanceof PreJavaTypeClassOrInterface && type.baseTypes && type.baseTypes.size) {
                 let implementationSuperTypes: PreJavaType[] = []

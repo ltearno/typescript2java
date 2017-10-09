@@ -139,6 +139,8 @@ export class PreJavaTypeClassOrInterface extends PreJavaType {
     }
 
     private extractBaseTypes(type: ts.Type, typeParametersToApplyToAnonymousTypes: PreJavaTypeParameter[], context: ProcessContext) {
+        if (this.name == 'Observable')
+            console.log(`yyyy`)
         /* ts.Type.getBaseTypes() does not return 'implemented' types, only 'extended'. We merge them in the PreJava tree */
         if (type.symbol && type.symbol.getDeclarations()) {
             type.symbol.getDeclarations().forEach(decl => {

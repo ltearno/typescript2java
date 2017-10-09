@@ -33,6 +33,13 @@
             "UnionOfConcatParamsAndDhKeyDeriveParamsAndEcdhKeyDeriveParamsAndHkdfCtrParamsAndPbkdf2ParamsAndString": "UnionOfCryptoParamsAndString3",
             "UnionOfDhImportKeyParamsAndEcKeyImportParamsAndHmacImportParamsAndRsaHashedImportParamsAndString": "UnionOfKeyParams",
             "UnionOfSVGCircleElementAndSVGEllipseElementAndSVGImageElementAndSVGLineElementAndSVGPathElementAndSVGPolygonElementAndSVGPolylineElementAndSVGRectElementAndSVGTextElementAndSVGUseElement": "UnionOfSeveralSVGElement"
+        },
+        "fr.lteconsulting.jsinterop.ng": {
+            "ɵStyleData": "ThetaStyleData",
+            "UnionOfStringAndɵStyleData": "UnionOfStringAndThetaStyleData"
+        },
+        "fr.lteconsulting.jsinterop": {
+            "UnionOfArrayOfɵStyleDataAndɵStyleData": "UnionOfArrayOfThetaStyleDataAndThetaStyleData"
         }
     },
     "adding": {
