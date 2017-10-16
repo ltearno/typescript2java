@@ -4,9 +4,23 @@ This tools takes Typescript definition files (`.d.ts`) as input, process them, a
 
 It is written in Typescript and uses the Typescript compiler to parse definition files.
 
+
+== Disclaimer : status of this project
+
 This tool is really in beta stage, many things can be added to render the generated API more user-friendly.
 
 _It is ready enough that people interested by it can try and open issues if needed._
+
+It can be useful for people maintaining interop libraries between Javascript and GWT.
+
+Although I don't have myself GWT projects to work on anymore, it was a long time since I wanted to try this approach of automatically convert typescript files to Java types.
+The experience has proved to be doable with quite a good success (for example after converting automatically the Angular 4 API to JsInterop, I get 20 or so java errors in the generated API,
+which requires something like 20 minutes of my time to fix).
+
+If you are interested in contributing this project, either because you like it or because it is useful to you, please feel welcome, I will help you in that sense.
+
+The next commits on this project will surely be code documentation so that you are more welcomed to contribute !
+
 
 == Example of code using the generated classes
 
