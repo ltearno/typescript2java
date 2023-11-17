@@ -251,7 +251,7 @@ export class PreJavaTypeUnion extends PreJavaType {
     }
 
     private getBaseTypesOf(type: PreJavaType): Set<PreJavaType> {
-        let res = new Set()
+        let res = new Set<PreJavaType>()
         this.addBaseTypesOf(type, res)
         return res
     }
