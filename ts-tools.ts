@@ -165,7 +165,7 @@ function fetchUsedFreeTypeParametersInternal(type: ts.Type, usedTypeParameters: 
             callSignatures && callSignatures.forEach(callSignature => {
                 callSignature.typeParameters && callSignature.typeParameters
 
-                let usedInSignature = new Set()
+                let usedInSignature = new Set<string>()
                 fetchUsedFreeTypeParametersInternal(callSignature.getReturnType(), usedInSignature, typeChecker)
                 callSignature.parameters && callSignature.parameters.forEach(param => {
                     let paramType = typeChecker.getTypeAtLocation(param.valueDeclaration)
