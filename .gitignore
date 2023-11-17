@@ -9,3 +9,6 @@ tests/
 tests.full/
 tests.mini/
 tests.angular4/
+/package-lock.json
+/.project
+/target/
